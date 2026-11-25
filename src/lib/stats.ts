@@ -5,7 +5,8 @@ import { DAY, combos, monthKey } from "./util";
  * Everyone starts at 1000. After each game every player gets their own change:
  *  - Each player is compared with every opponent one by one (no team average). Beating stronger players
  *    gives more, beating weaker players gives less; losing to stronger players costs less, to weaker more.
- *  - Placement: the first 10 games move faster (K 40), after that K 32.
+ *  - A 100 point gap means 13 for the favourite and 17 for the underdog (soft scale of 800 instead of chess's 400).
+ *  - Placement: the first 10 games move faster (K 40), after that K 30 (an even game is +/-15).
  *  - Surrender (FF): the losing team loses 5 extra.
  *  - Win streak bonus: +1 for the 3rd win in a row, +2 for the 4th, +3 from the 5th on.
  *  - Bounty: ending someone's streak of 3+ wins gives the winners +3.
@@ -13,14 +14,17 @@ import { DAY, combos, monthKey } from "./util";
  * Kills and deaths don't change the rating.
  */
 export const START_RATING = 1000;
-export const K_FACTOR = 32;
+export const K_FACTOR = 30;
 export const K_PLACEMENT = 40;
 export const PLACEMENT_GAMES = 10;
 export const FF_PENALTY = 5;
 export const BOUNTY_BONUS = 3;
 export const MIN_CHANGE = 3;
 
-export const expected = (a: number, b: number) => 1 / (1 + 10 ** ((b - a) / 400));
+/** Rating points for a 10x difference in odds. 800 keeps changes gentle: a 100 point gap is 13 vs 17. */
+export const ELO_SCALE = 800;
+
+export const expected = (a: number, b: number) => 1 / (1 + 10 ** ((b - a) / ELO_SCALE));
 const mean = (xs: number[], fallback: number) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : fallback);
 
 /** Chance that a player with this rating beats these opponents: their pairwise chances, averaged. */
