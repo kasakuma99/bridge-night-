@@ -1,11 +1,14 @@
 import type { LiveGame, Match, Side, TeamSize, TeamStyle } from "./types";
-import { combos, rndInt, shuffle, uid, type Rng } from "./util";
+import { combos, plural, rndInt, shuffle, uid, type Rng } from "./util";
 
 export const teamKey = (a: string[], b: string[]) =>
   [a.slice().sort().join(","), b.slice().sort().join(",")].sort().join("|");
 
-/** Largest team size the selection allows (1–4). */
-export const maxSize = (n: number): TeamSize => Math.max(1, Math.min(4, Math.floor(n / 2))) as TeamSize;
+export const TEAM_SIZES: TeamSize[] = [1, 2, 3, 4, 5];
+export const MAX_SIZE = 5;
+
+/** Largest team size the selection allows (1–5). */
+export const maxSize = (n: number): TeamSize => Math.max(1, Math.min(MAX_SIZE, Math.floor(n / 2))) as TeamSize;
 /** Default: the biggest size up to 3v3. */
 export const defaultSize = (n: number): TeamSize => Math.min(3, maxSize(n)) as TeamSize;
 
@@ -27,6 +30,82 @@ export function sitPriority(matches: Match[], ids: string[]): Record<string, num
   return out;
 }
 
+export type Sizes = [number, number];
+
+/** What happens when `n` players are picked for a `size` v `size` game. */
+export type TeamPlan =
+  | { kind: "none" }
+  /** Enough players for the mode. `out` of them sit out. */
+  | { kind: "full"; sizes: Sizes; out: number }
+  /** Too few for the mode, but an even number: a smaller game. */
+  | { kind: "short"; sizes: Sizes }
+  /** Odd number: teams would not be equal, so someone has to choose. */
+  | { kind: "odd"; uneven: { sizes: Sizes; out: number } | null; sit: { sizes: Sizes; out: number } };
+
+export function teamPlan(n: number, size: TeamSize): TeamPlan {
+  if (n < 2) return { kind: "none" };
+  const half = Math.floor(n / 2);
+  if (n % 2 === 0) {
+    if (n < 2 * size) return { kind: "short", sizes: [half, half] };
+    return { kind: "full", sizes: [size, size], out: n - 2 * size };
+  }
+  const small = Math.min(half, size);
+  return {
+    kind: "odd",
+    uneven: small + 1 <= MAX_SIZE ? { sizes: [small + 1, small], out: n - 2 * small - 1 } : null,
+    sit: { sizes: [small, small], out: n - 2 * small },
+  };
+}
+
+/* ---------- who sits out ---------- */
+
+/** "fair": whoever sat out most recently plays first (rotation). "random": anyone. "pick": tapped by hand. */
+export type SitMode = "fair" | "random" | "pick";
+
+/** How many players sit out with this many selected. */
+export const extraPlayers = (n: number, size: number) => Math.max(0, n - 2 * size);
+
+/** A stable seed from a string, so the same selection shows the same sit-out on every device. */
+export function strSeed(s: string) {
+  let h = 2166136261; // FNV-1a: spreads short, similar strings over the whole range
+  for (const ch of s) h = Math.imul(h ^ ch.charCodeAt(0), 16777619);
+  return ((h >>> 0) % 2147483646) + 1;
+}
+
+/** Picks that are still in tonight's selection, without duplicates. */
+export const validPicks = (picked: string[], selected: string[]) =>
+  picked.filter((id, i) => selected.includes(id) && picked.indexOf(id) === i);
+
+/** Players who sit out this game (empty when nobody has to). Throws in "pick" mode until exactly the right number is picked. */
+export function planSitOut(o: {
+  selected: string[];
+  size: TeamSize;
+  /** Players per team, when the teams are not `size` v `size`. */
+  sizes?: Sizes;
+  mode: SitMode;
+  sitPriority: Record<string, number>;
+  picked?: string[];
+  rng?: Rng;
+}): string[] {
+  const need = o.sizes ? o.sizes[0] + o.sizes[1] : 2 * o.size;
+  const extra = Math.max(0, o.selected.length - need);
+  if (!extra) return [];
+  if (o.mode === "pick") {
+    const p = validPicks(o.picked ?? [], o.selected);
+    if (p.length !== extra) throw new Error(`Pick ${plural(extra, "player")} to sit out`);
+    return p;
+  }
+  let order = shuffle(o.selected, o.rng ?? Math.random);
+  if (o.mode === "fair") order = order.sort((a, b) => (o.sitPriority[b] || 0) - (o.sitPriority[a] || 0));
+  return order.slice(need);
+}
+
+/** Tap a player in "pick" mode: on/off; when already full, the oldest pick makes room. */
+export function toggleSitPick(picked: string[], id: string, extra: number): string[] {
+  if (picked.includes(id)) return picked.filter((x) => x !== id);
+  return [...picked, id].slice(-Math.max(1, extra));
+}
+
 /** Snake order A-B-B-A-A-B… for `n` picks, `first` side picks first. */
 export function snakeOrder(n: number, first: Side): Side[] {
   const second: Side = first === "blue" ? "red" : "blue";
@@ -36,9 +115,13 @@ export function snakeOrder(n: number, first: Side): Side[] {
 export interface MakeTeamsInput {
   selected: string[];
   size: TeamSize;
+  /** Players per team, when the teams are not `size` v `size`. Which side gets more players is random. */
+  sizes?: Sizes;
   style: TeamStyle;
   ratingOf: (id: string) => number;
   sitPriority: Record<string, number>;
+  /** Who sits out, chosen beforehand with planSitOut. Default: fair rotation. */
+  sitOut?: string[];
   apart?: [string, string] | null;
   /** Teams of the last played game (when "Avoid the teams from the last game" is on). */
   avoid?: { blue: string[]; red: string[] } | null;
@@ -50,15 +133,16 @@ export interface MakeTeamsInput {
 
 export function makeTeams(inp: MakeTeamsInput): LiveGame {
   const rng = inp.rng ?? Math.random;
-  const { size } = inp;
-  let pool = inp.selected.slice();
-  let sitOut: string[] = [];
-  if (pool.length > 2 * size) {
-    pool = shuffle(pool, rng).sort((a, b) => (inp.sitPriority[b] || 0) - (inp.sitPriority[a] || 0));
-    sitOut = pool.slice(2 * size);
-    pool = pool.slice(0, 2 * size);
-  }
-  if (pool.length < 2 * size) throw new Error("Not enough players for this size");
+  const [big, small] = inp.sizes ? [Math.max(...inp.sizes), Math.min(...inp.sizes)] : [inp.size, inp.size];
+  const size = big as TeamSize;
+  const need = big + small;
+  const sitOut = inp.sitOut ?? planSitOut({ selected: inp.selected, size, sizes: inp.sizes, mode: "fair", sitPriority: inp.sitPriority, rng });
+  const pool = shuffle(
+    inp.selected.filter((id) => !sitOut.includes(id)),
+    rng,
+  );
+  if (small < 1 || pool.length < need) throw new Error("Not enough players for this size");
+  if (pool.length > need) throw new Error("Too many players for this size");
 
   const [a1, a2] = inp.apart ?? [];
   const apart = a1 && a2 && a1 !== a2 && pool.includes(a1) && pool.includes(a2) ? [a1, a2] : null;
@@ -69,6 +153,7 @@ export function makeTeams(inp: MakeTeamsInput): LiveGame {
     blue: [],
     red: [],
     sitOut,
+    style: inp.style,
     stats: {},
     dodgeLog: [],
     createdAt: inp.now ?? Date.now(),
@@ -88,10 +173,10 @@ export function makeTeams(inp: MakeTeamsInput): LiveGame {
   }
 
   const [first, ...rest] = pool;
-  let parts = combos(rest, size - 1).map((c) => {
-    const A = [first, ...c];
-    return [A, pool.filter((x) => !A.includes(x))] as [string[], string[]];
-  });
+  // Equal teams: the first player is always in A, so mirrored splits aren't counted twice.
+  let parts = (big === small ? combos(rest, big - 1).map((c) => [first, ...c]) : combos(pool, big)).map(
+    (A) => [A, pool.filter((x) => !A.includes(x))] as [string[], string[]],
+  );
   const keep = (f: (p: [string[], string[]]) => boolean) => {
     const x = parts.filter(f);
     if (x.length) parts = x;

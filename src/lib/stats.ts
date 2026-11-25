@@ -278,6 +278,30 @@ export const blueWinChance = (c: Computed, blue: string[], red: string[]) => {
   return mean(blue.map((id) => winChanceVs(r(id), opp)), 0.5);
 };
 
+export interface EloEntry {
+  match: Match;
+  won: boolean;
+  change: RatingChange;
+  /** Elo right after this game */
+  after: number;
+}
+
+/** One player's games with their Elo change and Elo after each game, oldest first. */
+export function eloLog(c: Computed, id: string): EloEntry[] {
+  const out: EloEntry[] = [];
+  let r = START_RATING;
+  for (const m of c.sorted) {
+    const change = c.changes[m.id]?.[id];
+    if (!change) continue;
+    r += change.delta;
+    out.push({ match: m, won: (m.blue.includes(id) ? "blue" : "red") === m.winner, change, after: r });
+  }
+  return out;
+}
+
+/** Elo won or lost over a player's last n games (0 without games). */
+export const eloTrend = (log: EloEntry[], n = 5) => log.slice(-n).reduce((a, e) => a + e.change.delta, 0);
+
 /* ---------- rivalries ---------- */
 
 export function rivalryVerb(streak: number) {
@@ -372,6 +396,71 @@ export function badges(x: PlayerStat | undefined): Badge[] {
   return b;
 }
 
+/** How many games with or against someone count as enough to compare. */
+export const MIN_TOGETHER = 3;
+
+/** Games and wins with a teammate, or against an opponent. */
+export interface Versus {
+  id: string;
+  g: number;
+  w: number;
+}
+
+/**
+ * The people with the highest and the lowest win rate. Only people with enough games are compared, or everyone
+ * if nobody has. One person is never both: with a single rate, it counts as high above 50% and as low below.
+ */
+export function extremes(list: Versus[], name: (id: string) => string): { high: Versus | null; low: Versus | null } {
+  const enough = list.filter((x) => x.g >= MIN_TOGETHER);
+  const pool = enough.length ? enough : list.filter((x) => x.g > 0);
+  if (!pool.length) return { high: null, low: null };
+  const rate = (x: Versus) => x.w / x.g;
+  const more = (a: Versus, b: Versus) => b.g - a.g || name(a.id).localeCompare(name(b.id));
+  const high = pool.slice().sort((a, b) => rate(b) - rate(a) || more(a, b))[0];
+  const low = pool.slice().sort((a, b) => rate(a) - rate(b) || more(a, b))[0];
+  if (rate(high) > rate(low)) return { high, low };
+  return { high: rate(high) > 0.5 ? high : null, low: rate(high) < 0.5 ? high : null };
+}
+
+/** One player's own stats page: all games, all time. */
+export function playerSummary(c: Computed, id: string, isActive: (id: string) => boolean, name: (id: string) => string) {
+  const x = c.st[id] ?? blank(id);
+  const champs: Record<string, { name: string; g: number; w: number }> = {};
+  for (const m of c.sorted) {
+    const side: Side | null = m.blue.includes(id) ? "blue" : m.red.includes(id) ? "red" : null;
+    const champ = side && m.stats[id]?.champion;
+    if (!champ) continue;
+    const e = (champs[champ] ??= { name: champ, g: 0, w: 0 });
+    e.g++;
+    if (m.winner === side) e.w++;
+  }
+  const mates = c.groups
+    .filter((g) => g.ids.length === 2 && g.ids.includes(id))
+    .map((g): Versus => ({ id: g.ids.find((i) => i !== id)!, g: g.g, w: g.w }))
+    .filter((v) => isActive(v.id));
+  const foes = c.h2h
+    .filter((f) => f.a === id || f.b === id)
+    .map((f): Versus => ({ id: f.a === id ? f.b : f.a, g: f.g, w: f.a === id ? f.wa : f.wb }))
+    .filter((v) => isActive(v.id));
+  const duo = extremes(mates, name);
+  const foe = extremes(foes, name);
+  return {
+    g: x.g,
+    w: x.w,
+    l: x.l,
+    k: x.k,
+    d: x.d,
+    a: x.a,
+    kdaGames: x.kdaGames,
+    champs: Object.values(champs).sort((a, b) => b.g - a.g || b.w - a.w || a.name.localeCompare(b.name)),
+    bestDuo: duo.high,
+    worstDuo: duo.low,
+    victim: foe.high,
+    toughest: foe.low,
+  };
+}
+
+/** Best teammate, victim and toughest opponent for the side card on the Stats page. */
 export function profile(c: Computed, id: string, isActive: (id: string) => boolean) {
   const mate = c.groups
     .filter((g) => g.ids.length === 2 && g.ids.includes(id) && g.g >= 3 && g.ids.every(isActive))

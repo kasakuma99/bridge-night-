@@ -6,6 +6,8 @@ import { supabase } from "../lib/supabase";
 import { compute, type Computed } from "../lib/stats";
 import type { AppData, Player, TeamSize, TeamStyle } from "../lib/types";
 import { fallbackDDragon, loadDDragon, type DDragon } from "../lib/champions";
+import { FEATURES } from "../lib/features";
+import type { SitMode } from "../lib/teams";
 
 /** Sample data: forced with VITE_SAMPLE_DATA=true, or automatic in local dev when Supabase isn't configured. */
 export const SAMPLE_MODE = import.meta.env.VITE_SAMPLE_DATA === "true" || (!supabase && import.meta.env.DEV);
@@ -41,6 +43,8 @@ export function useNow(ms = 30_000) {
 export function DataProvider({ children, store = defaultStore }: { children: ReactNode; store?: DataStore }) {
   const st = useSyncExternalStore(store.subscribe, store.getState);
   const now = useNow();
+  const { isMember } = useAuth();
+  useEffect(() => store.setAccess?.(isMember || !FEATURES.privateSite), [store, isMember]);
   const value = useMemo<DataCtx>(() => {
     const { players, matches } = st.data;
     const byId = new Map(players.map((p) => [p.id, p]));
@@ -101,10 +105,24 @@ export interface Prefs {
   /** reroll key -> number of drafts made */
   rerolls: Record<string, number>;
   period: 30 | 0;
+  /** Who sits out when too many players are in. */
+  sitMode: SitMode;
+  /** Players tapped to sit out in "pick" mode. */
+  sitPick: string[];
 }
 
 const PREFS_KEY = "bn-prefs-v1";
-const defaultPrefs: Prefs = { selected: null, size: null, style: "random", avoidLast: true, apart: ["", ""], rerolls: {}, period: 30 };
+const defaultPrefs: Prefs = {
+  selected: null,
+  size: null,
+  style: "random",
+  avoidLast: true,
+  apart: ["", ""],
+  rerolls: {},
+  period: 30,
+  sitMode: "fair",
+  sitPick: [],
+};
 
 function readPrefs(): Prefs {
   try {
@@ -140,6 +158,8 @@ export function usePrefs() {
 /* ---------- auth: Discord login via Supabase (sample mode: a local "View as" switch) ---------- */
 
 export type Role = "visitor" | "member" | "admin";
+/** Where someone stands: "none" = not logged in. */
+export type Access = "loading" | "none" | "pending" | "blocked" | "error" | "in";
 export interface AuthUser {
   id: string;
   name: string;
@@ -151,6 +171,7 @@ interface AuthState {
   isAdmin: boolean;
   /** Logged in, but an admin hasn't approved them yet. */
   pending: boolean;
+  access: Access;
   user: AuthUser | null;
   /** false until we know whether someone is logged in */
   ready: boolean;
@@ -165,6 +186,7 @@ const AuthCtx = createContext<AuthState>({
   isMember: false,
   isAdmin: false,
   pending: false,
+  access: "none",
   user: null,
   ready: true,
   canLogin: false,
@@ -187,21 +209,26 @@ function SampleAuth({ children }: { children: ReactNode }) {
     isMember: role !== "visitor",
     isAdmin: role === "admin",
     pending: false,
+    access: role === "visitor" ? "none" : "in",
     user: role === "visitor" ? null : { id: "local", name: "Preview" },
     ready: true,
     canLogin: false,
     setRole,
-    signIn: async () => {},
-    signOut: async () => {},
+    // Local preview: "logging in/out" just switches the View as role.
+    signIn: async () => setRole("member"),
+    signOut: async () => setRole("visitor"),
   };
   return <AuthCtx.Provider value={value}>{children}</AuthCtx.Provider>;
 }
+
+type MemberRole = "pending" | "member" | "admin" | "blocked";
 
 function SupabaseAuth({ children }: { children: ReactNode }) {
   const sb = supabase!;
   const [ready, setReady] = useState(false);
   const [user, setUser] = useState<AuthUser | null>(null);
-  const [memberRole, setMemberRole] = useState<"pending" | "member" | "admin" | null>(null);
+  const [memberRole, setMemberRole] = useState<MemberRole | null>(null);
+  const [failed, setFailed] = useState(false);
 
   const loadRole = useCallback(
     async (uid: string | undefined) => {
@@ -209,9 +236,12 @@ function SupabaseAuth({ children }: { children: ReactNode }) {
         setMemberRole(null);
         return;
       }
-      const { data, error } = await sb.from("members").select("role").eq("user_id", uid).maybeSingle();
+      // Makes a waiting row if there is none (the signup trigger only runs once per account).
+      const { data, error } = await sb.rpc("ensure_member");
       if (error) console.error("[bridge-night] could not load member role", error);
-      setMemberRole((data?.role as "pending" | "member" | "admin" | undefined) ?? "pending");
+      setFailed(!!error);
+      // A lost connection doesn't throw anyone out: the database decides anyway.
+      if (!error) setMemberRole((data as MemberRole | null) ?? "pending");
     },
     [sb],
   );
@@ -225,8 +255,9 @@ function SupabaseAuth({ children }: { children: ReactNode }) {
         u
           ? {
               id: u.id,
-              name: String(claims.global_name || md.full_name || md.name || md.user_name || u.email?.split("@")[0] || "Member"),
-              avatar: typeof md.avatar_url === "string" ? md.avatar_url : undefined,
+              name: String(claims.global_name || md.full_name || md.name || md.user_name || u.email?.split("@")[0] || "Member").slice(0, 40),
+              // Metadata can be edited by the user themself: only show avatars from Discord's CDN.
+              avatar: typeof md.avatar_url === "string" && md.avatar_url.startsWith("https://cdn.discordapp.com/") ? md.avatar_url : undefined,
             }
           : null,
       );
@@ -239,9 +270,10 @@ function SupabaseAuth({ children }: { children: ReactNode }) {
   }, [sb, loadRole]);
 
   // While waiting for approval, check again now and then, so the page unlocks by itself.
+  // Members are checked too, so someone who was removed doesn't keep an open page.
   useEffect(() => {
-    if (memberRole !== "pending" || !user) return;
-    const t = setInterval(() => void loadRole(user.id), 20_000);
+    if (!memberRole || !user) return;
+    const t = setInterval(() => void loadRole(user.id), memberRole === "pending" ? 20_000 : 5 * 60_000);
     const vis = () => document.visibilityState === "visible" && void loadRole(user.id);
     document.addEventListener("visibilitychange", vis);
     return () => {
@@ -250,11 +282,13 @@ function SupabaseAuth({ children }: { children: ReactNode }) {
     };
   }, [memberRole, user, loadRole]);
 
-  const role: Role = memberRole === "admin" ? "admin" : memberRole === "member" ? "member" : "visitor";
+  const role: Role = !user ? "visitor" : memberRole === "admin" ? "admin" : memberRole === "member" ? "member" : "visitor";
+  const access: Access = !ready ? "loading" : !user ? "none" : memberRole ? (role === "visitor" ? (memberRole as "pending" | "blocked") : "in") : failed ? "error" : "loading";
   const value: AuthState = {
     role,
     isMember: role !== "visitor",
     isAdmin: role === "admin",
+    access,
     pending: !!user && memberRole === "pending",
     user,
     ready,
