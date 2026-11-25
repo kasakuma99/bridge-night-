@@ -36,7 +36,7 @@ A hub for our ARAM Mayhem custom games (League of Legends), played as 1v1, 2v2, 
    - Show the rule status on Teams and Live: dodges on, or "come back in Xh".
 4. **Live game** (shared in realtime with everyone who has the site open)
    - Steps: Champ select → In game → Result.
-   - Champ select: each player's champion (picked on the site, or filled in automatically by the helper app). Team dodges shown as dots ("● ○ 1 left"). A Dodge button per player clears their pick and uses one of the team's dodges, logged as "Nick dodged Yuumi".
+   - Champ select: each player's champion (picked on the site, or filled in automatically by the helper app). Team dodges shown as dots ("● ○ 1 left"). A Dodge button per player uses one of that player's team's dodges and clears **all** champions (a dodge restarts champ select and everyone gets new random champions), logged as "Nick dodged Yuumi".
    - Optional random challenge: a small "Spin a random challenge" link in champ select (Spin again / Remove). Rules: Full AP builds even on AD champions, Full AD builds even on mages, No Flash, Tank items only, No boots, Always take the leftmost augment, Trade champions with a teammate before the game, No champion rerolls, Everyone takes Mark (snowball), No Heal or Barrier. It's saved with the match. A house-rules switch hides the link completely.
    - In game: running timer.
    - Result: K/D/A per player (optional, auto-filled by the helper when available), then Blue won / Red won saves it to the history. Saving also updates sit-out rotation.
