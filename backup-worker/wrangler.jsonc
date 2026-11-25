@@ -12,6 +12,6 @@
     "SUPABASE_URL": "https://kimgoxjydargqtbwolxz.supabase.co"
   },
   // SUPABASE_SECRET_KEY is set with `wrangler secret put` (never in git).
-  "kv_namespaces": [{ "binding": "BACKUPS", "id": "REPLACE_WITH_KV_ID" }],
+  "kv_namespaces": [{ "binding": "BACKUPS", "id": "95f3086db5f54d4b93ceab838133f588" }],
   "observability": { "enabled": true }
 }
