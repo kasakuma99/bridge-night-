@@ -20,6 +20,11 @@ export interface ParticipantStats {
   /** Data Dragon item ids, only when the helper app sent them. */
   items?: number[];
   damage?: number;
+  level?: number;
+  /** Summoner spells (Data Dragon numbers). */
+  spells?: number[];
+  /** Augments (Community Dragon ids), in the order they were picked. */
+  augments?: number[];
 }
 
 export interface DodgeEntry {
@@ -48,6 +53,13 @@ export interface Match {
   liveId?: string;
   /** The losing team surrendered ("ff"), or surrendered early ("early"). */
   surrender?: Surrender;
+  /** How it ended, when League told us. */
+  end?: EndReason;
+  durationSec?: number;
+  /** Bots, and people who aren't on the site. */
+  guests?: FeedPlayer[];
+  gameMode?: string;
+  map?: string;
 }
 
 export type Surrender = "ff" | "early";
@@ -81,6 +93,77 @@ export interface LiveGame {
   surrender?: Surrender;
 }
 
+/* ---------- the live game, as League reports it ---------- */
+
+/** "left": the whole losing team left, which counts as a surrender. */
+export type EndReason = "nexus" | "ff" | "early" | "left" | "unknown";
+
+export type FeedStatus = "select" | "loading" | "playing" | "ended";
+
+export interface FeedPlayer {
+  key: string;
+  /** Player of the site. Missing for bots and guests. */
+  playerId?: string;
+  /** Only between League and the site, never stored. */
+  riotId?: string;
+  bot?: boolean;
+  side: Side;
+  champion?: string;
+  level?: number;
+  kills?: number;
+  deaths?: number;
+  assists?: number;
+  damage?: number;
+  items: number[];
+  spells: number[];
+  augments?: number[];
+  dead?: boolean;
+}
+
+export interface FeedEvent {
+  id: number;
+  /** Seconds on the game clock. */
+  time: number;
+  type: "start" | "kill" | "firstblood" | "multikill" | "ace" | "firstturret" | "turret" | "inhibitor";
+  /** Player keys. */
+  by?: string;
+  byThing?: string;
+  victim?: string;
+  helpers?: string[];
+  /** Ace: the team that made it. Turret and inhibitor: the team that lost it. */
+  side?: Side;
+  n?: number;
+}
+
+export interface FeedEnd {
+  at: number;
+  winner?: Side;
+  reason?: EndReason;
+  /** The result came from League's own end-of-game data. */
+  sure?: boolean;
+  /** League says the game was not finished. */
+  aborted?: boolean;
+  durationSec?: number;
+}
+
+export interface LiveFeed {
+  id: string;
+  gameId?: string;
+  status: FeedStatus;
+  mode?: string;
+  map?: string;
+  players: FeedPlayer[];
+  events: FeedEvent[];
+  clock?: { sec: number; at: number };
+  startedAt: number;
+  updatedAt: number;
+  end?: FeedEnd;
+  /** What a member decided for a game without a winner. */
+  choice?: Side | "skip";
+  /** The saved game, so a deleted one doesn't come back. */
+  savedAs?: string;
+}
+
 export interface Settings {
   dodgeHours: number;
   dodgesPerTeam: number;
@@ -94,6 +177,8 @@ export interface AppData {
   players: Player[];
   matches: Match[];
   live: LiveGame | null;
+  /** The game League is playing right now, or just finished. */
+  feed?: LiveFeed | null;
   settings: Settings;
 }
 

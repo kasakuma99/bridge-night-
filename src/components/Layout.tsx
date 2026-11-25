@@ -1,11 +1,18 @@
-import { useEffect, useRef } from "react";
+import { Suspense, lazy, useEffect, useRef } from "react";
 import { Link, NavLink, Outlet, useLocation } from "react-router-dom";
 import { LogIn, LogOut, MessageCircle } from "lucide-react";
 import { SAMPLE_MODE, useAuth, useData, type Role } from "../data/context";
 import { FEATURES } from "../lib/features";
+import { showFeed } from "../lib/live";
 import { isDiscordInvite } from "../lib/util";
 import { Logo, Skeleton, useToast } from "./ui";
 import { PendingResults } from "./HelperAdmin";
+
+// npm run dev:live only: not in the production build.
+const LiveBridge =
+  import.meta.env.DEV && SAMPLE_MODE && import.meta.env.VITE_LIVE
+    ? lazy(() => import("../dev/LiveTools").then((m) => ({ default: m.LiveBridge })))
+    : null;
 
 function Account() {
   const { canLogin, ready, user, pending, signIn, signOut, isAdmin } = useAuth();
@@ -70,11 +77,11 @@ function DiscordLink({ className, children, label }: { className?: string; child
 }
 
 export function Layout() {
-  const { data, status, error } = useData();
+  const { data, status, error, now } = useData();
   const { role, setRole } = useAuth();
   const loc = useLocation();
   const nav = useRef<HTMLElement>(null);
-  const live = data.live && data.live.phase !== "draft";
+  const live = FEATURES.classicTeams ? data.live && data.live.phase !== "draft" : showFeed(data.feed, now) && data.feed.status !== "ended";
 
   useEffect(() => {
     window.scrollTo(0, 0);
@@ -86,6 +93,11 @@ export function Layout() {
 
   return (
     <>
+      {LiveBridge && (
+        <Suspense fallback={null}>
+          <LiveBridge />
+        </Suspense>
+      )}
       <a className="btn pri skip" href="#main">
         Skip to content
       </a>
@@ -114,7 +126,7 @@ export function Layout() {
         {SAMPLE_MODE && !loc.search.includes("shot") && (
           <p className="preview">
             <i />
-            Local preview with sample players and games. Changes are saved in this browser only.
+            Local preview with sample players. Changes are saved in this browser only.
             <label>
               <span className="sr-only">View as</span>
               <select value={role} onChange={(e) => setRole(e.target.value as Role)} aria-label="Preview the site as">

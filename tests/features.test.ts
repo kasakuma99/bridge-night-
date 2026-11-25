@@ -19,10 +19,12 @@ const OFF = all(false);
 const ON = all(true);
 
 describe("feature flags", () => {
-  it("everything extra is off", () => {
-    expect(Object.values(FEATURES).every((v) => v === false)).toBe(true);
+  it("everything extra is off (solo games are on while testing)", () => {
+    const { soloGames, ...extras } = FEATURES;
+    expect(soloGames).toBe(true);
+    expect(Object.values(extras).every((v) => v === false)).toBe(true);
     expect(Object.keys(FEATURES).sort()).toEqual(
-      ["bounties", "builds", "challenges", "classicTeams", "dodges", "ratings", "rerollLimit", "rivals", "teamModes"],
+      ["bounties", "builds", "challenges", "classicTeams", "dodges", "ratings", "rerollLimit", "rivals", "soloGames", "teamModes"],
     );
   });
 

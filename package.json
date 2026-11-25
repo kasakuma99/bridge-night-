@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "dev:sample": "vite --mode sample",
+    "dev:live": "node scripts/dev-live.mjs",
     "build": "tsc -b && vite build",
     "preview": "vite preview",
     "typecheck": "tsc -b",

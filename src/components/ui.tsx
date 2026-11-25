@@ -1,7 +1,8 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { AlertTriangle, Check } from "lucide-react";
 import { useData, useDDragon } from "../data/context";
-import { champIcon, itemIcon } from "../lib/champions";
+import { champIcon, itemIcon, loadAugments, spellIcon, type Augment } from "../lib/champions";
+import { SPELL_IDS } from "../lib/live";
 import { formOf } from "../lib/stats";
 
 /* ---------- toasts ---------- */
@@ -183,6 +184,45 @@ export function ItemIcon({ id }: { id: number }) {
   return (
     <span className="item" title={name} role="img" aria-label={name}>
       {src && !broken ? <img src={src} alt="" loading="lazy" onError={() => setBroken(true)} /> : initials(name)}
+    </span>
+  );
+}
+
+export function SpellIcon({ id }: { id: number }) {
+  const { dd } = useDDragon();
+  const [broken, setBroken] = useState(false);
+  const spell = dd.spells[id];
+  const name = spell?.name ?? Object.keys(SPELL_IDS).find((k) => SPELL_IDS[k] === id)?.replace(/^Summoner/, "") ?? "Unknown spell";
+  const src = spell ? spellIcon(dd.version, spell.id) : null;
+  return (
+    <span className="item spell" title={name} role="img" aria-label={name}>
+      {src && !broken ? <img src={src} alt="" loading="lazy" onError={() => setBroken(true)} /> : id ? initials(name) : "?"}
+    </span>
+  );
+}
+
+let augmentsOnce: Promise<Record<number, Augment>> | null = null;
+/** Loaded the first time an augment is shown. */
+function useAugments() {
+  const [all, setAll] = useState<Record<number, Augment>>({});
+  useEffect(() => {
+    let on = true;
+    augmentsOnce ??= loadAugments();
+    augmentsOnce.then((a) => on && setAll(a)).catch(() => (augmentsOnce = null));
+    return () => {
+      on = false;
+    };
+  }, []);
+  return all;
+}
+
+export function AugmentIcon({ id }: { id: number }) {
+  const a = useAugments()[id];
+  const [broken, setBroken] = useState(false);
+  const name = a?.name ?? `Augment ${id}`;
+  return (
+    <span className={`item aug ${a?.rarity ?? ""}`} title={name} role="img" aria-label={name}>
+      {a?.icon && !broken ? <img src={a.icon} alt="" loading="lazy" onError={() => setBroken(true)} /> : initials(name)}
     </span>
   );
 }
