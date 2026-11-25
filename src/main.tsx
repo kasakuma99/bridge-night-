@@ -12,6 +12,7 @@ import "./index.css";
 import { AuthProvider, DataProvider, DDragonProvider, PrefsProvider } from "./data/context";
 import { ConfirmProvider, ToastProvider } from "./components/ui";
 import { Layout } from "./components/Layout";
+import { FEATURES } from "./lib/features";
 import Teams from "./pages/Teams";
 import Live from "./pages/Live";
 import History from "./pages/History";
@@ -37,8 +38,8 @@ createRoot(document.getElementById("root")!).render(
                       <Route path="live" element={<Live />} />
                       <Route path="history" element={<History />} />
                       <Route path="stats" element={<Stats />} />
-                      <Route path="rivals" element={<Rivals />} />
-                      <Route path="builds" element={<Builds />} />
+                      {FEATURES.rivals && <Route path="rivals" element={<Rivals />} />}
+                      {FEATURES.builds && <Route path="builds" element={<Builds />} />}
                       <Route path="players" element={<Players />} />
                       <Route path="helper" element={<Helper />} />
                       <Route path="*" element={<NotFound />} />

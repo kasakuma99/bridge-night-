@@ -5,6 +5,7 @@ import { useAuth, useData, useDDragon, usePrefs } from "../data/context";
 import { RuleInfo, rivalryText, useDodges } from "../components/bits";
 import { Avatar, ChampAvatar, Empty, useConfirm, useToast } from "../components/ui";
 import { CHALLENGES } from "../lib/champions";
+import { FEATURES, pointsLabel } from "../lib/features";
 import { compute, rating, rivalries, teamAvg } from "../lib/stats";
 import type { LiveGame, LivePhase, ParticipantStats, Side } from "../lib/types";
 import { mmss, rndInt } from "../lib/util";
@@ -108,7 +109,7 @@ export default function Live() {
   const cancel = async () => {
     const yes = await confirm({
       title: "Cancel this game?",
-      text: "Teams, picks and dodges are thrown away. Nothing is saved to the history.",
+      text: `${FEATURES.dodges ? "Teams, picks and dodges" : "Teams and picks"} are thrown away. Nothing is saved.`,
       yes: "Cancel game",
     });
     if (!yes) return;
@@ -123,7 +124,9 @@ export default function Live() {
     setSaving(true);
     try {
       const losers = winner === "blue" ? L.red : L.blue;
-      const hunted = losers.filter((id) => (c.st[id]?.streak ?? 0) >= 3).sort((a, b) => c.st[b].streak - c.st[a].streak)[0];
+      const hunted = FEATURES.bounties
+        ? losers.filter((id) => (c.st[id]?.streak ?? 0) >= 3).sort((a, b) => c.st[b].streak - c.st[a].streak)[0]
+        : undefined;
       const huntedStreak = hunted ? c.st[hunted].streak : 0;
       const m = await store.saveResult(L.id, winner);
       if (!m) {
@@ -134,9 +137,11 @@ export default function Live() {
       // Did a rivalry between two opponents of this game grow?
       const after = compute([...data.matches, m], data.players);
       const winners = winner === "blue" ? m.blue : m.red;
-      const grew = rivalries(after, isActive).find(
-        (f) => winners.includes(f.leader) && (m.blue.includes(f.a) ? m.red : m.blue).includes(f.a === f.leader ? f.b : f.a),
-      );
+      const grew = FEATURES.rivals
+        ? rivalries(after, isActive).find(
+            (f) => winners.includes(f.leader) && (m.blue.includes(f.a) ? m.red : m.blue).includes(f.a === f.leader ? f.b : f.a),
+          )
+        : undefined;
       nav("/history");
       toast(
         hunted
@@ -175,7 +180,7 @@ export default function Live() {
             <b>{pname(id)}</b>
             <div className="rt">{champ ? `Locked in · ${champ}` : "Picking…"}</div>
           </div>
-          {isMember ? (
+          {isMember && FEATURES.dodges ? (
             <button
               className="dodge"
               type="button"
@@ -209,7 +214,7 @@ export default function Live() {
           <Avatar id={id} />
           <div>
             <b>{pname(id)}</b>
-            <div className="rt">Rating {rating(c, id)}</div>
+            <div className="rt">{pointsLabel(rating(c, id))}</div>
           </div>
           <span className="champ">
             {champ && <ChampAvatar name={champ} size={24} sq />}
@@ -253,7 +258,9 @@ export default function Live() {
     <div className={`side ${k === "blue" ? "b" : "r"}`}>
       <h3>
         {k === "blue" ? "Blue side" : "Red side"}
-        {L.phase === "select" ? pips(k) : <small title="Average Elo of the players in this team">Team Elo {teamAvg(c, ids)}</small>}
+        {L.phase === "select"
+          ? FEATURES.dodges && pips(k)
+          : FEATURES.ratings && <small title="Average Elo of the players in this team">Team Elo {teamAvg(c, ids)}</small>}
       </h3>
       {ids.map(row)}
     </div>
@@ -261,7 +268,7 @@ export default function Live() {
 
   const all = [...L.blue, ...L.red];
   const picked = all.filter((id) => L.stats[id]?.champion).length;
-  const showChallenge = data.settings.challengesEnabled || !!L.challenge;
+  const showChallenge = FEATURES.challenges && (data.settings.challengesEnabled || !!L.challenge);
 
   return (
     <section>
@@ -306,7 +313,7 @@ export default function Live() {
         {side(L.red, "red")}
       </div>
       {L.sitOut.length > 0 && <p className="sit">Sitting out: {L.sitOut.map(pname).join(", ")}</p>}
-      {L.dodgeLog.length > 0 && (
+      {FEATURES.dodges && L.dodgeLog.length > 0 && (
         <p className="sit" data-testid="dodgelog">
           {L.dodgeLog.map((d) => `${pname(d.playerId)} dodged${d.champion ? ` ${d.champion}` : ""}`).join(" · ")}
         </p>

@@ -2,6 +2,7 @@ import { useEffect, useRef } from "react";
 import { Link, NavLink, Outlet, useLocation } from "react-router-dom";
 import { LogIn, LogOut, MessageCircle } from "lucide-react";
 import { SAMPLE_MODE, useAuth, useData, type Role } from "../data/context";
+import { FEATURES } from "../lib/features";
 import { isDiscordInvite } from "../lib/util";
 import { Logo, Skeleton, useToast } from "./ui";
 import { PendingResults } from "./HelperAdmin";
@@ -47,15 +48,15 @@ function PendingNote() {
 
 export const SITE_NAME = "Bridge Night";
 
-const NAV = [
+const NAV: [to: string, label: string][] = [
   ["/", "Teams"],
   ["/live", "Live"],
-  ["/history", "History"],
+  ["/history", "Past games"],
   ["/stats", "Stats"],
-  ["/rivals", "Rivals"],
-  ["/builds", "Builds"],
+  ...(FEATURES.rivals ? [["/rivals", "Rivals"] as [string, string]] : []),
+  ...(FEATURES.builds ? [["/builds", "Builds"] as [string, string]] : []),
   ["/players", "Players"],
-] as const;
+];
 
 function DiscordLink({ className, children, label }: { className?: string; children: React.ReactNode; label?: string }) {
   const { data } = useData();
@@ -155,8 +156,8 @@ export function Layout() {
             </span>
             <DiscordLink>Join our Discord</DiscordLink>
             <Link to="/stats">Stats</Link>
-            <Link to="/rivals">Rivals</Link>
-            <Link to="/builds">Builds</Link>
+            {FEATURES.rivals && <Link to="/rivals">Rivals</Link>}
+            {FEATURES.builds && <Link to="/builds">Builds</Link>}
             <Link to="/helper">Helper app</Link>
             <span>Fan project, made by friends for friends.</span>
           </div>

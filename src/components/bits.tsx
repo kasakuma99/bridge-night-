@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import { Clock } from "lucide-react";
 import { useData } from "../data/context";
 import { dodgeStatus } from "../lib/dodges";
+import { FEATURES } from "../lib/features";
 import { blueWinChance, rivalryVerb, type HeadToHead } from "../lib/stats";
 import { fmtDuration, plural, seeded } from "../lib/util";
 import { Avatar } from "./ui";
@@ -35,7 +36,10 @@ export function FeudBanner({ f }: { f: HeadToHead }) {
 
 export function useDodges() {
   const { data, now } = useData();
-  return useMemo(() => dodgeStatus(data.matches, data.settings, now, data.live), [data.matches, data.settings, now, data.live]);
+  return useMemo(() => {
+    const d = dodgeStatus(data.matches, data.settings, now, data.live);
+    return FEATURES.dodges ? d : { ...d, off: true };
+  }, [data.matches, data.settings, now, data.live]);
 }
 
 /** Dodge rule status for Teams and Live. */
@@ -76,6 +80,7 @@ export function RuleInfo({ inGame }: { inGame?: boolean }) {
 
 export function WinChance({ blue, red }: { blue: string[]; red: string[] }) {
   const { c } = useData();
+  if (!FEATURES.ratings) return null;
   const pb = Math.round(blueWinChance(c, blue, red) * 100);
   return (
     <div className="prob">
