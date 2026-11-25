@@ -27,7 +27,8 @@ const PAGE = 1000;
 
 async function rest(env: Env, path: string) {
   const res = await fetch(`${env.SUPABASE_URL}/rest/v1/${path}`, {
-    headers: { apikey: env.SUPABASE_SECRET_KEY, Authorization: `Bearer ${env.SUPABASE_SECRET_KEY}` },
+    // New Supabase secret keys (sb_secret_...) go in the apikey header only.
+    headers: { apikey: env.SUPABASE_SECRET_KEY },
   });
   if (!res.ok) throw new Error(`${path}: HTTP ${res.status}`);
   return (await res.json()) as unknown[];
