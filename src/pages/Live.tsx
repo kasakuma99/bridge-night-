@@ -253,7 +253,7 @@ export default function Live() {
     <div className={`side ${k === "blue" ? "b" : "r"}`}>
       <h3>
         {k === "blue" ? "Blue side" : "Red side"}
-        {L.phase === "select" ? pips(k) : <small>avg {teamAvg(c, ids)}</small>}
+        {L.phase === "select" ? pips(k) : <small title="Average Elo of the players in this team">Team Elo {teamAvg(c, ids)}</small>}
       </h3>
       {ids.map(row)}
     </div>

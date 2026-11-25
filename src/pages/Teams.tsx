@@ -347,7 +347,7 @@ function Draft({ L, onLock }: { L: LiveGame; onLock: () => void }) {
     <div className={`side ${k === "blue" ? "b" : "r"}${turn === k ? " turn" : ""}${open ? "" : " reveal"}`}>
       <h3>
         {k === "blue" ? "Blue side" : "Red side"}
-        {turn === k ? <span className="picking">Picking</span> : <small>avg {teamAvg(c, ids)}</small>}
+        {turn === k ? <span className="picking">Picking</span> : <small title="Average Elo of the players in this team">Team Elo {teamAvg(c, ids)}</small>}
       </h3>
       {ids.map((id, j) => {
         const r = rankList.indexOf(id) + 1;
