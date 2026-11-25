@@ -34,8 +34,7 @@ async function rest(env: Env, path: string) {
   return (await res.json()) as unknown[];
 }
 
-async function keepAlive(env: Env) {
-  await rest(env, "settings?select=id&limit=1");
+async function keepAlive(env: Env) {  await rest(env, "settings?select=id&limit=1");
   console.log("keep-alive ok");
 }
 
