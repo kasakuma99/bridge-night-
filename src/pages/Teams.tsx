@@ -41,7 +41,7 @@ export function useTeamPicker() {
 
 export default function Teams() {
   const { data, c, store, now, pname, isActive, active } = useData();
-  const { isMember } = useAuth();
+  const { isMember, isAdmin } = useAuth();
   const { prefs, setPrefs } = usePrefs();
   const toast = useToast();
   const confirm = useConfirm();
@@ -213,7 +213,7 @@ export default function Teams() {
               {p.name}
             </button>
           ))}
-          {isMember &&
+          {isAdmin &&
             (adding ? (
               <form className="addchip" onSubmit={addPlayer}>
                 <input

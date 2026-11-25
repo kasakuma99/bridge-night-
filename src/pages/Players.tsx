@@ -90,16 +90,16 @@ export default function Players() {
               <p className="sub">No players yet.</p>
             )}
           </div>
-          {isMember ? (
+          {isAdmin ? (
             <form className="addf" onSubmit={add}>
               <input className="f" value={name} onChange={(e) => setName(e.target.value)} placeholder="Name" aria-label="New player name" required maxLength={20} />
-              {isAdmin && (
-                <input className="f" value={riot} onChange={(e) => setRiot(e.target.value)} placeholder="Riot ID (optional)" aria-label="Riot ID" maxLength={30} />
-              )}
+              <input className="f" value={riot} onChange={(e) => setRiot(e.target.value)} placeholder="Riot ID (optional)" aria-label="Riot ID" maxLength={30} />
               <button className="btn pri" type="submit">
                 Add player
               </button>
             </form>
+          ) : isMember ? (
+            <p className="note">Only the admin adds, removes and renames players and sets Riot IDs.</p>
           ) : (
             <p className="note">Riot IDs are only visible to logged-in members.</p>
           )}
@@ -211,9 +211,13 @@ function PlayerRow({ p, onRemove }: { p: Player; onRemove: () => void }) {
           {p.riotId ?? "No Riot ID yet"}
         </span>
       )}
-      <button className="icon" type="button" onClick={onRemove} aria-label={`Remove ${p.name}`}>
-        <Trash2 aria-hidden />
-      </button>
+      {isAdmin ? (
+        <button className="icon" type="button" onClick={onRemove} aria-label={`Remove ${p.name}`}>
+          <Trash2 aria-hidden />
+        </button>
+      ) : (
+        <span />
+      )}
     </div>
   );
 }
