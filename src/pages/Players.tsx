@@ -5,8 +5,12 @@ import { Avatar, useConfirm, useToast } from "../components/ui";
 import { MembersPanel } from "../components/Members";
 import { HelperTokensPanel } from "../components/HelperAdmin";
 import { StoreError } from "../data/store";
+import { FEATURES } from "../lib/features";
 import type { Player, Settings } from "../lib/types";
 import { RIOT_ID_RE, clampInt, isDiscordInvite, plural } from "../lib/util";
+
+/** House rules only show the settings of features that are on. */
+const HAS_RULES = FEATURES.dodges || FEATURES.rerollLimit || FEATURES.challenges;
 
 export default function Players() {
   const { data, store, active } = useData();
@@ -72,7 +76,7 @@ export default function Players() {
           <p className="sub">Anyone can look. Only our group can make changes here, after logging in with Discord.</p>
         </div>
       </div>
-      <div className="settings">
+      <div className="settings" style={HAS_RULES || isAdmin ? undefined : { gridTemplateColumns: "minmax(0, 1fr)" }}>
         <section className="panel" aria-labelledby="pl-h">
           <div className="ph">
             <h2 id="pl-h">Players</h2>
@@ -105,7 +109,7 @@ export default function Players() {
           )}
         </section>
         <div className="stack2">
-          <HouseRules settings={data.settings} disabled={!isMember} />
+          {HAS_RULES && <HouseRules settings={data.settings} disabled={!isMember} />}
           <DiscordBox settings={data.settings} disabled={!isAdmin} />
           {isAdmin && !SAMPLE_MODE && <MembersPanel />}
           {isAdmin && !SAMPLE_MODE && <HelperTokensPanel />}
@@ -233,8 +237,9 @@ function HouseRules({ settings, disabled }: { settings: Settings; disabled: bool
     <section className="panel">
       <h3>House rules</h3>
       <p className="sub">
-        Dodges: after a long enough break a new night starts, and each side gets this many dodges in champ select for the whole night,
-        from 1v1 to 4v4. Rerolls: how often you can reroll teams before a game.
+        {FEATURES.dodges &&
+          "Dodges: after a long enough break a new night starts, and each side gets this many dodges in champ select for the whole night, from 1v1 to 4v4. "}
+        {FEATURES.rerollLimit && "Rerolls: how often you can reroll teams before a game."}
       </p>
       <form
         className="addf"
@@ -242,10 +247,10 @@ function HouseRules({ settings, disabled }: { settings: Settings; disabled: bool
           e.preventDefault();
           const s: Settings = {
             ...settings,
-            dodgeHours: clampInt(h, 1, 72, 12),
-            dodgesPerTeam: clampInt(d, 0, 5, 2),
-            rerollLimit: clampInt(r, -1, 10, 2),
-            challengesEnabled: fun,
+            // Settings of hidden features keep their saved values.
+            ...(FEATURES.dodges && { dodgeHours: clampInt(h, 1, 72, 12), dodgesPerTeam: clampInt(d, 0, 5, 2) }),
+            ...(FEATURES.rerollLimit && { rerollLimit: clampInt(r, -1, 10, 2) }),
+            ...(FEATURES.challenges && { challengesEnabled: fun }),
           };
           await store.saveSettings(s);
           setH(String(s.dodgeHours));
@@ -254,30 +259,38 @@ function HouseRules({ settings, disabled }: { settings: Settings; disabled: bool
         }}
       >
         <fieldset disabled={disabled} style={{ display: "contents" }}>
-          <label>
-            Break needed (hours)
-            <input className="f" type="number" min={1} max={72} inputMode="numeric" value={h} onChange={(e) => setH(e.target.value)} />
-          </label>
-          <label>
-            Dodges per team
-            <input className="f" type="number" min={0} max={5} inputMode="numeric" value={d} onChange={(e) => setD(e.target.value)} />
-          </label>
-          <label>
-            Rerolls per game
-            <select className="f" value={r} onChange={(e) => setR(e.target.value)}>
-              <option value="-1">No limit</option>
-              <option value="0">None</option>
-              {[1, 2, 3, 5].map((k) => (
-                <option key={k} value={k}>
-                  {k}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="chk">
-            <input type="checkbox" checked={fun} onChange={(e) => setFun(e.target.checked)} /> Offer a random challenge in champ select
-            (like "No Flash")
-          </label>
+          {FEATURES.dodges && (
+            <>
+              <label>
+                Break needed (hours)
+                <input className="f" type="number" min={1} max={72} inputMode="numeric" value={h} onChange={(e) => setH(e.target.value)} />
+              </label>
+              <label>
+                Dodges per team
+                <input className="f" type="number" min={0} max={5} inputMode="numeric" value={d} onChange={(e) => setD(e.target.value)} />
+              </label>
+            </>
+          )}
+          {FEATURES.rerollLimit && (
+            <label>
+              Rerolls per game
+              <select className="f" value={r} onChange={(e) => setR(e.target.value)}>
+                <option value="-1">No limit</option>
+                <option value="0">None</option>
+                {[1, 2, 3, 5].map((k) => (
+                  <option key={k} value={k}>
+                    {k}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
+          {FEATURES.challenges && (
+            <label className="chk">
+              <input type="checkbox" checked={fun} onChange={(e) => setFun(e.target.checked)} /> Offer a random challenge in champ select
+              (like "No Flash")
+            </label>
+          )}
           <button className="btn" type="submit">
             Save rules
           </button>

@@ -3,6 +3,7 @@ import { useSearchParams } from "react-router-dom";
 import { Award, Crown, Flame, Shield, Sparkles, Swords, Target } from "lucide-react";
 import { useData, usePrefs } from "../data/context";
 import { Avatar, ChampAvatar, Form, ItemIcon } from "../components/ui";
+import { FEATURES, POINTS_NAME, byWins, shownPoints, visibleBadges } from "../lib/features";
 import {
   badges,
   kdaRatio,
@@ -39,13 +40,16 @@ export default function Stats() {
   const sorted = rows
     .slice()
     .sort(
-      period
-        ? (a, b) => b.w - a.w || b.w / b.g - a.w / a.g || rating(c, b.id) - rating(c, a.id)
-        : (a, b) => rating(c, b.id) - rating(c, a.id),
+      !FEATURES.ratings
+        ? byWins(pname)
+        : period
+          ? (a, b) => b.w - a.w || b.w / b.g - a.w / a.g || rating(c, b.id) - rating(c, a.id)
+          : (a, b) => rating(c, b.id) - rating(c, a.id),
     );
   const all = Object.values(c.st).filter((x) => isActive(x.id) && x.g);
   const topW = rows.slice().sort((a, b) => b.w - a.w)[0];
   const topR = all.slice().sort((a, b) => b.rating - a.rating)[0];
+  const topS = all.filter((x) => x.bestStreak > 0).sort((a, b) => b.bestStreak - a.bestStreak)[0];
   const hot = all.filter((x) => x.streak > 0).sort((a, b) => b.streak - a.streak)[0];
   const asked = params.get("player");
   const focus = asked && c.st[asked] && isActive(asked) ? asked : sorted[0]?.id;
@@ -119,7 +123,9 @@ export default function Stats() {
       <div className="kpis">
         {kpi("Games played", count, period ? `in the last ${period} days` : "since the start")}
         {kpi("Most wins", topW ? who(topW.id) : "–", topW ? `${topW.w} wins in ${per}` : "No games yet")}
-        {kpi("Highest rating", topR ? who(topR.id) : "–", topR ? `${rating(c, topR.id)} rating` : "No games yet")}
+        {FEATURES.ratings
+          ? kpi("Highest rating", topR ? who(topR.id) : "–", topR ? `${rating(c, topR.id)} rating` : "No games yet")
+          : kpi("Best win streak", topS ? who(topS.id) : "–", topS ? `${plural(topS.bestStreak, "win")} in a row, all time` : "No games yet")}
         {kpi("Hottest streak", hot ? who(hot.id) : "–", hot ? `${hot.streak} wins in a row` : "Nobody is on a streak")}
       </div>
 
@@ -127,14 +133,14 @@ export default function Stats() {
         <section className="panel" aria-labelledby="lb-h">
           <div className="ph">
             <h2 id="lb-h">Leaderboard</h2>
-            <p className="sub">{period ? "Sorted by wins" : "Sorted by rating"}</p>
+            <p className="sub">{period || !FEATURES.ratings ? "Sorted by wins" : "Sorted by rating"}</p>
           </div>
           <div className="lbhead" aria-hidden>
             <span />
             <span>Player</span>
             <span>Last 5</span>
             <span className="xs">Avg K/D/A</span>
-            <span>Rating</span>
+            <span>{POINTS_NAME}</span>
             <span className="xs">Streak</span>
             <span>{period ? "Wins" : "Win rate"}</span>
           </div>
@@ -170,7 +176,7 @@ export default function Stats() {
                         <b>{x.kn ? `${f1(x.k / x.kn)}/${f1(x.d / x.kn)}/${f1(x.a / x.kn)}` : "–"}</b>
                       </span>
                       <span className="c r">
-                        <b>{rating(c, x.id)}</b>
+                        <b>{shownPoints(rating(c, x.id))}</b>
                       </span>
                       <span className="c s xs">
                         <b>{s.streak > 0 ? `W${s.streak}` : s.streak < 0 ? `L${-s.streak}` : "–"}</b>
@@ -190,10 +196,9 @@ export default function Stats() {
             )}
           </ol>
           <p className="note">
-            Tap a player to see their profile. Everyone starts at 1000. After each game you're compared with every opponent: beating
-            stronger players gives more, beating weaker players less, and losing to stronger players costs less. The first 10 games
-            count a bit more. Losers who surrender lose 5 extra; 3+ wins in a row and ending a bounty give a small bonus. Every game
-            counts at least 3. Kills and deaths don't change the rating. It always counts all games.
+            Tap a player to see their profile.
+            {FEATURES.ratings &&
+              " Everyone starts at 1000. After each game you're compared with every opponent: beating stronger players gives more, beating weaker players less, and losing to stronger players costs less. The first 10 games count a bit more. Losers who surrender lose 5 extra; 3+ wins in a row and ending a bounty give a small bonus. Every game counts at least 3. Kills and deaths don't change the rating. It always counts all games."}
           </p>
         </section>
         <aside className="panel pcard" id="pcard" aria-label="Player profile">
@@ -328,7 +333,7 @@ function Profile({ id }: { id: string }) {
   const mx = Math.max(...h) + 8;
   const line = h.map((v, i) => `${((i / Math.max(1, h.length - 1)) * 300).toFixed(1)},${(100 - ((v - mn) / (mx - mn)) * 66 - 8).toFixed(1)}`).join(" ");
   const up = change >= 0;
-  const bs = badges(x);
+  const bs = visibleBadges(badges(x));
 
   return (
     <>
@@ -337,7 +342,8 @@ function Profile({ id }: { id: string }) {
         <div>
           <h2>{p?.name}</h2>
           <p className="sub">
-            <span>#{rank} by rating</span> · <Form id={id} n={10} />
+            {FEATURES.ratings && <span>#{rank} by rating · </span>}
+            <Form id={id} n={10} />
           </p>
         </div>
       </div>
@@ -350,8 +356,8 @@ function Profile({ id }: { id: string }) {
       )}
       <div className="pc-stats">
         <div>
-          <small>Rating</small>
-          <b>{rating(c, id)}</b>
+          <small>{POINTS_NAME}</small>
+          <b>{shownPoints(rating(c, id))}</b>
         </div>
         <div>
           <small>Win rate</small>
@@ -366,24 +372,26 @@ function Profile({ id }: { id: string }) {
           <b>{x.kdaGames ? kdaRatio(x.k, x.d, x.a).toFixed(2) : "–"}</b>
         </div>
       </div>
-      <div className="chart">
-        <span className="cl">Rating, last {h.length - 1} games</span>
-        <span className="cr" style={{ color: up ? "var(--color-ice)" : "var(--color-red)" }}>
-          {up ? "+" : ""}
-          {change} last 5
-        </span>
-        <svg viewBox="0 0 300 100" preserveAspectRatio="none" role="img" aria-label={`Rating chart, now ${rating(c, id)}`}>
-          <polygon points={`0,100 ${line} 300,100`} fill={up ? "rgba(191,230,255,.10)" : "rgba(255,90,110,.10)"} />
-          <polyline
-            points={line}
-            fill="none"
-            stroke={up ? "var(--color-ice)" : "var(--color-red)"}
-            strokeWidth="2.2"
-            vectorEffect="non-scaling-stroke"
-            strokeLinejoin="round"
-          />
-        </svg>
-      </div>
+      {FEATURES.ratings && (
+        <div className="chart">
+          <span className="cl">Rating, last {h.length - 1} games</span>
+          <span className="cr" style={{ color: up ? "var(--color-ice)" : "var(--color-red)" }}>
+            {up ? "+" : ""}
+            {change} last 5
+          </span>
+          <svg viewBox="0 0 300 100" preserveAspectRatio="none" role="img" aria-label={`Rating chart, now ${rating(c, id)}`}>
+            <polygon points={`0,100 ${line} 300,100`} fill={up ? "rgba(191,230,255,.10)" : "rgba(255,90,110,.10)"} />
+            <polyline
+              points={line}
+              fill="none"
+              stroke={up ? "var(--color-ice)" : "var(--color-red)"}
+              strokeWidth="2.2"
+              vectorEffect="non-scaling-stroke"
+              strokeLinejoin="round"
+            />
+          </svg>
+        </div>
+      )}
       <div>
         <div className="fact">
           <span>Record</span>

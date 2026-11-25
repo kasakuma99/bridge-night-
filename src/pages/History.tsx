@@ -2,6 +2,7 @@ import { useState } from "react";
 import { ArrowLeftRight, Trash2 } from "lucide-react";
 import { useAuth, useData } from "../data/context";
 import { Empty, ItemIcon, useConfirm, useToast } from "../components/ui";
+import { FEATURES } from "../lib/features";
 import { hasKda } from "../lib/stats";
 import type { Match, Side } from "../lib/types";
 import { DAY, dayKey, fmtDayLong, fmtTime, plural } from "../lib/util";
@@ -26,7 +27,7 @@ export default function History() {
   for (const m of list) perDay.set(dayKey(m.playedAt), (perDay.get(dayKey(m.playedAt)) ?? 0) + 1);
 
   const del = async (m: Match) => {
-    if (await confirm({ title: "Delete this game?", text: "Ratings and stats are recalculated without it.", yes: "Delete" })) {
+    if (await confirm({ title: "Delete this game?", text: `${FEATURES.ratings ? "Ratings and stats" : "Stats"} are recalculated without it.`, yes: "Delete" })) {
       await store.deleteMatch(m.id);
       toast("Game deleted");
     }
@@ -34,7 +35,7 @@ export default function History() {
   const flip = async (m: Match) => {
     const yes = await confirm({
       title: "Swap the winner?",
-      text: `${m.winner === "blue" ? "Red" : "Blue"} side will be saved as the winner. Ratings are recalculated.`,
+      text: `${m.winner === "blue" ? "Red" : "Blue"} side will be saved as the winner. ${FEATURES.ratings ? "Ratings" : "Stats"} are recalculated.`,
       yes: "Swap winner",
       danger: false,
     });
@@ -52,7 +53,7 @@ export default function History() {
       </span>
       {m[s].map((id) => {
         const st = m.stats[id];
-        const rc = c.changes[m.id]?.[id];
+        const rc = FEATURES.ratings ? c.changes[m.id]?.[id] : undefined;
         const why = rc
           ? [
               `Game ${rc.base > 0 ? "+" : ""}${rc.base}`,
@@ -101,7 +102,7 @@ export default function History() {
     <section>
       <div className="head">
         <div>
-          <h1>Match history</h1>
+          <h1>Past games</h1>
           <p className="sub">
             {plural(data.matches.length, "game")} logged{list.length !== data.matches.length && `, ${list.length} match the filter`}.
           </p>
@@ -144,8 +145,8 @@ export default function History() {
             const loser = m.winner === "blue" ? "Red" : "Blue";
             const extra = [
               m.surrender && `${loser} surrendered${m.surrender === "early" ? " early" : ""} (FF)`,
-              m.challenge && `Challenge: ${m.challenge}`,
-              m.dodges.length > 0 && `Dodged: ${m.dodges.map((d) => `${pname(d.playerId)}${d.champion ? ` (${d.champion})` : ""}`).join(", ")}`,
+              FEATURES.challenges && m.challenge && `Challenge: ${m.challenge}`,
+              FEATURES.dodges && m.dodges.length > 0 && `Dodged: ${m.dodges.map((d) => `${pname(d.playerId)}${d.champion ? ` (${d.champion})` : ""}`).join(", ")}`,
             ].filter(Boolean);
             return (
               <div key={m.id}>

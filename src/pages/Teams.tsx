@@ -4,6 +4,7 @@ import { Plus, Target } from "lucide-react";
 import { useAuth, useData, usePrefs } from "../data/context";
 import { FeudBanner, HeroArt, RuleInfo, WinChance, useDodges } from "../components/bits";
 import { Avatar, Empty, useConfirm, useToast } from "../components/ui";
+import { FEATURES, pointsLabel, usedRerollLimit, usedTeamStyle } from "../lib/features";
 import { bountyTarget, rating, rivalries, teamAvg } from "../lib/stats";
 import {
   canDraft,
@@ -36,7 +37,7 @@ export function useTeamPicker() {
   const size: TeamSize = prefs.size && prefs.size <= maxSize(n) ? prefs.size : defaultSize(n);
   const key = rerollKey(selected, size);
   const made = prefs.rerolls[key] || 0;
-  return { selected, n, size, key, made, limit: data.settings.rerollLimit };
+  return { selected, n, size, key, made, limit: usedRerollLimit(data.settings.rerollLimit) };
 }
 
 export default function Teams() {
@@ -81,7 +82,7 @@ export default function Teams() {
       const live = makeTeams({
         selected,
         size,
-        style: prefs.style,
+        style: usedTeamStyle(prefs.style),
         ratingOf: (id) => rating(c, id),
         sitPriority: sitPriority(data.matches, selected),
         apart: a1 && a2 ? [a1, a2] : null,
@@ -106,7 +107,7 @@ export default function Teams() {
   const cancel = async () => {
     const yes = await confirm({
       title: "Cancel this game?",
-      text: "Teams, picks and dodges are thrown away. Nothing is saved to the history.",
+      text: `${FEATURES.dodges ? "Teams, picks and dodges" : "Teams and picks"} are thrown away. Nothing is saved.`,
       yes: "Cancel game",
     });
     if (!yes) return;
@@ -131,10 +132,12 @@ export default function Teams() {
 
   const lastAt = dodges.lastGameAt;
   const month = data.matches.filter((m) => m.playedAt >= now - 30 * DAY).length;
-  const lead = Object.values(c.st)
-    .filter((x) => isActive(x.id) && x.g)
-    .sort((a, b) => b.rating - a.rating)[0];
-  const feud = rivalries(c, isActive)[0];
+  const lead = FEATURES.ratings
+    ? Object.values(c.st)
+        .filter((x) => isActive(x.id) && x.g)
+        .sort((a, b) => b.rating - a.rating)[0]
+    : undefined;
+  const feud = FEATURES.rivals ? rivalries(c, isActive)[0] : undefined;
   const apartOn = !!(prefs.apart[0] && prefs.apart[1] && prefs.apart[0] !== prefs.apart[1]);
   const optCount = (prefs.avoidLast ? 1 : 0) + (apartOn ? 1 : 0);
 
@@ -256,13 +259,15 @@ export default function Teams() {
               </button>
             ))}
           </div>
-          <div className="seg" role="group" aria-label="Team style">
-            {STYLES.map(([s, label]) => (
-              <button key={s} type="button" aria-pressed={prefs.style === s} disabled={!isMember} onClick={() => setPrefs({ style: s })}>
-                {label}
-              </button>
-            ))}
-          </div>
+          {FEATURES.teamModes && (
+            <div className="seg" role="group" aria-label="Team style">
+              {STYLES.map(([s, label]) => (
+                <button key={s} type="button" aria-pressed={prefs.style === s} disabled={!isMember} onClick={() => setPrefs({ style: s })}>
+                  {label}
+                </button>
+              ))}
+            </div>
+          )}
           <span className="grow" />
           <button className="btn pri" type="button" disabled={!isMember || n < 2 || (!busy && !ok)} onClick={generate}>
             {btnLabel}
@@ -306,7 +311,10 @@ export default function Teams() {
                   </span>
                 ))}
               </span>
-              <p className="note">Keep apart puts two players on opposite teams. In Captains mode they become the two captains.</p>
+              <p className="note">
+                Keep apart puts two players on opposite teams.
+                {FEATURES.teamModes && " In Captains mode they become the two captains."}
+              </p>
             </div>
           </details>
         )}
@@ -338,16 +346,22 @@ function Draft({ L, onLock }: { L: LiveGame; onLock: () => void }) {
   const { isMember } = useAuth();
   const open = draftOpen(L);
   const turn: Side | "" = open ? L.captains!.order[L.captains!.i] : "";
-  const rankList = Object.values(c.st)
-    .filter((x) => x.g)
-    .sort((a, b) => b.rating - a.rating)
-    .map((x) => x.id);
+  const rankList = FEATURES.ratings
+    ? Object.values(c.st)
+        .filter((x) => x.g)
+        .sort((a, b) => b.rating - a.rating)
+        .map((x) => x.id)
+    : [];
 
   const side = (ids: string[], k: Side) => (
     <div className={`side ${k === "blue" ? "b" : "r"}${turn === k ? " turn" : ""}${open ? "" : " reveal"}`}>
       <h3>
         {k === "blue" ? "Blue side" : "Red side"}
-        {turn === k ? <span className="picking">Picking</span> : <small title="Average Elo of the players in this team">Team Elo {teamAvg(c, ids)}</small>}
+        {turn === k ? (
+          <span className="picking">Picking</span>
+        ) : (
+          FEATURES.ratings && <small title="Average Elo of the players in this team">Team Elo {teamAvg(c, ids)}</small>
+        )}
       </h3>
       {ids.map((id, j) => {
         const r = rankList.indexOf(id) + 1;
@@ -361,7 +375,7 @@ function Draft({ L, onLock }: { L: LiveGame; onLock: () => void }) {
                 {r > 0 && r <= 3 && <span className="rank">#{r}</span>}
               </b>
               <div className="rt">
-                Rating {rating(c, id)} · {c.st[id]?.w ?? 0}–{c.st[id]?.l ?? 0}
+                {pointsLabel(rating(c, id))} · {c.st[id]?.w ?? 0}–{c.st[id]?.l ?? 0}
               </div>
             </div>
           </div>
@@ -370,7 +384,7 @@ function Draft({ L, onLock }: { L: LiveGame; onLock: () => void }) {
     </div>
   );
 
-  const hunt = bountyTarget(c, [...L.blue, ...L.red]);
+  const hunt = FEATURES.bounties ? bountyTarget(c, [...L.blue, ...L.red]) : undefined;
   return (
     <div key={L.id}>
       <div className="board" data-testid="board">
@@ -387,7 +401,7 @@ function Draft({ L, onLock }: { L: LiveGame; onLock: () => void }) {
             </h3>
             <p className="sub">
               Pick {L.captains!.i + 1} of {L.captains!.order.length}
-              {L.captains!.i === 0 && " · lower rated captain goes first"}
+              {FEATURES.ratings && L.captains!.i === 0 && " · lower rated captain goes first"}
             </p>
           </div>
           <div className="chips">
@@ -402,7 +416,7 @@ function Draft({ L, onLock }: { L: LiveGame; onLock: () => void }) {
               >
                 <Avatar id={id} />
                 {pname(id)}
-                <small>{rating(c, id)}</small>
+                {FEATURES.ratings && <small>{rating(c, id)}</small>}
               </button>
             ))}
           </div>
