@@ -54,7 +54,7 @@ Private web app for a group of friends playing custom League games:
 ## Tasks
 
 ### Phase 0: Foundation
-- [~] **T01** Bring `tosh` up to date with `main` and record a test baseline. Branch remade from the rewritten `main` (`5f47193`); baseline checks remain.
+- [x] **T01** Bring `tosh` up to date with `main` and record a test baseline. Branch remade from the rewritten `main` (`5f47193`); baseline recorded.
 - [ ] **T02** Set up a separate Supabase test project with Discord login, and point local development at it (D1)
 - [ ] **T03** Capture one real custom ARAM: Mayhem game (read-only) to confirm augment, surrender and live fields. Proves or disproves the assumptions behind T30 to T45. Captures stay out of git.
 
@@ -124,3 +124,4 @@ Private web app for a group of friends playing custom League games:
 
 | Date | Task | Notes |
 |---|---|---|
+| 2026-11-25 | T01 | Baseline at `8ef1bd1`: install, typecheck, 33 tests, build, 8 sample pages and helper compile all pass. Afterwards: `npm test` fixed for paths starting with lowercase `c:` (`scripts/vitest.mjs`), and wrangler checked locally. |
