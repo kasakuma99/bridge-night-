@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { Download, ShieldCheck } from "lucide-react";
+import { SAMPLE_MODE, useAuth } from "../data/context";
+import { HelperTokensPanel } from "../components/HelperAdmin";
 
 export const REPO = "kasakuma99/bridge-night-";
 
@@ -44,6 +46,7 @@ function useHelperRelease() {
 
 export default function Helper() {
   const { loading, release } = useHelperRelease();
+  const { isMember, pending, user, canLogin } = useAuth();
   return (
     <section>
       <div className="head">
@@ -98,11 +101,23 @@ export default function Helper() {
               )}
               <h2>Set it up</h2>
               <ol>
-                <li>Download it and double-click it. If Windows says "unknown publisher", click More info, then Run anyway (see the right).</li>
-                <li>Ask an admin for a helper token (Players page, "Helper tokens").</li>
+                <li>Log in with Discord (top right) and wait until an admin approves you.</li>
+                <li>Download it and double-click it. If Windows says "Windows protected your PC", click More info, then Run anyway (see the right).</li>
+                <li>Make your helper token below and copy it.</li>
                 <li>Paste the token in the helper's window and click "Save and test connection".</li>
-                <li>Leave it running (icon next to the clock). It does its thing in custom games only.</li>
+                <li>Leave it running (BN icon next to the clock). It only does something in custom games.</li>
               </ol>
+              {isMember && !SAMPLE_MODE ? (
+                <HelperTokensPanel />
+              ) : (
+                <p className="note">
+                  {pending
+                    ? `You're logged in as ${user?.name}. As soon as an admin approves you, you can make your token here.`
+                    : canLogin
+                      ? "Log in with Discord (top right) to make your helper token here."
+                      : "Helper tokens are made on the live site."}
+                </p>
+              )}
             </>
           ) : (
             <>

@@ -16,8 +16,10 @@ interface TokenRow {
 
 const when = (t: string | null) => (t ? new Date(t).toLocaleString("de-DE", { timeZone: "Europe/Berlin", dateStyle: "short", timeStyle: "short" }) : "never");
 
+/** Members see and make their own tokens; admins see everyone's and the review switch. */
 export function HelperTokensPanel() {
   const sb = supabase;
+  const { isAdmin, user } = useAuth();
   const toast = useToast();
   const confirm = useConfirm();
   const [rows, setRows] = useState<TokenRow[] | null>(null);
@@ -40,11 +42,10 @@ export function HelperTokensPanel() {
 
   const create = async (e: React.FormEvent) => {
     e.preventDefault();
-    const n = name.trim();
-    if (!n) return;
+    const n = name.trim() || `${user?.name ?? "My"}'s PC`;
     const { data: tok, error } = await sb.rpc("create_helper_token", { p_name: n });
     if (error || typeof tok !== "string") {
-      toast("Could not create the token. Try again.", { err: true });
+      toast(error?.code === "P0001" && error.message ? error.message : "Could not create the token. Try again.", { err: true });
       return;
     }
     setFresh({ name: n, token: tok });
@@ -71,10 +72,12 @@ export function HelperTokensPanel() {
 
   return (
     <section className="panel" aria-labelledby="ht-h">
-      <h3 id="ht-h">Helper tokens</h3>
+      <h3 id="ht-h">{isAdmin ? "Helper tokens" : "Your helper token"}</h3>
       <p className="sub">
-        Each helper app needs its own token. Make one per friend who runs the helper, so you can revoke it on its own. The token is shown
-        only once.
+        {isAdmin
+          ? "Everyone's helper tokens. Members make their own on the Helper page; you can revoke any of them here."
+          : "The helper app needs a token to send results. Make one, paste it into the helper, done."}{" "}
+        A token is shown only once.
       </p>
       {fresh && (
         <div className="panel" role="status" style={{ background: "var(--color-s2)" }}>
@@ -116,12 +119,19 @@ export function HelperTokensPanel() {
       ))}
       {rows && !activeRows.length && <p className="sub">No helper tokens yet.</p>}
       <form className="addf" onSubmit={create}>
-        <input className="f" value={name} onChange={(e) => setName(e.target.value)} placeholder="Who runs it, e.g. Samu's PC" aria-label="Token name" maxLength={40} required />
-        <button className="btn" type="submit">
-          <KeyRound aria-hidden /> New token
+        <input
+          className="f"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder={`Name, e.g. ${user?.name ?? "My"}'s PC`}
+          aria-label="Token name"
+          maxLength={40}
+        />
+        <button className="btn pri" type="submit">
+          <KeyRound aria-hidden /> Make a token
         </button>
       </form>
-      {review !== null && (
+      {isAdmin && review !== null && (
         <label style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 12 }}>
           <input type="checkbox" checked={review} onChange={(e) => void toggleReview(e.target.checked)} />
           <span>Check helper results before they count (a member confirms each one)</span>
