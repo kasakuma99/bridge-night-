@@ -7,7 +7,7 @@ import type { Match, Side } from "../lib/types";
 import { DAY, dayKey, fmtDayLong, fmtTime, plural } from "../lib/util";
 
 export default function History() {
-  const { data, store, pname, active, now } = useData();
+  const { data, store, pname, active, now, c } = useData();
   const { isMember } = useAuth();
   const toast = useToast();
   const confirm = useConfirm();
@@ -52,9 +52,31 @@ export default function History() {
       </span>
       {m[s].map((id) => {
         const st = m.stats[id];
+        const rc = c.changes[m.id]?.[id];
+        const why = rc
+          ? [
+              `Game ${rc.base > 0 ? "+" : ""}${rc.base}`,
+              rc.streak ? `win streak +${rc.streak}` : "",
+              rc.bounty ? `bounty +${rc.bounty}` : "",
+              rc.ff ? `surrender ${rc.ff}` : "",
+            ]
+              .filter(Boolean)
+              .join(", ")
+          : "";
         return (
           <div key={id} className="tp">
             <span>{pname(id)}</span>
+            {rc && (
+              <span
+                className="k"
+                title={`Rating ${rc.delta > 0 ? "+" : ""}${rc.delta} (${why})`}
+                aria-label={`Rating change ${rc.delta > 0 ? "plus" : "minus"} ${Math.abs(rc.delta)}`}
+                style={{ color: rc.delta > 0 ? "var(--color-ice)" : "var(--color-mute)", fontWeight: 600 }}
+              >
+                {rc.delta > 0 ? "+" : "−"}
+                {Math.abs(rc.delta)}
+              </span>
+            )}
             {st?.champion && <span className="c">{st.champion}</span>}
             {hasKda(st) && (
               <span className="k">
