@@ -238,6 +238,7 @@
   .feud { display: flex; gap: 14px; align-items: center; padding: 14px 18px; border-radius: var(--radius-lg); background: linear-gradient(90deg, color-mix(in srgb, var(--color-red) 16%, var(--color-s1)), var(--color-s1) 70%); border: 1px solid color-mix(in srgb, var(--color-red) 32%, var(--color-line)); margin-bottom: 14px; }
   .feud b { font: 600 19px var(--font-disp); }
   .feud span { color: var(--color-mute); font-size: 14px; }
+  .feud .ava { color: #fff; }
   .feud .rec { margin-left: auto; text-align: right; white-space: nowrap; }
   .feud .rec b { display: block; font: 700 24px var(--font-disp); font-variant-numeric: tabular-nums; }
 

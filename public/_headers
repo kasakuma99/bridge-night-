@@ -1,7 +1,8 @@
 /*
-  Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://ddragon.leagueoflegends.com https://raw.communitydragon.org https://cdn.discordapp.com; font-src 'self'; connect-src 'self' https://kimgoxjydargqtbwolxz.supabase.co wss://kimgoxjydargqtbwolxz.supabase.co https://ddragon.leagueoflegends.com https://raw.communitydragon.org https://api.github.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'
+  Content-Security-Policy: default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data: https://ddragon.leagueoflegends.com https://raw.communitydragon.org https://cdn.discordapp.com; font-src 'self' data:; connect-src 'self' https://kimgoxjydargqtbwolxz.supabase.co wss://kimgoxjydargqtbwolxz.supabase.co https://ddragon.leagueoflegends.com https://raw.communitydragon.org https://api.github.com; manifest-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'; object-src 'none'
+  Cross-Origin-Opener-Policy: same-origin
   X-Content-Type-Options: nosniff
   X-Frame-Options: DENY
   Referrer-Policy: strict-origin-when-cross-origin
-  Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=()
-  Strict-Transport-Security: max-age=31536000
+  Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=(), usb=(), serial=(), hid=(), bluetooth=()
+  Strict-Transport-Security: max-age=31536000; includeSubDomains

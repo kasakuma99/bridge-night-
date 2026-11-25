@@ -109,7 +109,7 @@ npm run typecheck
 .\helper\build.ps1   # builds the helper with the C# compiler that ships with Windows
 ```
 
-- `src/lib/` holds the rules as plain functions: ratings (start 1000, K=32, team average vs team average), streaks, bounties, badges, awards, monthly champions, rivalries, team generator and the dodge rule. Times use Europe/Berlin.
+- `src/lib/` holds the rules as plain functions: per-player Elo (start 1000; after 10 placement games a 100 point gap gives the favourite 13 and the underdog 17; FF costs 5 extra; small streak and bounty bonuses), streaks, bounties, badges, awards, monthly champions, rivalries, team generator and the dodge rule. Times use Europe/Berlin.
 - `src/data/` is the only place that changes data: a local store for the sample preview and a Supabase store for the live site, behind the same interface. Ratings and awards are always recalculated from the full match list.
 - `supabase/migrations/` has the database schema, security rules and functions. `supabase/functions/helper/` is the helper endpoint.
 - `backup-worker/` is the backup and keep-alive worker.
