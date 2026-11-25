@@ -2,6 +2,8 @@
 
 Team generator, live games, match history and stats for our custom game nights. Fan project, not endorsed by Riot Games.
 
+**Live site:** https://bridge-night.bridge-night.workers.dev · **Helper app:** see the [Releases](https://github.com/kasakuma99/bridge-night-/releases)
+
 ## Run it locally
 
 ```bash
