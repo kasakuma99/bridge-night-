@@ -316,11 +316,11 @@ describe("data", () => {
       length: 0,
     };
   });
-  it("launch data has our real players and no games", () => {
+  it("starts with the six dummy players and no games", () => {
     const d = emptyData();
     expect(d.players.map((p) => p.name)).toEqual(ROSTER);
     expect(d.matches).toHaveLength(0);
-    expect(ROSTER).toHaveLength(10);
+    expect(ROSTER).toEqual(["Tosh", "Samu", "Lenny", "Artur", "Philip", "Nick"]);
   });
   it("sample data is consistent", () => {
     const d = sampleData();
@@ -342,8 +342,8 @@ describe("data", () => {
     expect(s.getState().data.players.find((p) => p.id === "p0")?.active).toBe(false);
     expect(s.getState().data.matches[0].blue.concat(s.getState().data.matches[0].red)).toContain("p0");
     await expect(s.addPlayer("nick")).rejects.toThrow(/already/);
-    const p = await s.addPlayer("Samu"); // removed name can be reused
-    expect(p.name).toBe("Samu");
+    const p = await s.addPlayer("Tosh"); // removed name can be reused
+    expect(p.name).toBe("Tosh");
     const json = s.exportBackup();
     await s.deleteMatch(s.getState().data.matches[0].id);
     await s.restoreBackup(json);

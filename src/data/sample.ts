@@ -3,25 +3,25 @@ import { DEFAULT_SETTINGS } from "../lib/types";
 import { FALLBACK_CHAMPIONS, CHALLENGES, SAMPLE_ITEM_NAMES } from "../lib/champions";
 import { DAY, HOUR, seeded, shuffle } from "../lib/util";
 
-/** Our real group. Riot IDs are added later on the Players page. */
-export const ROSTER = ["Samu", "Nick", "Phillip", "Lenny", "Francesco", "Tosh", "Arthur", "Mantas", "Ilia", "Emilian"];
+/** Dummy names for local work. Later, the players are the people who signed in with Discord. */
+export const ROSTER = ["Tosh", "Samu", "Lenny", "Artur", "Philip", "Nick"];
 
 export function rosterPlayers(now = Date.now()): Player[] {
   return ROSTER.map((name, i) => ({ id: "p" + i, name, active: true, createdAt: now - DAY * 60 + i }));
 }
 
-/** Launch data: real players, empty history. */
+/** Players only, empty history. */
 export function emptyData(now = Date.now()): AppData {
   return { players: rosterPlayers(now), matches: [], live: null, settings: { ...DEFAULT_SETTINGS } };
 }
 
-/** Sample data for local development only: ~34 fake games over the last 6 weeks. */
+/** Sample data for local development only: 33 fake games over the last 6 weeks. */
 export function sampleData(now = Date.now()): AppData {
   const r = seeded(51);
   const players = rosterPlayers(now);
-  players[0].riotId = "Samu#EUW";
-  players[1].riotId = "NickTheQuick#EUW";
-  const skill = [0.66, 0.4, 0.52, 0.5, 0.55, 0.47, 0.5, 0.5, 0.45, 0.48];
+  players[0].riotId = "Tosh#TEST";
+  players[1].riotId = "Samu#TEST";
+  const skill = [0.6, 0.66, 0.5, 0.47, 0.52, 0.4];
   const sk = (id: string) => skill[+id.slice(1)];
   const items = Object.keys(SAMPLE_ITEM_NAMES).map(Number);
   const midnight = new Date(now);
@@ -56,8 +56,8 @@ export function sampleData(now = Date.now()): AppData {
   };
   const ids = players.map((p) => p.id);
   for (let i = 0; i < 28; i++) {
-    const tonight = shuffle(ids, r).slice(0, 6 + Math.floor(r() * 3));
-    const size = r() < 0.6 ? 3 : 2;
+    const tonight = shuffle(ids, r).slice(0, 4 + Math.floor(r() * 3));
+    const size = tonight.length === 6 && r() < 0.7 ? 3 : 2;
     const pool = tonight.slice(0, size * 2);
     const blue = pool.slice(0, size);
     const red = pool.slice(size);
@@ -68,9 +68,9 @@ export function sampleData(now = Date.now()): AppData {
   // A few recent nights so streaks, rivalries and awards show up.
   mk(["p0", "p2"], ["p1", "p4"], "blue", evening(4, 0.1), ["p3", "p5"], true);
   mk(["p1", "p3", "p5"], ["p0", "p2", "p4"], "red", evening(4, 0.3), [], true);
-  mk(["p0", "p5", "p6"], ["p1", "p3", "p7"], "blue", evening(2, 0.2), ["p2"], true);
-  mk(["p1", "p2", "p4"], ["p0", "p3", "p5"], "red", evening(2, 0.45), ["p6"], true);
-  mk(["p0", "p6"], ["p1", "p8"], "blue", evening(1, 0.25), ["p9"], true);
+  mk(["p0", "p5", "p4"], ["p1", "p3", "p2"], "blue", evening(2, 0.2), [], true);
+  mk(["p1", "p2", "p4"], ["p0", "p3", "p5"], "red", evening(2, 0.45), [], true);
+  mk(["p0", "p3"], ["p1", "p5"], "blue", evening(1, 0.25), ["p2", "p4"], true);
   matches[20].challenge = CHALLENGES[2];
   matches[25].challenge = CHALLENGES[0];
   matches[30].challenge = CHALLENGES[5];

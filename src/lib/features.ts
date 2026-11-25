@@ -6,6 +6,11 @@ import type { TeamStyle } from "./types";
  * set a value to true to bring a feature back.
  */
 export interface Features {
+  /**
+   * The first Teams page (hero, captains, options, locking teams by hand). Off: the "Create random teams" page.
+   * teamModes, rerollLimit, and the bounty and dodge info on the Teams page need this one too.
+   */
+  classicTeams: boolean;
   /** Rivals page, rivalry banner and rivalry messages. */
   rivals: boolean;
   /** Builds page. */
@@ -25,6 +30,7 @@ export interface Features {
 }
 
 export const FEATURES: Features = {
+  classicTeams: false,
   rivals: false,
   builds: false,
   teamModes: false,
@@ -44,6 +50,8 @@ export const POINTS_NAME = FEATURES.ratings ? "Rating" : "Papi Points";
 
 /** The number next to a player: their rating, or the fixed Papi Points. */
 export const shownPoints = (rating: number, f: Features = FEATURES) => (f.ratings ? String(rating) : fmtPoints(PAPI_POINTS));
+/** The same as a number. Weighted teams use it, so with Papi Points everyone counts the same. */
+export const pointsOf = (rating: number, f: Features = FEATURES) => (f.ratings ? rating : PAPI_POINTS);
 /** "Rating 1016" or "1,000 Papi Points". */
 export const pointsLabel = (rating: number, f: Features = FEATURES) =>
   f.ratings ? `Rating ${rating}` : `${fmtPoints(PAPI_POINTS)} Papi Points`;

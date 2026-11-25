@@ -65,7 +65,11 @@ export default function Live() {
           </div>
         </div>
         <RuleInfo />
-        <Empty title="No game running" text="Make teams first, then lock them to start champ select.">
+        <Empty title="No game running" text={
+            FEATURES.classicTeams
+              ? "Make teams first, then lock them to start champ select."
+              : "Make teams first. Your game shows up here once the helper app sees it in League."
+          }>
           <Link className="btn pri" to="/">
             Make teams
           </Link>
