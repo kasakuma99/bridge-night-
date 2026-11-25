@@ -4,6 +4,7 @@ import { LogIn, LogOut, MessageCircle } from "lucide-react";
 import { SAMPLE_MODE, useAuth, useData, type Role } from "../data/context";
 import { isDiscordInvite } from "../lib/util";
 import { Logo, Skeleton, useToast } from "./ui";
+import { PendingResults } from "./HelperAdmin";
 
 function Account() {
   const { canLogin, ready, user, pending, signIn, signOut, isAdmin } = useAuth();
@@ -139,7 +140,10 @@ export function Layout() {
             </button>
           </section>
         ) : (
-          <Outlet />
+          <>
+            {(loc.pathname === "/live" || loc.pathname === "/history") && <PendingResults />}
+            <Outlet />
+          </>
         )}
       </main>
       <footer>
