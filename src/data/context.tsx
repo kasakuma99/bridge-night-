@@ -1,11 +1,14 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from "react";
 import type { DataStore } from "./store";
 import { LocalStore } from "./store";
+import { SupabaseStore } from "./supabaseStore";
+import { supabase } from "../lib/supabase";
 import { compute, type Computed } from "../lib/stats";
 import type { AppData, Player, TeamSize, TeamStyle } from "../lib/types";
 import { fallbackDDragon, loadDDragon, type DDragon } from "../lib/champions";
 
-export const SAMPLE_MODE = import.meta.env.DEV || import.meta.env.VITE_SAMPLE_DATA === "true";
+/** Sample data: forced with VITE_SAMPLE_DATA=true, or automatic in local dev when Supabase isn't configured. */
+export const SAMPLE_MODE = import.meta.env.VITE_SAMPLE_DATA === "true" || (!supabase && import.meta.env.DEV);
 
 /* ---------- data ---------- */
 
@@ -23,7 +26,7 @@ interface DataCtx {
 }
 
 const Data = createContext<DataCtx | null>(null);
-const defaultStore = new LocalStore(SAMPLE_MODE && import.meta.env.VITE_SAMPLE_DATA !== "false");
+const defaultStore: DataStore = supabase && !SAMPLE_MODE ? new SupabaseStore(supabase) : new LocalStore(SAMPLE_MODE);
 
 /** A clock that ticks every 30s so "Xh ago" and the dodge rule stay current. */
 export function useNow(ms = 30_000) {
@@ -134,19 +137,44 @@ export function usePrefs() {
   return v;
 }
 
-/* ---------- auth (Phase 1: local preview switch; Phase 2: Discord login via Supabase) ---------- */
+/* ---------- auth: Discord login via Supabase (sample mode: a local "View as" switch) ---------- */
 
 export type Role = "visitor" | "member" | "admin";
-const AuthCtx = createContext<{ role: Role; isMember: boolean; isAdmin: boolean; setRole: (r: Role) => void }>({
+export interface AuthUser {
+  id: string;
+  name: string;
+  avatar?: string;
+}
+interface AuthState {
+  role: Role;
+  isMember: boolean;
+  isAdmin: boolean;
+  /** Logged in, but an admin hasn't approved them yet. */
+  pending: boolean;
+  user: AuthUser | null;
+  /** false until we know whether someone is logged in */
+  ready: boolean;
+  /** true when real login is available (Supabase configured, not sample mode) */
+  canLogin: boolean;
+  setRole: (r: Role) => void;
+  signIn: () => Promise<void>;
+  signOut: () => Promise<void>;
+}
+const AuthCtx = createContext<AuthState>({
   role: "visitor",
   isMember: false,
   isAdmin: false,
+  pending: false,
+  user: null,
+  ready: true,
+  canLogin: false,
   setRole: () => {},
+  signIn: async () => {},
+  signOut: async () => {},
 });
 
-export function AuthProvider({ children }: { children: ReactNode }) {
+function SampleAuth({ children }: { children: ReactNode }) {
   const [role, setRoleState] = useState<Role>(() => {
-    if (!SAMPLE_MODE) return "visitor";
     const r = localStorage.getItem("bn-role");
     return r === "visitor" || r === "member" ? r : "admin";
   });
@@ -154,8 +182,99 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.setItem("bn-role", r);
     setRoleState(r);
   }, []);
-  return (
-    <AuthCtx.Provider value={{ role, isMember: role !== "visitor", isAdmin: role === "admin", setRole }}>{children}</AuthCtx.Provider>
+  const value: AuthState = {
+    role,
+    isMember: role !== "visitor",
+    isAdmin: role === "admin",
+    pending: false,
+    user: role === "visitor" ? null : { id: "local", name: "Preview" },
+    ready: true,
+    canLogin: false,
+    setRole,
+    signIn: async () => {},
+    signOut: async () => {},
+  };
+  return <AuthCtx.Provider value={value}>{children}</AuthCtx.Provider>;
+}
+
+function SupabaseAuth({ children }: { children: ReactNode }) {
+  const sb = supabase!;
+  const [ready, setReady] = useState(false);
+  const [user, setUser] = useState<AuthUser | null>(null);
+  const [memberRole, setMemberRole] = useState<"pending" | "member" | "admin" | null>(null);
+
+  const loadRole = useCallback(
+    async (uid: string | undefined) => {
+      if (!uid) {
+        setMemberRole(null);
+        return;
+      }
+      const { data, error } = await sb.from("members").select("role").eq("user_id", uid).maybeSingle();
+      if (error) console.error("[bridge-night] could not load member role", error);
+      setMemberRole((data?.role as "pending" | "member" | "admin" | undefined) ?? "pending");
+    },
+    [sb],
   );
+
+  useEffect(() => {
+    const apply = (session: import("@supabase/supabase-js").Session | null) => {
+      const u = session?.user;
+      const md = (u?.user_metadata ?? {}) as Record<string, unknown>;
+      const claims = (md.custom_claims ?? {}) as Record<string, unknown>;
+      setUser(
+        u
+          ? {
+              id: u.id,
+              name: String(claims.global_name || md.full_name || md.name || md.user_name || u.email?.split("@")[0] || "Member"),
+              avatar: typeof md.avatar_url === "string" ? md.avatar_url : undefined,
+            }
+          : null,
+      );
+      // Don't call Supabase inside the auth callback itself (it can deadlock); do it right after.
+      setTimeout(() => void loadRole(u?.id).finally(() => setReady(true)), 0);
+    };
+    void sb.auth.getSession().then(({ data }) => apply(data.session));
+    const { data: sub } = sb.auth.onAuthStateChange((_ev, session) => apply(session));
+    return () => sub.subscription.unsubscribe();
+  }, [sb, loadRole]);
+
+  // While waiting for approval, check again now and then, so the page unlocks by itself.
+  useEffect(() => {
+    if (memberRole !== "pending" || !user) return;
+    const t = setInterval(() => void loadRole(user.id), 20_000);
+    const vis = () => document.visibilityState === "visible" && void loadRole(user.id);
+    document.addEventListener("visibilitychange", vis);
+    return () => {
+      clearInterval(t);
+      document.removeEventListener("visibilitychange", vis);
+    };
+  }, [memberRole, user, loadRole]);
+
+  const role: Role = memberRole === "admin" ? "admin" : memberRole === "member" ? "member" : "visitor";
+  const value: AuthState = {
+    role,
+    isMember: role !== "visitor",
+    isAdmin: role === "admin",
+    pending: !!user && memberRole === "pending",
+    user,
+    ready,
+    canLogin: true,
+    setRole: () => {},
+    signIn: async () => {
+      const { error } = await sb.auth.signInWithOAuth({
+        provider: "discord",
+        options: { redirectTo: window.location.origin + window.location.pathname },
+      });
+      if (error) throw error;
+    },
+    signOut: async () => {
+      await sb.auth.signOut();
+    },
+  };
+  return <AuthCtx.Provider value={value}>{children}</AuthCtx.Provider>;
+}
+
+export function AuthProvider({ children }: { children: ReactNode }) {
+  return supabase && !SAMPLE_MODE ? <SupabaseAuth>{children}</SupabaseAuth> : <SampleAuth>{children}</SampleAuth>;
 }
 export const useAuth = () => useContext(AuthCtx);
