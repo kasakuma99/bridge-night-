@@ -163,3 +163,5 @@ supabase/.temp/
 
 # Helper build output (built by GitHub Actions)
 helper/dist/
+!.env.production
+.wrangler/

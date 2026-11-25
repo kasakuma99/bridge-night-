@@ -1,0 +1,11 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  // The website: static files from dist/, served by Cloudflare Workers (free plan).
+  "name": "bridge-night",
+  "compatibility_date": "2026-11-01",
+  "assets": {
+    "directory": "./dist",
+    // Any unknown path loads the app, so refreshing /stats or /live works (the app shows its own 404 page).
+    "not_found_handling": "single-page-application"
+  }
+}
