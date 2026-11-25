@@ -8,6 +8,7 @@ import { isDiscordInvite } from "../lib/util";
 import { Logo, Skeleton } from "./ui";
 import { PendingResults } from "./HelperAdmin";
 import { AccountMenu } from "./qol/AccountMenu";
+import { Gate } from "./qol/Gate";
 import { LoginPrompt } from "./qol/LoginPrompt";
 import { OfflineBanner, UpdateNotice } from "./qol/Notices";
 import { pageTitle } from "./qol/logic";
@@ -55,23 +56,24 @@ function DiscordLink({ className, children, label }: { className?: string; child
 
 export function Layout() {
   const { data, status, error, now } = useData();
-  const { role, setRole } = useAuth();
+  const { role, setRole, isMember } = useAuth();
+  const closed = FEATURES.privateSite && !isMember;
   const loc = useLocation();
   const nav = useRef<HTMLElement>(null);
   const live = FEATURES.classicTeams ? data.live && data.live.phase !== "draft" : showFeed(data.feed, now) && data.feed.status !== "ended";
 
   useEffect(() => {
-    document.title = pageTitle(loc.pathname);
+    document.title = closed ? SITE_NAME : pageTitle(loc.pathname);
     window.scrollTo(0, 0);
     // Keep the active tab visible on phones.
     const n = nav.current;
     const t = n?.querySelector<HTMLElement>('[aria-current="page"]');
     if (n && t && n.scrollWidth > n.clientWidth) n.scrollTo({ left: t.offsetLeft - n.clientWidth / 2 + t.offsetWidth / 2 });
-  }, [loc.pathname]);
+  }, [loc.pathname, closed]);
 
   return (
     <>
-      {LiveBridge && (
+      {LiveBridge && !closed && (
         <Suspense fallback={null}>
           <LiveBridge />
         </Suspense>
@@ -86,17 +88,19 @@ export function Layout() {
             {SITE_NAME}
           </Link>
           <nav className="tabs" aria-label="Sections" ref={nav}>
-            {NAV.map(([to, label]) => (
+            {(closed ? [] : NAV).map(([to, label]) => (
               <NavLink key={to} className="tab" to={to} end={to === "/"}>
                 {to === "/live" && live && <span className="live-dot" role="img" aria-label="Game running" />}
                 {label}
               </NavLink>
             ))}
           </nav>
-          <DiscordLink className="btn sm dis" label="Join our Discord (opens in a new tab)">
-            <MessageCircle aria-hidden />
-            <span>Join our Discord</span>
-          </DiscordLink>
+          {!closed && (
+            <DiscordLink className="btn sm dis" label="Join our Discord (opens in a new tab)">
+              <MessageCircle aria-hidden />
+              <span>Join our Discord</span>
+            </DiscordLink>
+          )}
           <AccountMenu />
         </div>
       </header>
@@ -116,8 +120,10 @@ export function Layout() {
           </p>
         )}
         <OfflineBanner />
-        <PendingNote />
-        {status === "loading" ? (
+        {!closed && <PendingNote />}
+        {closed ? (
+          <Gate />
+        ) : status === "loading" ? (
           <div role="status" aria-busy="true" aria-label="Loading">
             <Skeleton h={48} />
             <div style={{ height: 16 }} />
@@ -145,11 +151,15 @@ export function Layout() {
               <Logo size={24} />
               {SITE_NAME}
             </span>
-            <DiscordLink>Join our Discord</DiscordLink>
-            <Link to="/stats">Stats</Link>
-            {FEATURES.rivals && <Link to="/rivals">Rivals</Link>}
-            {FEATURES.builds && <Link to="/builds">Builds</Link>}
-            <Link to="/helper">Helper app</Link>
+            {!closed && (
+              <>
+                <DiscordLink>Join our Discord</DiscordLink>
+                <Link to="/stats">Stats</Link>
+                {FEATURES.rivals && <Link to="/rivals">Rivals</Link>}
+                {FEATURES.builds && <Link to="/builds">Builds</Link>}
+                <Link to="/helper">Helper app</Link>
+              </>
+            )}
             <span>Fan project, made by friends for friends.</span>
           </div>
           <p>
@@ -158,7 +168,7 @@ export function Layout() {
           </p>
         </div>
       </footer>
-      <LoginPrompt />
+      {!FEATURES.privateSite && <LoginPrompt />}
       <UpdateNotice />
     </>
   );

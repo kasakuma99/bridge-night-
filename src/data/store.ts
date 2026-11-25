@@ -19,6 +19,8 @@ export interface DataStore {
   readonly sample: boolean;
   subscribe(fn: () => void): () => void;
   getState(): StoreState;
+  /** Whether this person may see the data. Without it nothing is loaded, and nothing is kept. */
+  setAccess?(allowed: boolean): void;
   addPlayer(name: string, riotId?: string): Promise<Player>;
   updatePlayer(id: string, patch: Partial<Pick<Player, "name" | "riotId">>): Promise<void>;
   removePlayer(id: string): Promise<void>;

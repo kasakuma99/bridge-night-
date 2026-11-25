@@ -15,6 +15,24 @@ dialog.qol-login { max-width: 440px; }
 .qol-login-acts { display: grid; gap: 10px; margin-top: 12px; }
 .qol-login .note { margin: 4px 0 0; }
 
+/* ---------- private site: log in, wait, no access ---------- */
+.qol-gate { display: grid; place-items: center; min-height: 60vh; }
+.qol-gate .panel { width: min(100%, 440px); padding: 28px 24px 22px; text-align: center; display: grid; gap: 10px; }
+.qol-gate h1 { font-size: var(--text-xl); }
+.qol-gate .sub { margin: 0 auto; max-width: 36ch; }
+.qol-gate .note { margin: 4px 0 0; }
+.qol-gate .qol-login-logo > svg { width: 32px; height: 32px; }
+
+/* ---------- members ---------- */
+.prow.mem { grid-template-columns: auto minmax(0, 1fr) minmax(110px, 150px) auto auto; }
+.prow.mem select.f { min-width: 0; width: 100%; }
+.blocked { margin-top: 12px; }
+.blocked summary { cursor: pointer; color: var(--color-mute); font-size: 14px; font-weight: 600; }
+@media (max-width: 640px) {
+  .prow.mem { grid-template-columns: auto minmax(0, 1fr) auto auto; }
+  .prow.mem select.f { grid-column: 2 / -1; grid-row: 2; }
+}
+
 /* ---------- account menu ---------- */
 .qol-acct { position: relative; flex: none; }
 .qol-acct-btn { padding-left: 6px; gap: 8px; }
