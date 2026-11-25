@@ -35,14 +35,14 @@ using System.Windows.Forms;
 [assembly: AssemblyTitle("Bridge Night Helper")]
 [assembly: AssemblyProduct("Bridge Night Helper")]
 [assembly: AssemblyDescription("Sends custom game picks and results to the Bridge Night site. Read-only towards the League client.")]
-[assembly: AssemblyVersion("0.3.0.0")]
-[assembly: AssemblyFileVersion("0.3.0.0")]
+[assembly: AssemblyVersion("0.3.1.0")]
+[assembly: AssemblyFileVersion("0.3.1.0")]
 
 namespace BridgeNight
 {
     static class Program
     {
-        public const string Version = "0.3.0";
+        public const string Version = "0.3.1";
         public const string DefaultServer = "https://kimgoxjydargqtbwolxz.supabase.co/functions/v1/helper";
 
         [STAThread]
