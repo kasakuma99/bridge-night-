@@ -93,7 +93,9 @@ export default function Players() {
           {isMember ? (
             <form className="addf" onSubmit={add}>
               <input className="f" value={name} onChange={(e) => setName(e.target.value)} placeholder="Name" aria-label="New player name" required maxLength={20} />
-              <input className="f" value={riot} onChange={(e) => setRiot(e.target.value)} placeholder="Riot ID (optional)" aria-label="Riot ID" maxLength={30} />
+              {isAdmin && (
+                <input className="f" value={riot} onChange={(e) => setRiot(e.target.value)} placeholder="Riot ID (optional)" aria-label="Riot ID" maxLength={30} />
+              )}
               <button className="btn pri" type="submit">
                 Add player
               </button>
@@ -192,17 +194,23 @@ function PlayerRow({ p, onRemove }: { p: Player; onRemove: () => void }) {
           {p.name}
         </b>
       )}
-      <input
-        className="f riot"
-        value={riot}
-        onChange={(e) => setRiot(e.target.value)}
-        onBlur={saveRiot}
-        onKeyDown={enter}
-        placeholder="Riot ID (Name#TAG)"
-        aria-label={`Riot ID of ${p.name}`}
-        aria-invalid={badRiot}
-        maxLength={30}
-      />
+      {isAdmin ? (
+        <input
+          className="f riot"
+          value={riot}
+          onChange={(e) => setRiot(e.target.value)}
+          onBlur={saveRiot}
+          onKeyDown={enter}
+          placeholder="Riot ID (Name#TAG)"
+          aria-label={`Riot ID of ${p.name}`}
+          aria-invalid={badRiot}
+          maxLength={30}
+        />
+      ) : (
+        <span className="sub" title="Only admins can change Riot IDs" style={{ alignSelf: "center" }}>
+          {p.riotId ?? "No Riot ID yet"}
+        </span>
+      )}
       <button className="icon" type="button" onClick={onRemove} aria-label={`Remove ${p.name}`}>
         <Trash2 aria-hidden />
       </button>
