@@ -2,9 +2,11 @@ import { useState } from "react";
 import { ArrowLeftRight, Trash2 } from "lucide-react";
 import { useAuth, useData } from "../data/context";
 import { Empty, ItemIcon, useConfirm, useToast } from "../components/ui";
+import { EloDelta, reasons } from "../components/stats/Elo";
 import { hasKda } from "../lib/stats";
 import type { Match, Side } from "../lib/types";
 import { DAY, dayKey, fmtDayLong, fmtTime, plural } from "../lib/util";
+import "../styles/stats.css";
 
 export default function History() {
   const { data, store, pname, active, now, c } = useData();
@@ -26,7 +28,7 @@ export default function History() {
   for (const m of list) perDay.set(dayKey(m.playedAt), (perDay.get(dayKey(m.playedAt)) ?? 0) + 1);
 
   const del = async (m: Match) => {
-    if (await confirm({ title: "Delete this game?", text: "Ratings and stats are recalculated without it.", yes: "Delete" })) {
+    if (await confirm({ title: "Delete this game?", text: "Elo and stats are recalculated without it.", yes: "Delete" })) {
       await store.deleteMatch(m.id);
       toast("Game deleted");
     }
@@ -34,7 +36,7 @@ export default function History() {
   const flip = async (m: Match) => {
     const yes = await confirm({
       title: "Swap the winner?",
-      text: `${m.winner === "blue" ? "Red" : "Blue"} side will be saved as the winner. Ratings are recalculated.`,
+      text: `${m.winner === "blue" ? "Red" : "Blue"} side will be saved as the winner. Elo is recalculated.`,
       yes: "Swap winner",
       danger: false,
     });
@@ -53,30 +55,10 @@ export default function History() {
       {m[s].map((id) => {
         const st = m.stats[id];
         const rc = c.changes[m.id]?.[id];
-        const why = rc
-          ? [
-              `Game ${rc.base > 0 ? "+" : ""}${rc.base}`,
-              rc.streak ? `win streak +${rc.streak}` : "",
-              rc.bounty ? `bounty +${rc.bounty}` : "",
-              rc.ff ? `surrender ${rc.ff}` : "",
-            ]
-              .filter(Boolean)
-              .join(", ")
-          : "";
         return (
           <div key={id} className="tp">
             <span>{pname(id)}</span>
-            {rc && (
-              <span
-                className="k"
-                title={`Rating ${rc.delta > 0 ? "+" : ""}${rc.delta} (${why})`}
-                aria-label={`Rating change ${rc.delta > 0 ? "plus" : "minus"} ${Math.abs(rc.delta)}`}
-                style={{ color: rc.delta > 0 ? "var(--color-ice)" : "var(--color-mute)", fontWeight: 600 }}
-              >
-                {rc.delta > 0 ? "+" : "−"}
-                {Math.abs(rc.delta)}
-              </span>
-            )}
+            {rc && <EloDelta d={rc.delta} why={reasons(rc).join(", ")} />}
             {st?.champion && <span className="c">{st.champion}</span>}
             {hasKda(st) && (
               <span className="k">
@@ -125,7 +107,7 @@ export default function History() {
           </select>
         </div>
       </div>
-      <div className="panel" style={{ padding: 0 }}>
+      <div className="panel hist" style={{ padding: 0 }}>
         {list.length === 0 ? (
           <Empty
             title={data.matches.length ? "No games here" : "No games yet"}
