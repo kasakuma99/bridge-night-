@@ -3,16 +3,10 @@ import { Link } from "react-router-dom";
 import { Download, ShieldCheck } from "lucide-react";
 import { SAMPLE_MODE, useAuth } from "../data/context";
 import { HelperTokensPanel } from "../components/HelperAdmin";
+import { Skeleton } from "../components/ui";
+import { pickHelperRelease, type Release } from "../components/qol/logic";
 
 export const REPO = "kasakuma99/bridge-night-";
-
-interface Release {
-  version: string;
-  url: string;
-  sha256: string | null;
-  date: string;
-  page: string;
-}
 
 /** Newest helper release from GitHub (public API, no key). */
 function useHelperRelease() {
@@ -21,23 +15,7 @@ function useHelperRelease() {
     const ac = new AbortController();
     fetch(`https://api.github.com/repos/${REPO}/releases?per_page=20`, { signal: ac.signal, headers: { Accept: "application/vnd.github+json" } })
       .then((r) => (r.ok ? r.json() : []))
-      .then((list: { tag_name: string; html_url: string; published_at: string; body?: string; draft: boolean; assets: { name: string; browser_download_url: string; digest?: string }[] }[]) => {
-        const rel = list.find((r) => !r.draft && r.tag_name.startsWith("helper-v") && r.assets.some((a) => a.name === "bridge-night-helper.exe"));
-        if (!rel) return setState({ loading: false, release: null });
-        const exe = rel.assets.find((a) => a.name === "bridge-night-helper.exe")!;
-        const fromDigest = exe.digest?.startsWith("sha256:") ? exe.digest.slice(7) : null;
-        const fromNotes = rel.body?.match(/SHA-256:\*\*\s*`([0-9a-f]{64})`/i)?.[1] ?? null;
-        setState({
-          loading: false,
-          release: {
-            version: rel.tag_name.replace(/^helper-v/, ""),
-            url: exe.browser_download_url,
-            sha256: (fromDigest ?? fromNotes)?.toLowerCase() ?? null,
-            date: new Date(rel.published_at).toLocaleDateString("de-DE", { timeZone: "Europe/Berlin" }),
-            page: rel.html_url,
-          },
-        });
-      })
+      .then((list: unknown) => setState({ loading: false, release: pickHelperRelease(list, REPO) }))
       .catch(() => !ac.signal.aborted && setState({ loading: false, release: null }));
     return () => ac.abort();
   }, []);
@@ -119,11 +97,14 @@ export default function Helper() {
                 </p>
               )}
             </>
+          ) : loading ? (
+            <div role="status" aria-busy="true">
+              <p className="sub">Looking for the latest version…</p>
+              <Skeleton h={44} />
+            </div>
           ) : (
             <>
-              <p className="sub">
-                {loading ? "Looking for the latest version…" : "No release found right now. Try again later, or see the releases on GitHub."}
-              </p>
+              <p className="sub">No release found right now. Try again later, or see the releases on GitHub.</p>
               <div>
                 <a className="btn" href={`https://github.com/${REPO}/releases`} target="_blank" rel="noopener noreferrer">
                   <Download aria-hidden /> Releases on GitHub
