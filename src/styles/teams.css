@@ -1,0 +1,99 @@
+/* Teams tab. Uses the design tokens from index.css; everything is scoped under .tm. */
+
+.tm-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+
+/* ---------- setup panel ---------- */
+.tm-setup { display: grid; gap: 0; }
+.tm-top { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 16px; margin-bottom: 14px; }
+.tm-top .hint { margin: 0; font-size: 14px; }
+
+.tm-chips { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 168px), 1fr)); gap: 8px; }
+.tm-chips .chip { justify-content: flex-start; padding-right: 14px; }
+.tm-chips .chip .tm-nm { flex: 1; text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tm-chips .chip small { font-size: 13px; font-weight: 600; color: var(--color-dim); }
+.tm-chips .chip[aria-pressed="true"] small { color: var(--color-ice); }
+.tm-chips .chip.add { justify-content: center; }
+.tm-chips .addchip { grid-column: 1 / -1; flex-wrap: wrap; }
+.tm-chips .chip[disabled] { cursor: not-allowed; }
+
+.tm-fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr)); gap: 18px 24px; margin-top: 18px; padding-top: 18px; border-top: 1px solid var(--color-line); }
+.tm-field { display: grid; gap: 8px; align-content: start; justify-items: start; }
+.tm-label { font-size: 13px; font-weight: 600; color: var(--color-mute); }
+.tm-desc { font-size: 13px; color: var(--color-dim); max-width: 46ch; }
+
+/* radio buttons that look like the segmented control */
+.tm-radio label { position: relative; display: inline-flex; align-items: center; min-height: 38px; padding: 0 14px; border-radius: 9px; cursor: pointer; font-weight: 600; color: var(--color-mute); transition: background .15s, color .15s; }
+.tm-radio input { position: absolute; inset: 0; margin: 0; opacity: 0; cursor: pointer; }
+.tm-radio label:hover { color: var(--color-ink); }
+.tm-radio label:has(input:checked) { background: var(--color-s3); color: var(--color-ink); }
+.tm-radio label:has(input:focus-visible) { outline: 2px solid var(--color-ice); outline-offset: 2px; }
+.tm-radio label:has(input:disabled) { opacity: .45; cursor: not-allowed; }
+.tm-radio input:disabled { cursor: not-allowed; }
+
+/* who sits out */
+.tm-sitbox { display: grid; gap: 14px; margin-top: 18px; padding: 16px; border-radius: var(--radius-md); background: var(--color-bg); border: 1px solid var(--color-line); animation: pop .3s var(--ease-out) both; }
+.tm-sitlist { display: grid; gap: 10px; }
+.tm-sitlist .note { margin: 0; }
+.tm-sithead { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; font-weight: 600; }
+.tm-why { font-size: 13px; font-weight: 400; color: var(--color-dim); }
+.tm-badge { font-size: 12px; font-weight: 600; color: var(--color-mute); padding: 2px 9px; border-radius: 999px; border: 1px solid var(--color-line2); }
+.tm-badge.ok { color: var(--color-ice); border-color: color-mix(in srgb, var(--color-ice) 45%, transparent); background: color-mix(in srgb, var(--color-ice) 10%, transparent); }
+.tm-outs { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 8px; }
+.tm-outs li { display: inline-flex; align-items: center; gap: 9px; min-height: 40px; padding: 0 14px 0 5px; border-radius: 999px; border: 1px dashed var(--color-line2); color: var(--color-mute); font-weight: 600; animation: pop .3s var(--ease-out) both; }
+.tm-outs .ava { opacity: .6; width: 28px; height: 28px; font-size: 12px; }
+.tm-pick .tm-tick { width: 16px; height: 16px; color: var(--color-ice); margin-left: -2px; }
+
+/* action row */
+.tm-go { justify-content: space-between; margin-top: 4px; }
+.tm .opts + .tm-go { margin-top: 12px; }
+.tm-sum { color: var(--color-mute); font-size: 14px; }
+.tm-sum b { color: var(--color-ink); font: 700 16px var(--font-disp); }
+.tm-go .btn.pri { min-width: 200px; }
+
+/* ---------- board ---------- */
+.tm-result { margin-top: 20px; }
+.tm .board { margin-top: 0; gap: 14px; }
+.tm-side { padding: 18px 18px 8px; }
+.tm-sh { min-height: 58px; display: flex; align-items: center; justify-content: space-between; gap: 10px; padding-bottom: 12px; margin-bottom: 2px; border-bottom: 1px solid color-mix(in srgb, var(--color-line2) 60%, transparent); }
+.tm-sh h3 { display: inline-flex; align-items: center; gap: 9px; font-size: 20px; }
+.tm-sh h3::before { content: ""; width: 10px; height: 10px; border-radius: 50%; background: var(--color-blue); box-shadow: 0 0 12px var(--color-blue); }
+.side.r .tm-sh h3::before { background: var(--color-red); box-shadow: 0 0 12px var(--color-red); }
+.tm-telo { display: grid; justify-items: end; line-height: 1.1; }
+.tm-telo small { font-size: 12px; font-weight: 600; color: var(--color-mute); }
+.tm-telo b { font-size: 26px; font-weight: 700; }
+.tm-side .pl:first-of-type { border-top: 0; }
+.tm-r { font-size: 18px; font-weight: 700; color: var(--color-ink); }
+.tm-slot { display: flex; align-items: center; gap: 12px; padding: 11px 0; color: var(--color-dim); font-size: 14px; border-top: 1px solid color-mix(in srgb, var(--color-line2) 60%, transparent); }
+.tm-slot .ava { border: 1px dashed var(--color-line2); }
+.tm .vs span { display: grid; place-items: center; width: 52px; height: 52px; border-radius: 50%; border: 1px solid var(--color-line2); background: var(--color-s1); font-size: 17px; letter-spacing: .04em; color: var(--color-ice); }
+.tm .prob { padding: 14px 16px; border-radius: var(--radius-md); border: 1px solid var(--color-line); background: var(--color-s1); margin-top: 14px; }
+.tm .sit { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; }
+.tm-sitp { display: inline-flex; align-items: center; gap: 7px; color: var(--color-ink); font-weight: 600; }
+.tm-sitp .ava { width: 24px; height: 24px; font-size: 11px; opacity: .7; }
+.tm-draft { margin-top: 16px; }
+.tm-draft .win .btn { flex: 0 1 auto; }
+
+@media (min-width: 900px) {
+  .tm-sitbox { grid-template-columns: auto minmax(0, 1fr); gap: 24px; align-items: start; }
+  .tm-sitlist { padding-left: 24px; border-left: 1px solid var(--color-line); min-height: 100%; align-content: start; }
+}
+
+/* reveal: players slide in one after another */
+.tm .side.reveal .pl { animation: tm-row .4s var(--ease-out) both; animation-delay: calc(.12s + var(--i, 0) * 70ms); }
+.tm .side.r.reveal .pl { animation-name: tm-row-r; animation-delay: calc(.24s + var(--i, 0) * 70ms); }
+@keyframes tm-row { from { opacity: 0; transform: translateX(-8px); } to { opacity: 1; transform: none; } }
+@keyframes tm-row-r { from { opacity: 0; transform: translateX(8px); } to { opacity: 1; transform: none; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .tm .side.reveal .pl, .tm-sitbox, .tm-outs li { animation: none; }
+}
+
+@media (max-width: 640px) {
+  .tm-setup { padding: 16px; }
+  .tm-chips { grid-template-columns: repeat(auto-fill, minmax(min(100%, 140px), 1fr)); }
+  .tm-field, .tm-field .seg { width: 100%; }
+  .tm-field .seg > * { flex: 1; justify-content: center; }
+  .tm-sitbox { padding: 14px; }
+  .tm-go .btn.pri { flex: 1 1 100%; }
+  .tm .vs span { width: 40px; height: 40px; font-size: 14px; }
+}

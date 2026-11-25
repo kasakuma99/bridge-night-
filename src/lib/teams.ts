@@ -1,5 +1,5 @@
 import type { LiveGame, Match, Side, TeamSize, TeamStyle } from "./types";
-import { combos, rndInt, shuffle, uid, type Rng } from "./util";
+import { combos, plural, rndInt, shuffle, uid, type Rng } from "./util";
 
 export const teamKey = (a: string[], b: string[]) =>
   [a.slice().sort().join(","), b.slice().sort().join(",")].sort().join("|");
@@ -27,6 +27,52 @@ export function sitPriority(matches: Match[], ids: string[]): Record<string, num
   return out;
 }
 
+/* ---------- who sits out ---------- */
+
+/** "fair": whoever sat out most recently plays first (rotation). "random": anyone. "pick": tapped by hand. */
+export type SitMode = "fair" | "random" | "pick";
+
+/** How many players sit out with this many selected. */
+export const extraPlayers = (n: number, size: number) => Math.max(0, n - 2 * size);
+
+/** A stable seed from a string, so the same selection shows the same sit-out on every device. */
+export function strSeed(s: string) {
+  let h = 2166136261; // FNV-1a: spreads short, similar strings over the whole range
+  for (const ch of s) h = Math.imul(h ^ ch.charCodeAt(0), 16777619);
+  return ((h >>> 0) % 2147483646) + 1;
+}
+
+/** Picks that are still in tonight's selection, without duplicates. */
+export const validPicks = (picked: string[], selected: string[]) =>
+  picked.filter((id, i) => selected.includes(id) && picked.indexOf(id) === i);
+
+/** Players who sit out this game (empty when nobody has to). Throws in "pick" mode until exactly the right number is picked. */
+export function planSitOut(o: {
+  selected: string[];
+  size: TeamSize;
+  mode: SitMode;
+  sitPriority: Record<string, number>;
+  picked?: string[];
+  rng?: Rng;
+}): string[] {
+  const extra = extraPlayers(o.selected.length, o.size);
+  if (!extra) return [];
+  if (o.mode === "pick") {
+    const p = validPicks(o.picked ?? [], o.selected);
+    if (p.length !== extra) throw new Error(`Pick ${plural(extra, "player")} to sit out`);
+    return p;
+  }
+  let order = shuffle(o.selected, o.rng ?? Math.random);
+  if (o.mode === "fair") order = order.sort((a, b) => (o.sitPriority[b] || 0) - (o.sitPriority[a] || 0));
+  return order.slice(2 * o.size);
+}
+
+/** Tap a player in "pick" mode: on/off; when already full, the oldest pick makes room. */
+export function toggleSitPick(picked: string[], id: string, extra: number): string[] {
+  if (picked.includes(id)) return picked.filter((x) => x !== id);
+  return [...picked, id].slice(-Math.max(1, extra));
+}
+
 /** Snake order A-B-B-A-A-B… for `n` picks, `first` side picks first. */
 export function snakeOrder(n: number, first: Side): Side[] {
   const second: Side = first === "blue" ? "red" : "blue";
@@ -39,6 +85,8 @@ export interface MakeTeamsInput {
   style: TeamStyle;
   ratingOf: (id: string) => number;
   sitPriority: Record<string, number>;
+  /** Who sits out, chosen beforehand with planSitOut. Default: fair rotation. */
+  sitOut?: string[];
   apart?: [string, string] | null;
   /** Teams of the last played game (when "Avoid the teams from the last game" is on). */
   avoid?: { blue: string[]; red: string[] } | null;
@@ -51,14 +99,13 @@ export interface MakeTeamsInput {
 export function makeTeams(inp: MakeTeamsInput): LiveGame {
   const rng = inp.rng ?? Math.random;
   const { size } = inp;
-  let pool = inp.selected.slice();
-  let sitOut: string[] = [];
-  if (pool.length > 2 * size) {
-    pool = shuffle(pool, rng).sort((a, b) => (inp.sitPriority[b] || 0) - (inp.sitPriority[a] || 0));
-    sitOut = pool.slice(2 * size);
-    pool = pool.slice(0, 2 * size);
-  }
+  const sitOut = inp.sitOut ?? planSitOut({ selected: inp.selected, size, mode: "fair", sitPriority: inp.sitPriority, rng });
+  const pool = shuffle(
+    inp.selected.filter((id) => !sitOut.includes(id)),
+    rng,
+  );
   if (pool.length < 2 * size) throw new Error("Not enough players for this size");
+  if (pool.length > 2 * size) throw new Error("Too many players for this size");
 
   const [a1, a2] = inp.apart ?? [];
   const apart = a1 && a2 && a1 !== a2 && pool.includes(a1) && pool.includes(a2) ? [a1, a2] : null;

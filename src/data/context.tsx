@@ -6,6 +6,7 @@ import { supabase } from "../lib/supabase";
 import { compute, type Computed } from "../lib/stats";
 import type { AppData, Player, TeamSize, TeamStyle } from "../lib/types";
 import { fallbackDDragon, loadDDragon, type DDragon } from "../lib/champions";
+import type { SitMode } from "../lib/teams";
 
 /** Sample data: forced with VITE_SAMPLE_DATA=true, or automatic in local dev when Supabase isn't configured. */
 export const SAMPLE_MODE = import.meta.env.VITE_SAMPLE_DATA === "true" || (!supabase && import.meta.env.DEV);
@@ -101,10 +102,24 @@ export interface Prefs {
   /** reroll key -> number of drafts made */
   rerolls: Record<string, number>;
   period: 30 | 0;
+  /** Who sits out when too many players are in. */
+  sitMode: SitMode;
+  /** Players tapped to sit out in "pick" mode. */
+  sitPick: string[];
 }
 
 const PREFS_KEY = "bn-prefs-v1";
-const defaultPrefs: Prefs = { selected: null, size: null, style: "random", avoidLast: true, apart: ["", ""], rerolls: {}, period: 30 };
+const defaultPrefs: Prefs = {
+  selected: null,
+  size: null,
+  style: "random",
+  avoidLast: true,
+  apart: ["", ""],
+  rerolls: {},
+  period: 30,
+  sitMode: "fair",
+  sitPick: [],
+};
 
 function readPrefs(): Prefs {
   try {
