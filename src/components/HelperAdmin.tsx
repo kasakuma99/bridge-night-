@@ -149,6 +149,7 @@ interface PendingRow {
   created_at: string;
   payload: {
     durationSec?: number;
+    surrender?: "ff" | "early";
     players: { playerId: string; side: "blue" | "red"; win: boolean; champion?: string; kills?: number; deaths?: number; assists?: number }[];
   };
 }
@@ -220,6 +221,7 @@ export function PendingResults() {
               <p className="sub">
                 {when(r.created_at)}
                 {r.payload.durationSec ? ` · ${Math.round(r.payload.durationSec / 60)} min` : ""}
+                {r.payload.surrender ? ` · ${won === "blue" ? "Red" : "Blue"} surrendered (FF)` : ""}
               </p>
             </div>
             <button className="btn sm pri" type="button" onClick={() => void accept(r)}>

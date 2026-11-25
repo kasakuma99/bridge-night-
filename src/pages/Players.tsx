@@ -160,6 +160,7 @@ export default function Players() {
 
 function PlayerRow({ p, onRemove }: { p: Player; onRemove: () => void }) {
   const { store } = useData();
+  const { isAdmin } = useAuth();
   const toast = useToast();
   const [name, setName] = useState(p.name);
   const [riot, setRiot] = useState(p.riotId ?? "");
@@ -184,7 +185,13 @@ function PlayerRow({ p, onRemove }: { p: Player; onRemove: () => void }) {
   return (
     <div className="prow">
       <Avatar id={p.id} />
-      <input className="f" value={name} onChange={(e) => setName(e.target.value)} onBlur={saveName} onKeyDown={enter} aria-label={`Name of ${p.name}`} maxLength={20} />
+      {isAdmin ? (
+        <input className="f" value={name} onChange={(e) => setName(e.target.value)} onBlur={saveName} onKeyDown={enter} aria-label={`Name of ${p.name}`} maxLength={20} />
+      ) : (
+        <b title="Only admins can rename players" style={{ alignSelf: "center" }}>
+          {p.name}
+        </b>
+      )}
       <input
         className="f riot"
         value={riot}

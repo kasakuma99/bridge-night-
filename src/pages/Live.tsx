@@ -354,6 +354,16 @@ export default function Live() {
         <p className="note">You're watching live. Members fill in picks and results.</p>
       )}
       {L.phase === "result" && isMember && (
+        <label style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 12 }}>
+          <input
+            type="checkbox"
+            checked={!!L.surrender}
+            onChange={(e) => set({ surrender: e.target.checked ? "ff" : undefined })}
+          />
+          <span>The losing team surrendered (FF)</span>
+        </label>
+      )}
+      {L.phase === "result" && isMember && (
         <p className="note">
           K/D/A is optional. Leave it empty if you didn't check the scoreboard. <button className="linkbtn" style={{ margin: 0, minHeight: 0 }} type="button" onClick={() => set({ phase: "playing" })}>Back to the game</button>
         </p>

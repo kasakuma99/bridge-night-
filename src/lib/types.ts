@@ -46,7 +46,11 @@ export interface Match {
   gameId?: string;
   /** Live game id it came from, so the same live game is never saved twice. */
   liveId?: string;
+  /** The losing team surrendered ("ff"), or surrendered early ("early"). */
+  surrender?: Surrender;
 }
+
+export type Surrender = "ff" | "early";
 
 export type LivePhase = "draft" | "select" | "playing" | "result";
 
@@ -72,6 +76,7 @@ export interface LiveGame {
   lockedAt?: number;
   startedAt?: number;
   durationMin?: number;
+  surrender?: Surrender;
 }
 
 export interface Settings {

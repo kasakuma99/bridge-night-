@@ -141,6 +141,7 @@ export class LocalStore implements DataStore {
       dodges: L.dodgeLog,
       sitOut: L.sitOut,
       challenge: L.challenge || undefined,
+      surrender: L.surrender,
       durationMin: L.durationMin ?? (L.startedAt ? Math.max(1, Math.round((now - L.startedAt) / 6e4)) : undefined),
     };
     this.update((d) => ({ ...d, matches: [...d.matches, m], live: null }));
