@@ -160,3 +160,6 @@ vite.config.ts.timestamp-*
 *.local.json
 supabase/.temp/
 !.env.sample
+
+# Helper build output (built by GitHub Actions)
+helper/dist/
