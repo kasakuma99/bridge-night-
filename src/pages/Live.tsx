@@ -81,13 +81,20 @@ export default function Live() {
     const s = sideOf(id);
     const champ = L.stats[id]?.champion;
     if (!champ || dodges.left[s] <= 0) return;
-    const { champion: _drop, ...rest } = L.stats[id];
-    void _drop;
+    // A dodge restarts champ select: everyone gets new random champions, so all picks are cleared.
+    // It still costs one dodge of the dodger's team.
+    const stats = Object.fromEntries(
+      Object.entries(L.stats).map(([pid, st]) => {
+        const { champion: _drop, ...rest } = st;
+        void _drop;
+        return [pid, rest];
+      }),
+    );
     set({
-      stats: { ...L.stats, [id]: rest },
+      stats,
       dodgeLog: [...L.dodgeLog, { playerId: id, champion: champ, side: s, at: Date.now() }],
     });
-    toast(`${pname(id)} dodged ${champ}. ${s === "blue" ? "Blue" : "Red"} has ${dodges.left[s] - 1} left tonight`);
+    toast(`${pname(id)} dodged ${champ}. New champions for everyone. ${s === "blue" ? "Blue" : "Red"} has ${dodges.left[s] - 1} left tonight`);
   };
 
   const spin = () => {
