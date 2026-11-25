@@ -35,14 +35,14 @@ using System.Windows.Forms;
 [assembly: AssemblyTitle("Bridge Night Helper")]
 [assembly: AssemblyProduct("Bridge Night Helper")]
 [assembly: AssemblyDescription("Sends custom game picks and results to the Bridge Night site. Read-only towards the League client.")]
-[assembly: AssemblyVersion("0.1.0.0")]
-[assembly: AssemblyFileVersion("0.1.0.0")]
+[assembly: AssemblyVersion("0.2.0.0")]
+[assembly: AssemblyFileVersion("0.2.0.0")]
 
 namespace BridgeNight
 {
     static class Program
     {
-        public const string Version = "0.1.0";
+        public const string Version = "0.2.0";
         public const string DefaultServer = "https://kimgoxjydargqtbwolxz.supabase.co/functions/v1/helper";
 
         [STAThread]
@@ -284,30 +284,43 @@ namespace BridgeNight
                 if (lastPhase != "") { lastPhase = ""; log("League client closed"); }
                 return;
             }
+            if (lastPhase == "") log("Connected to the League client (port " + c.Port + ")");
             var phase = (Lcu.Get(c, "/lol-gameflow/v1/gameflow-phase") ?? "None").ToString();
+            var inGameFlow = phase == "ChampSelect" || phase == "GameStart" || phase == "InProgress" || phase == "Reconnect"
+                || phase == "WaitingForStats" || phase == "PreEndOfGame" || phase == "EndOfGame";
+            object sess = null;
+            if (inGameFlow)
+            {
+                // Check every time: right after the phase changes, the session can still be incomplete.
+                sess = Lcu.Get(c, "/lol-gameflow/v1/session");
+                var gd = Json.Dict(sess, "gameData");
+                var isCustom = Json.Bool(gd, "isCustomGame");
+                if (isCustom.HasValue)
+                {
+                    if (isCustom.Value != customGame || phase != lastPhase)
+                        log("Game type: " + (isCustom.Value ? "custom game" : "not a custom game (nothing is sent)"));
+                    customGame = isCustom.Value;
+                }
+            }
+            else if (phase == "None" || phase == "Lobby" || phase == "Matchmaking") customGame = false;
+
             if (phase != lastPhase)
             {
                 log("Client phase: " + phase);
-                if (phase == "ChampSelect" || phase == "InProgress" || phase == "GameStart" || phase == "EndOfGame" || phase == "PreEndOfGame" || phase == "WaitingForStats")
-                {
-                    var sess = Lcu.Get(c, "/lol-gameflow/v1/session");
-                    var gd = Json.Dict(sess, "gameData");
-                    var isCustom = Json.Bool(gd, "isCustomGame");
-                    if (isCustom.HasValue) customGame = isCustom.Value;
-                    else if (phase == "ChampSelect") customGame = false;
-                }
                 if (phase == "ChampSelect") { lastPicksSig = ""; eogGiveUp = DateTime.MinValue; }
             }
             var prev = lastPhase;
             lastPhase = phase;
-            status(settings.Paused ? "Paused" : customGame && phase != "None" && phase != "Lobby" ? "Custom game: " + phase : "Connected to the League client");
+            status(settings.Paused ? "Paused" : customGame && inGameFlow ? "Custom game: " + phase : "Connected to the League client");
 
             if (!customGame) return;
 
-            if (phase == "ChampSelect") ChampSelect(c);
-            else if (phase == "InProgress" && prev != "InProgress" && prev != "")
+            if (phase == "ChampSelect") ChampSelect(c, sess);
+            else if (phase == "InProgress" && prev != "InProgress")
             {
-                if (lastPlayers.Count >= 2) Send(Dict("type", "phase", "phase", "InProgress", "players", lastPlayers.ToArray()), "Game started");
+                if (lastPlayers.Count == 0) lastPlayers = Players(c, sess, null).Select(p => (string)p["riotId"]).ToList();
+                if (lastPlayers.Count >= 1) Send(Dict("type", "phase", "phase", "InProgress", "players", lastPlayers.ToArray()), "Game started");
+                else log("Game started, but no players could be read");
             }
             else if (phase == "EndOfGame" || phase == "PreEndOfGame" || phase == "WaitingForStats") EndOfGame(c);
         }
@@ -352,34 +365,70 @@ namespace BridgeNight
             return champions != null && champions.TryGetValue(id, out n) ? n : null;
         }
 
-        void ChampSelect(LcuCreds c)
+        /// Everyone in the game with their side (blue = team 100 / teamOne, red = team 200 / teamTwo) and champion.
+        /// The lobby (gameflow session) lists both teams; champ select only shows your own team's picks
+        /// in custom games, so both are combined.
+        List<Dictionary<string, object>> Players(LcuCreds c, object sess, object champSelect)
         {
-            var s = Lcu.Get(c, "/lol-champ-select/v1/session");
-            if (s == null) return;
-            var players = new List<object>();
-            var ids = new List<string>();
-            foreach (var team in new[] { "myTeam", "theirTeam" })
+            var byPuuid = new Dictionary<string, Dictionary<string, object>>();
+            var order = new List<string>();
+            Action<object, string> add = delegate(object p, string side)
             {
-                var list = Json.List(s, team);
-                if (list == null) continue;
-                foreach (var p in list)
+                var puuid = Json.Str(p, "puuid");
+                if (string.IsNullOrEmpty(puuid)) return;
+                Dictionary<string, object> e;
+                if (!byPuuid.TryGetValue(puuid, out e))
                 {
-                    var rid = RiotId(c, Json.Str(p, "puuid"), p);
-                    if (rid == null) continue;
-                    var champId = Json.Long(p, "championId") ?? 0;
-                    if (champId <= 0) champId = Json.Long(p, "championPickIntent") ?? 0;
-                    ids.Add(rid);
-                    players.Add(Dict("riotId", rid, "champion", Champion(c, champId) ?? ""));
+                    var rid = RiotId(c, puuid, p);
+                    if (rid == null) return;
+                    e = Dict("riotId", rid);
+                    byPuuid[puuid] = e;
+                    order.Add(puuid);
                 }
+                if (side != null && !e.ContainsKey("side")) e["side"] = side;
+                var champId = Json.Long(p, "championId") ?? 0;
+                if (champId <= 0) champId = Json.Long(p, "championPickIntent") ?? 0;
+                var name = Champion(c, champId);
+                if (!string.IsNullOrEmpty(name)) e["champion"] = name;
+            };
+
+            var gd = Json.Dict(sess, "gameData");
+            foreach (var p in Json.List(gd, "teamOne") ?? new object[0]) add(p, "blue");
+            foreach (var p in Json.List(gd, "teamTwo") ?? new object[0]) add(p, "red");
+            foreach (var sel in Json.List(gd, "playerChampionSelections") ?? new object[0]) add(sel, null);
+
+            if (champSelect != null)
+            {
+                foreach (var team in new[] { "myTeam", "theirTeam" })
+                    foreach (var p in Json.List(champSelect, team) ?? new object[0])
+                    {
+                        var t = Json.Long(p, "team");
+                        add(p, t == 1 ? "blue" : t == 2 ? "red" : null);
+                    }
             }
-            if (ids.Count < 2) return;
-            lastPlayers = ids;
+            return order.Select(k => byPuuid[k]).ToList();
+        }
+
+        void ChampSelect(LcuCreds c, object sess)
+        {
+            var cs = Lcu.Get(c, "/lol-champ-select/v1/session");
+            var players = Players(c, sess, cs);
+            if (players.Count == 0)
+            {
+                if (lastPicksSig != "none") log("Champ select: no players could be read yet");
+                lastPicksSig = "none";
+                return;
+            }
+            lastPlayers = players.Select(p => (string)p["riotId"]).ToList();
             var sig = Json.Write(players);
             // Send when picks change, and repeat every 20 s in case the site needed a moment.
             if (sig == lastPicksSig && (DateTime.UtcNow - lastPicksSent).TotalSeconds < 20) return;
+            if (sig != lastPicksSig)
+                log("Champ select: " + string.Join(", ", players.Select(p => p["riotId"] + (p.ContainsKey("side") ? " (" + p["side"] + ")" : "") +
+                    (p.ContainsKey("champion") ? " " + p["champion"] : "")).ToArray()));
             lastPicksSig = sig;
             lastPicksSent = DateTime.UtcNow;
-            Send(Dict("type", "champselect", "players", players.ToArray()), "Champ select picks");
+            Send(Dict("type", "champselect", "players", players.Cast<object>().ToArray()), "Champ select sent");
         }
 
         void EndOfGame(LcuCreds c)
@@ -547,9 +596,33 @@ namespace BridgeNight
             }
         }
 
+        static readonly object fileLock = new object();
+        static string LogFile { get { return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "BridgeNightHelper", "helper-log.txt"); } }
+
+        /// Also keeps a log file (no token in it), so problems can be checked after the game.
+        static void WriteLogFile(string text)
+        {
+            try
+            {
+                lock (fileLock)
+                {
+                    Directory.CreateDirectory(Path.GetDirectoryName(LogFile));
+                    var fi = new FileInfo(LogFile);
+                    if (fi.Exists && fi.Length > 512 * 1024)
+                    {
+                        var keep = File.ReadAllLines(LogFile, Encoding.UTF8);
+                        File.WriteAllLines(LogFile, keep.Skip(keep.Length / 2).ToArray(), Encoding.UTF8);
+                    }
+                    File.AppendAllText(LogFile, DateTime.Now.ToString("yyyy-MM-dd ") + text + Environment.NewLine, Encoding.UTF8);
+                }
+            }
+            catch { }
+        }
+
         void Log(string line)
         {
             var text = DateTime.Now.ToString("HH:mm:ss") + "  " + line;
+            WriteLogFile(text);
             ui.Post(delegate
             {
                 logLines.Add(text);
