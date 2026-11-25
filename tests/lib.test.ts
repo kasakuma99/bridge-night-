@@ -31,19 +31,19 @@ describe("ratings", () => {
     expect(rating(c, "b")).toBe(980);
     expect(rating(c, "c")).toBe(1000);
   });
-  it("after placement an even game moves 16 points (K=32)", () => {
-    expect(ratingChange({ ...base, rating: 1000, opponents: [1000], won: true }).delta).toBe(16);
-    expect(ratingChange({ ...base, rating: 1000, opponents: [1000], won: false }).delta).toBe(-16);
+  it("after placement an even game moves 15 points (K=30)", () => {
+    expect(ratingChange({ ...base, rating: 1000, opponents: [1000], won: true }).delta).toBe(15);
+    expect(ratingChange({ ...base, rating: 1000, opponents: [1000], won: false }).delta).toBe(-15);
   });
   it("the favourite wins less and the underdog loses less", () => {
     const favWins = ratingChange({ ...base, rating: 1100, opponents: [1000], won: true }).delta;
     const dogWins = ratingChange({ ...base, rating: 1000, opponents: [1100], won: true }).delta;
     const dogLoses = ratingChange({ ...base, rating: 1000, opponents: [1100], won: false }).delta;
     const favLoses = ratingChange({ ...base, rating: 1100, opponents: [1000], won: false }).delta;
-    expect(favWins).toBe(12);
-    expect(dogWins).toBe(20);
-    expect(dogLoses).toBe(-12);
-    expect(favLoses).toBe(-20);
+    expect(favWins).toBe(13);
+    expect(dogWins).toBe(17);
+    expect(dogLoses).toBe(-13);
+    expect(favLoses).toBe(-17);
   });
   it("compares each player with every opponent, not team averages", () => {
     // Same team, different ratings: the stronger player gains less for the same win.
@@ -53,8 +53,8 @@ describe("ratings", () => {
     expect(winChanceVs(1000, [900, 1100])).toBeCloseTo((expected(1000, 900) + expected(1000, 1100)) / 2);
   });
   it("surrendering costs 5 extra, only for the losers", () => {
-    expect(ratingChange({ ...base, rating: 1000, opponents: [1000], won: false, surrendered: true }).delta).toBe(-21);
-    expect(ratingChange({ ...base, rating: 1000, opponents: [1000], won: true, surrendered: true }).delta).toBe(16);
+    expect(ratingChange({ ...base, rating: 1000, opponents: [1000], won: false, surrendered: true }).delta).toBe(-20);
+    expect(ratingChange({ ...base, rating: 1000, opponents: [1000], won: true, surrendered: true }).delta).toBe(15);
     const c = compute([match(["a"], ["b"], "blue", { surrender: "ff" })], players);
     expect(rating(c, "b")).toBe(1000 - 20 - FF_PENALTY);
   });
@@ -65,8 +65,8 @@ describe("ratings", () => {
     expect(ratingChange({ ...base, rating: 1000, opponents: [1000], won: true, endedBounty: true }).bounty).toBe(3);
   });
   it("every game counts at least 3 points", () => {
-    expect(ratingChange({ ...base, rating: 1600, opponents: [1000], won: true }).delta).toBe(3);
-    expect(ratingChange({ ...base, rating: 1000, opponents: [1600], won: false }).delta).toBe(-3);
+    expect(ratingChange({ ...base, rating: 2000, opponents: [1000], won: true }).delta).toBe(3);
+    expect(ratingChange({ ...base, rating: 1000, opponents: [2000], won: false }).delta).toBe(-3);
   });
   it("records the change per game and recalculates from the match list", () => {
     const ms = [match(["a"], ["b"], "blue"), match(["a"], ["b"], "blue")];
