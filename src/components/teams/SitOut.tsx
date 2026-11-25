@@ -1,26 +1,20 @@
-import { useId } from "react";
-import { Check } from "lucide-react";
+import { Check, Dices, Hand, RotateCcw } from "lucide-react";
 import { useData } from "../../data/context";
 import { Avatar } from "../ui";
 import type { SitMode } from "../../lib/teams";
-import { plural } from "../../lib/util";
-
-const MODES: [SitMode, string][] = [
-  ["fair", "Fair rotation"],
-  ["random", "Random"],
-  ["pick", "Pick"],
-];
 
 const WHY: Record<SitMode, string> = {
-  fair: "Whoever sat out last time plays first.",
-  random: "Picked at random. A reroll may pick someone else.",
-  pick: "",
+  fair: "Fair rotation: whoever sat out last time plays first.",
+  random: "Picked at random. Shuffle again for someone else.",
+  pick: "Tap who sits out.",
 };
 
-/** "Who sits out": the mode choice plus a clear preview of who is out this game. */
+/** One simple line: who sits out, plus Shuffle (random), Choose (tap) and Fair (back to the default). */
 export function SitOut(props: {
   mode: SitMode;
   onMode: (m: SitMode) => void;
+  /** Random pick; pressing it again picks someone else. */
+  onShuffle: () => void;
   extra: number;
   selected: string[];
   /** Who sits out right now (planned, or of the current draft). */
@@ -32,80 +26,60 @@ export function SitOut(props: {
   disabled: boolean;
 }) {
   const { pname } = useData();
-  const id = useId();
-  const { mode, extra } = props;
+  const { mode, extra, disabled } = props;
+  const choosing = mode === "pick";
   return (
-    <div className="tm-sitbox">
-      <div className="tm-field">
-        <span className="tm-label" id={id}>
-          Who sits out
-        </span>
-        <div className="seg tm-radio" role="radiogroup" aria-labelledby={id}>
-          {MODES.map(([m, label]) => (
-            <label key={m}>
-              <input
-                type="radio"
-                name={`${id}-mode`}
-                value={m}
-                checked={mode === m}
-                disabled={props.disabled}
-                onChange={() => props.onMode(m)}
-              />
-              <span>{label}</span>
-            </label>
-          ))}
+    <div className="tm-sit2" aria-live="polite">
+      <div className="tm-sit2-row">
+        <span className="tm-label">{extra > 1 ? `${extra} sit out` : "Sits out"}</span>
+        {choosing ? (
+          <span className={`tm-badge${props.picks.length === extra ? " ok" : ""}`}>
+            {props.picks.length} of {extra} picked
+          </span>
+        ) : (
+          <ul className="tm-outs">
+            {props.out.map((p) => (
+              <li key={p}>
+                <Avatar id={p} />
+                {pname(p)}
+              </li>
+            ))}
+          </ul>
+        )}
+        <div className="tm-sit2-act">
+          <button type="button" className="btn sm" disabled={disabled} onClick={props.onShuffle}>
+            <Dices aria-hidden /> {mode === "random" ? "Shuffle again" : "Shuffle"}
+          </button>
+          <button type="button" className="btn sm ghost" aria-pressed={choosing} disabled={disabled} onClick={() => props.onMode("pick")}>
+            <Hand aria-hidden /> Choose
+          </button>
+          {mode !== "fair" && (
+            <button type="button" className="btn sm ghost" disabled={disabled} onClick={() => props.onMode("fair")}>
+              <RotateCcw aria-hidden /> Fair
+            </button>
+          )}
         </div>
       </div>
-
-      <div className="tm-sitlist" aria-live="polite">
-        {mode === "pick" ? (
-          <>
-            <p className="tm-sithead">
-              Tap who sits out{" "}
-              <span className={`tm-badge${props.picks.length === extra ? " ok" : ""}`}>
-                {props.picks.length} of {extra} picked
-              </span>
-            </p>
-            <div className="chips" role="group" aria-label="Pick who sits out">
-              {props.selected.map((p) => {
-                const on = props.picks.includes(p);
-                return (
-                  <button
-                    key={p}
-                    type="button"
-                    className="chip tm-pick"
-                    aria-pressed={on}
-                    disabled={props.disabled}
-                    onClick={() => props.onPick(p)}
-                  >
-                    <Avatar id={p} />
-                    {pname(p)}
-                    {on && <Check aria-hidden className="tm-tick" />}
-                  </button>
-                );
-              })}
-            </div>
-          </>
-        ) : (
-          <>
-            <p className="tm-sithead">
-              {extra > 1 ? `${plural(extra, "player")} sit out` : "Sits out"}
-              <span className="tm-why">{WHY[mode]}</span>
-            </p>
-            <ul className="tm-outs">
-              {props.out.map((p) => (
-                <li key={p}>
-                  <Avatar id={p} />
-                  {pname(p)}
-                </li>
-              ))}
-            </ul>
-          </>
-        )}
-        {props.apartOut.length > 0 && (
-          <p className="note">Keep apart is skipped this game: {props.apartOut.map(pname).join(" and ")} {props.apartOut.length > 1 ? "sit" : "sits"} out.</p>
-        )}
-      </div>
+      <p className="tm-why">{WHY[mode]}</p>
+      {choosing && (
+        <div className="chips" role="group" aria-label="Pick who sits out">
+          {props.selected.map((p) => {
+            const on = props.picks.includes(p);
+            return (
+              <button key={p} type="button" className="chip tm-pick" aria-pressed={on} disabled={disabled} onClick={() => props.onPick(p)}>
+                <Avatar id={p} />
+                {pname(p)}
+                {on && <Check aria-hidden className="tm-tick" />}
+              </button>
+            );
+          })}
+        </div>
+      )}
+      {props.apartOut.length > 0 && (
+        <p className="note">
+          Keep apart is skipped this game: {props.apartOut.map(pname).join(" and ")} {props.apartOut.length > 1 ? "sit" : "sits"} out.
+        </p>
+      )}
     </div>
   );
 }
