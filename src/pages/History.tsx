@@ -119,7 +119,9 @@ export default function History() {
                 </div>
               ) : null;
             prevDay = k;
+            const loser = m.winner === "blue" ? "Red" : "Blue";
             const extra = [
+              m.surrender && `${loser} surrendered${m.surrender === "early" ? " early" : ""} (FF)`,
               m.challenge && `Challenge: ${m.challenge}`,
               m.dodges.length > 0 && `Dodged: ${m.dodges.map((d) => `${pname(d.playerId)}${d.champion ? ` (${d.champion})` : ""}`).join(", ")}`,
             ].filter(Boolean);

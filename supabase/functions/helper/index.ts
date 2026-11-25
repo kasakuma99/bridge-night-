@@ -192,7 +192,8 @@ async function result(body: Record<string, unknown>, tokenId: string) {
   if (players.length < 2) return { ok: true, note: "fewer than 2 of our players, ignored" };
   if (!players.some((p) => p.side === "blue") || !players.some((p) => p.side === "red"))
     return { ok: true, note: "our players were all on one side, ignored" };
-  const payload = { gameId, durationSec: int(body.durationSec, 36_000), players };
+  const surrender = body.surrender === "ff" || body.surrender === "early" ? body.surrender : undefined;
+  const payload = { gameId, durationSec: int(body.durationSec, 36_000), surrender, players };
 
   const { data: dup } = await db.from("matches").select("id").eq("game_id", gameId).maybeSingle();
   if (dup) return { ok: true, note: "already saved" };

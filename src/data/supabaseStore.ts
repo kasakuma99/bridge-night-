@@ -8,7 +8,7 @@ interface PlayerRow { id: string; name: string; active: boolean; created_at: str
 interface RiotRow { player_id: string; riot_id: string }
 interface MatchRow {
   id: string; played_at: string; mode: number; winner: Side; sit_out: string[]; challenge: string | null;
-  duration_min: number | null; game_id: string | null; live_id: string | null;
+  duration_min: number | null; game_id: string | null; live_id: string | null; surrender: "ff" | "early" | null;
 }
 interface PartRow {
   match_id: string; player_id: string; team: Side; slot: number; champion: string | null; kills: number | null;
@@ -25,6 +25,7 @@ const PAGE = 1000;
 /** Readable messages for database errors. */
 function friendly(e: PostgrestError | Error, fallback: string): StoreError {
   const pe = e as PostgrestError;
+  if (pe.code === "42501" && /admins/i.test(pe.message)) return new StoreError(pe.message);
   if (pe.code === "42501") return new StoreError("Only members of our group can do that. Log in first.");
   if (pe.code === "23505") {
     if (/riot/i.test(pe.message + (pe.details ?? ""))) return new StoreError("That Riot ID is already used by another player");
@@ -104,7 +105,7 @@ export class SupabaseStore implements DataStore {
           this.all<PlayerRow>("players", "id,name,active,created_at", "created_at"),
           // Riot IDs are members-only: visitors are refused (on purpose), so treat that as "no Riot IDs".
           this.all<RiotRow>("player_riot_ids", "player_id,riot_id", "player_id").catch(() => [] as RiotRow[]),
-          this.all<MatchRow>("matches", "id,played_at,mode,winner,sit_out,challenge,duration_min,game_id,live_id", "played_at"),
+          this.all<MatchRow>("matches", "id,played_at,mode,winner,sit_out,challenge,duration_min,game_id,live_id,surrender", "played_at"),
           this.all<PartRow>("match_participants", "match_id,player_id,team,slot,champion,kills,deaths,assists,items,damage", "match_id"),
           this.all<DodgeRow>("dodge_log", "match_id,player_id,side,champion,at", "at"),
           this.sb.from("live_game").select("data").maybeSingle(),
@@ -175,6 +176,7 @@ export class SupabaseStore implements DataStore {
           ...(m.duration_min ? { durationMin: m.duration_min } : {}),
           ...(m.game_id ? { gameId: m.game_id } : {}),
           ...(m.live_id ? { liveId: m.live_id } : {}),
+          ...(m.surrender ? { surrender: m.surrender } : {}),
         };
       }),
       live,

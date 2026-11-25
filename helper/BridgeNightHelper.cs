@@ -35,14 +35,14 @@ using System.Windows.Forms;
 [assembly: AssemblyTitle("Bridge Night Helper")]
 [assembly: AssemblyProduct("Bridge Night Helper")]
 [assembly: AssemblyDescription("Sends custom game picks and results to the Bridge Night site. Read-only towards the League client.")]
-[assembly: AssemblyVersion("0.2.1.0")]
-[assembly: AssemblyFileVersion("0.2.1.0")]
+[assembly: AssemblyVersion("0.3.0.0")]
+[assembly: AssemblyFileVersion("0.3.0.0")]
 
 namespace BridgeNight
 {
     static class Program
     {
-        public const string Version = "0.2.1";
+        public const string Version = "0.3.0";
         public const string DefaultServer = "https://kimgoxjydargqtbwolxz.supabase.co/functions/v1/helper";
 
         [STAThread]
@@ -484,6 +484,8 @@ namespace BridgeNight
             }
             if (players.Count < 2) { log("End of game: not enough player data yet"); return; }
             var body = Dict("type", "result", "gameId", gid, "players", players.ToArray());
+            var surrender = Surrender(b);
+            if (surrender != null) body["surrender"] = surrender;
             var len = Json.Long(b, "gameLength");
             if (len.HasValue && len.Value > 0) body["durationSec"] = len.Value;
             if (Send(body, "Game result " + gid))
@@ -491,6 +493,37 @@ namespace BridgeNight
                 settings.SentGames.Add(gid);
                 try { settings.Save(); } catch { }
             }
+        }
+
+        /// "ff", "early" or null. The client only says whether the game ended by surrender, not who voted.
+        /// Field names differ between patches, so every "surrender" flag in the block, its teams and the
+        /// players' stats is checked, and what was found is written to the log.
+        string Surrender(object block)
+        {
+            var found = new List<string>();
+            Action<object, string> scan = delegate(object o, string where)
+            {
+                var d = o as Dictionary<string, object>;
+                if (d == null) return;
+                foreach (var kv in d)
+                {
+                    if (kv.Key.IndexOf("surrender", StringComparison.OrdinalIgnoreCase) < 0) continue;
+                    var on = kv.Value is bool ? (bool)kv.Value : kv.Value != null && (kv.Value.ToString() == "1" || kv.Value.ToString().Equals("true", StringComparison.OrdinalIgnoreCase));
+                    found.Add(where + kv.Key + "=" + kv.Value);
+                    if (on) found.Add(kv.Key.IndexOf("early", StringComparison.OrdinalIgnoreCase) >= 0 ? "!early" : "!ff");
+                }
+            };
+            scan(block, "");
+            foreach (var t in Json.List(block, "teams") ?? new object[0])
+            {
+                scan(t, "team.");
+                foreach (var p in Json.List(t, "players") ?? new object[0]) { scan(p, "player."); scan(Json.Dict(p, "stats"), "stats."); }
+            }
+            var info = found.Where(x => !x.StartsWith("!")).Distinct().ToArray();
+            log(info.Length > 0 ? "Surrender info: " + string.Join(", ", info) : "Surrender info: no surrender fields in the end-of-game data");
+            if (found.Contains("!early")) return "early";
+            if (found.Contains("!ff")) return "ff";
+            return null;
         }
 
         static Dictionary<string, object> Dict(params object[] kv)
