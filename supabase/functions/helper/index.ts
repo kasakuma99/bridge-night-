@@ -84,21 +84,46 @@ async function saveLive(row: { id: string; updated_at: string }, data: LiveGame)
 /** The known players from the helper, if they all belong to the live game. */
 function matchLive(L: LiveGame, playerIds: string[]) {
   const inGame = new Set([...L.blue, ...L.red]);
-  return playerIds.length >= 2 && playerIds.every((p) => inGame.has(p));
+  return playerIds.length >= 1 && playerIds.every((p) => inGame.has(p));
+}
+
+/** No live game on the site yet: start one from the League lobby (our players on both sides needed). */
+async function startLiveFromLobby(picks: { pid: string; champion?: string; side?: "blue" | "red" }[]) {
+  const blue = picks.filter((p) => p.side === "blue").map((p) => p.pid);
+  const red = picks.filter((p) => p.side === "red").map((p) => p.pid);
+  if (!blue.length || !red.length) return { ok: true, note: "no live game on the site, and our players aren't on both sides" };
+  const stats: Record<string, Record<string, unknown>> = {};
+  for (const p of picks) stats[p.pid] = p.champion ? { champion: p.champion } : {};
+  const now = Date.now();
+  const id = crypto.randomUUID();
+  const data = {
+    id, phase: "select", size: Math.min(4, Math.max(blue.length, red.length)), blue, red, sitOut: [],
+    stats, dodgeLog: [], createdAt: now, lockedAt: now,
+  };
+  // singleton: if someone started a game on the site at the same moment, theirs wins
+  const { error } = await db.from("live_game").insert({ id, data, updated_at: new Date().toISOString() });
+  if (error) return { ok: true, note: "a live game was started at the same time" };
+  return { ok: true, note: "started the live game on the site" };
 }
 
 /* ---------- handlers ---------- */
 
 async function champSelect(body: Record<string, unknown>) {
   const map = await roster();
-  const picks: { pid: string; champion?: string }[] = [];
-  for (const p of Array.isArray(body.players) ? body.players.slice(0, 10) : []) {
-    const pid = map.get(riot((p as Record<string, unknown>).riotId) ?? "");
-    if (pid) picks.push({ pid, champion: str((p as Record<string, unknown>).champion, 40) });
+  const picks: { pid: string; champion?: string; side?: "blue" | "red" }[] = [];
+  const seen = new Set<string>();
+  for (const raw of Array.isArray(body.players) ? body.players.slice(0, 10) : []) {
+    const p = raw as Record<string, unknown>;
+    const pid = map.get(riot(p.riotId) ?? "");
+    if (pid && !seen.has(pid)) {
+      seen.add(pid);
+      picks.push({ pid, champion: str(p.champion, 40), side: side(p.side) });
+    }
   }
+  if (!picks.length) return { ok: true, note: "none of our players in this game" };
   for (let attempt = 0; attempt < 3; attempt++) {
     const row = await loadLive();
-    if (!row) return { ok: true, note: "no live game on the site" };
+    if (!row) return await startLiveFromLobby(picks);
     const L = structuredClone(row.data);
     if (L.phase !== "draft" && L.phase !== "select") return { ok: true, note: "live game is past champ select" };
     if (!matchLive(L, picks.map((p) => p.pid))) return { ok: true, note: "players don't match the live game" };
