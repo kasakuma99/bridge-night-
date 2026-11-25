@@ -38,14 +38,14 @@ using System.Windows.Forms;
 [assembly: AssemblyTitle("Bridge Night Helper")]
 [assembly: AssemblyProduct("Bridge Night Helper")]
 [assembly: AssemblyDescription("Shows custom games on the Bridge Night site. Read-only towards League.")]
-[assembly: AssemblyVersion("0.5.0.0")]
-[assembly: AssemblyFileVersion("0.5.0.0")]
+[assembly: AssemblyVersion("0.6.0.0")]
+[assembly: AssemblyFileVersion("0.6.0.0")]
 
 namespace BridgeNight
 {
     static class Program
     {
-        public const string Version = "0.5.0";
+        public const string Version = "0.6.0";
         public const string DefaultServer = "https://kimgoxjydargqtbwolxz.supabase.co/functions/v1/live";
         /// Versions before 0.5 sent to this one. Settings that still have it move to the new one.
         public const string OldServer = "https://kimgoxjydargqtbwolxz.supabase.co/functions/v1/helper";
