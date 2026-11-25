@@ -35,14 +35,14 @@ using System.Windows.Forms;
 [assembly: AssemblyTitle("Bridge Night Helper")]
 [assembly: AssemblyProduct("Bridge Night Helper")]
 [assembly: AssemblyDescription("Sends custom game picks and results to the Bridge Night site. Read-only towards the League client.")]
-[assembly: AssemblyVersion("0.2.0.0")]
-[assembly: AssemblyFileVersion("0.2.0.0")]
+[assembly: AssemblyVersion("0.2.1.0")]
+[assembly: AssemblyFileVersion("0.2.1.0")]
 
 namespace BridgeNight
 {
     static class Program
     {
-        public const string Version = "0.2.0";
+        public const string Version = "0.2.1";
         public const string DefaultServer = "https://kimgoxjydargqtbwolxz.supabase.co/functions/v1/helper";
 
         [STAThread]
@@ -318,7 +318,14 @@ namespace BridgeNight
             if (phase == "ChampSelect") ChampSelect(c, sess);
             else if (phase == "InProgress" && prev != "InProgress")
             {
-                if (lastPlayers.Count == 0) lastPlayers = Players(c, sess, null).Select(p => (string)p["riotId"]).ToList();
+                // Loading screen: everyone sees all champions now, so they may be filled in on the site.
+                var all = Players(c, sess, null);
+                if (all.Count > 0)
+                {
+                    lastPlayers = all.Select(p => (string)p["riotId"]).ToList();
+                    log("Game loading: " + string.Join(", ", all.Select(p => p["riotId"] + (p.ContainsKey("champion") ? " " + p["champion"] : "")).ToArray()));
+                    Send(Dict("type", "champselect", "stage", "loading", "players", all.Cast<object>().ToArray()), "Champions sent");
+                }
                 if (lastPlayers.Count >= 1) Send(Dict("type", "phase", "phase", "InProgress", "players", lastPlayers.ToArray()), "Game started");
                 else log("Game started, but no players could be read");
             }
@@ -420,12 +427,15 @@ namespace BridgeNight
                 return;
             }
             lastPlayers = players.Select(p => (string)p["riotId"]).ToList();
+            // Fair play: during champ select nobody may learn picks they can't see in their own client
+            // (the site is shared by both teams). So only names and sides are sent here; champions follow
+            // when the game loads, when everyone sees all champions on the loading screen anyway.
+            foreach (var p in players) p.Remove("champion");
             var sig = Json.Write(players);
             // Send when picks change, and repeat every 20 s in case the site needed a moment.
             if (sig == lastPicksSig && (DateTime.UtcNow - lastPicksSent).TotalSeconds < 20) return;
             if (sig != lastPicksSig)
-                log("Champ select: " + string.Join(", ", players.Select(p => p["riotId"] + (p.ContainsKey("side") ? " (" + p["side"] + ")" : "") +
-                    (p.ContainsKey("champion") ? " " + p["champion"] : "")).ToArray()));
+                log("Champ select: " + string.Join(", ", players.Select(p => p["riotId"] + (p.ContainsKey("side") ? " (" + p["side"] + ")" : "")).ToArray()));
             lastPicksSig = sig;
             lastPicksSent = DateTime.UtcNow;
             Send(Dict("type", "champselect", "players", players.Cast<object>().ToArray()), "Champ select sent");

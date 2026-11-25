@@ -121,7 +121,7 @@ export default function History() {
             prevDay = k;
             const extra = [
               m.challenge && `Challenge: ${m.challenge}`,
-              m.dodges.length > 0 && `Dodged: ${m.dodges.map((d) => `${pname(d.playerId)} (${d.champion})`).join(", ")}`,
+              m.dodges.length > 0 && `Dodged: ${m.dodges.map((d) => `${pname(d.playerId)}${d.champion ? ` (${d.champion})` : ""}`).join(", ")}`,
             ].filter(Boolean);
             return (
               <div key={m.id}>

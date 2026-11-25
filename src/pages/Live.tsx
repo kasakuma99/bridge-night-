@@ -79,8 +79,9 @@ export default function Live() {
 
   const dodge = (id: string) => {
     const s = sideOf(id);
-    const champ = L.stats[id]?.champion;
-    if (!champ || dodges.left[s] <= 0) return;
+    // The champion may be unknown here: the helper only fills champions in once the game loads (fair play).
+    const champ = L.stats[id]?.champion ?? "";
+    if (dodges.left[s] <= 0) return;
     // A dodge restarts champ select: everyone gets new random champions, so all picks are cleared.
     // It still costs one dodge of the dodger's team.
     const stats = Object.fromEntries(
@@ -94,7 +95,7 @@ export default function Live() {
       stats,
       dodgeLog: [...L.dodgeLog, { playerId: id, champion: champ, side: s, at: Date.now() }],
     });
-    toast(`${pname(id)} dodged ${champ}. New champions for everyone. ${s === "blue" ? "Blue" : "Red"} has ${dodges.left[s] - 1} left tonight`);
+    toast(`${pname(id)} dodged${champ ? ` ${champ}` : ""}. New champions for everyone. ${s === "blue" ? "Blue" : "Red"} has ${dodges.left[s] - 1} left tonight`);
   };
 
   const spin = () => {
@@ -178,7 +179,7 @@ export default function Live() {
             <button
               className="dodge"
               type="button"
-              disabled={!champ || dodges.left[sideOf(id)] <= 0}
+              disabled={dodges.left[sideOf(id)] <= 0}
               onClick={() => dodge(id)}
               aria-label={`Dodge for ${pname(id)}`}
             >
@@ -307,7 +308,7 @@ export default function Live() {
       {L.sitOut.length > 0 && <p className="sit">Sitting out: {L.sitOut.map(pname).join(", ")}</p>}
       {L.dodgeLog.length > 0 && (
         <p className="sit" data-testid="dodgelog">
-          {L.dodgeLog.map((d) => `${pname(d.playerId)} dodged ${d.champion}`).join(" · ")}
+          {L.dodgeLog.map((d) => `${pname(d.playerId)} dodged${d.champion ? ` ${d.champion}` : ""}`).join(" · ")}
         </p>
       )}
       {isMember ? (

@@ -110,6 +110,9 @@ async function startLiveFromLobby(picks: { pid: string; champion?: string; side?
 
 async function champSelect(body: Record<string, unknown>) {
   const map = await roster();
+  // Fair play: champions are only accepted once the game is loading (everyone sees them on the loading screen).
+  // During champ select the site is shared by both teams, so picks there would reveal what the client hides.
+  const loading = body.stage === "loading";
   const picks: { pid: string; champion?: string; side?: "blue" | "red" }[] = [];
   const seen = new Set<string>();
   for (const raw of Array.isArray(body.players) ? body.players.slice(0, 10) : []) {
@@ -117,7 +120,7 @@ async function champSelect(body: Record<string, unknown>) {
     const pid = map.get(riot(p.riotId) ?? "");
     if (pid && !seen.has(pid)) {
       seen.add(pid);
-      picks.push({ pid, champion: str(p.champion, 40), side: side(p.side) });
+      picks.push({ pid, champion: loading ? str(p.champion, 40) : undefined, side: side(p.side) });
     }
   }
   if (!picks.length) return { ok: true, note: "none of our players in this game" };
