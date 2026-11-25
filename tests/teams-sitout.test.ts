@@ -97,6 +97,21 @@ describe("makeTeams with a chosen sit-out", () => {
     }
   });
 
+  it("works with uneven teams and 5v5", () => {
+    const ten = [...ids, "h", "i", "j"];
+    for (let s = 1; s < 30; s++) {
+      const out = planSitOut({ selected: ids, size: 3, sizes: [3, 2], mode: "fair", sitPriority: { a: 2 }, rng: seeded(s) });
+      expect(out).toHaveLength(2);
+      expect(out).not.toContain("a");
+      const L = makeTeams({ selected: ids, size: 3, sizes: [3, 2], style: "random", ratingOf, sitPriority: {}, sitOut: out, rng: seeded(s) });
+      expect([L.blue.length, L.red.length].sort()).toEqual([2, 3]);
+      expect(L.sitOut).toEqual(out);
+      const five = makeTeams({ selected: ten, size: 5, style: "balanced", ratingOf, sitPriority: {}, rng: seeded(s) });
+      expect([five.blue.length, five.red.length, five.sitOut.length]).toEqual([5, 5, 0]);
+    }
+    expect(() => planSitOut({ selected: ids, size: 3, sizes: [3, 2], mode: "pick", sitPriority: {}, picked: ["a"] })).toThrow("Pick 2 players to sit out");
+  });
+
   it("refuses a sit-out list of the wrong size", () => {
     expect(() => makeTeams({ selected: ids, size: 3, style: "random", ratingOf, sitPriority: {}, sitOut: [] })).toThrow("Too many");
     expect(() => makeTeams({ selected: ids, size: 3, style: "random", ratingOf, sitPriority: {}, sitOut: ["a", "b"] })).toThrow("Not enough");

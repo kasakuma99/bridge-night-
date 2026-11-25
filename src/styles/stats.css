@@ -11,6 +11,7 @@
 .rk { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
 .rk-head, .rk-row { display: grid; grid-template-columns: 28px minmax(0, 1fr) 56px 64px 52px 60px 48px; gap: 10px; align-items: center; }
 .rk-head { color: var(--color-dim); font-size: 12px; font-weight: 600; padding: 0 13px 6px; }
+.rk-head.noelo, .rk-row.noelo { grid-template-columns: 28px minmax(0, 1fr) 92px 52px 60px 48px; }
 .rk-head > :nth-child(n+3), .rk-row > :nth-child(n+3) { text-align: right; justify-content: flex-end; }
 .rk-row { width: 100%; padding: 10px 12px; border-radius: var(--radius-md); border: 1px solid transparent; background: transparent; text-align: left; cursor: pointer; transition: background .15s, border-color .15s; }
 .rk-row:hover { background: var(--color-s2); }
@@ -98,6 +99,7 @@
 @media (max-width: 640px) {
   .rk-head { display: none; }
   .rk-row { grid-template-columns: 22px minmax(0, 1fr) auto auto; gap: 10px; }
+  .rk-row.noelo { grid-template-columns: 22px minmax(0, 1fr) auto; }
   .rk-row .md { display: none; }
   .rk-row .who small.rk-meta { display: flex; }
   .rk-row .elo { font-size: 18px; }

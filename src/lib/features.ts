@@ -2,16 +2,16 @@ import type { Badge } from "./stats";
 import type { TeamStyle } from "./types";
 
 /**
- * What the site shows. Everything here is hidden for now, but the code, tests and stored data stay:
+ * What the site shows. What is false is hidden, but the code, tests and stored data stay:
  * set a value to true to bring a feature back.
  */
 export interface Features {
   /**
-   * The first Teams page (hero, captains, options, locking teams by hand). Off: the "Create random teams" page.
+   * The other Teams page (hero, captains, who sits out, options, locking teams by hand), from samu-dev. Off: the "Create random teams" page.
    * teamModes, rerollLimit, and the bounty and dodge info on the Teams page need this one too.
    */
   classicTeams: boolean;
-  /** Rivals page, rivalry banner and rivalry messages. */
+  /** Rivals page, and on the other Teams page the rivalry banner and messages. */
   rivals: boolean;
   /** Builds page. */
   builds: boolean;
@@ -25,6 +25,8 @@ export interface Features {
   dodges: boolean;
   /** Random challenges. */
   challenges: boolean;
+  /** A page per player (/stats/:id). Off: the side card on the Stats page. */
+  playerPages: boolean;
   /** Games with our players on one side only (alone, or against bots) are saved and counted. For testing: switch off before release. */
   soloGames: boolean;
   /** Calculated Elo ratings. Off: everyone has a fixed number of Papi Points. */
@@ -33,13 +35,14 @@ export interface Features {
 
 export const FEATURES: Features = {
   classicTeams: false,
-  rivals: false,
+  rivals: true,
   builds: false,
   teamModes: false,
   bounties: false,
   rerollLimit: false,
   dodges: false,
   challenges: false,
+  playerPages: false,
   soloGames: true,
   ratings: false,
 };

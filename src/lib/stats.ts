@@ -460,6 +460,26 @@ export function playerSummary(c: Computed, id: string, isActive: (id: string) =>
   };
 }
 
+/** Best teammate, victim and toughest opponent for the side card on the Stats page. */
+export function profile(c: Computed, id: string, isActive: (id: string) => boolean) {
+  const mate = c.groups
+    .filter((g) => g.ids.length === 2 && g.ids.includes(id) && g.g >= 3 && g.ids.every(isActive))
+    .sort((a, b) => b.w / b.g - a.w / a.g || b.g - a.g)[0];
+  const foes = c.h2h
+    .filter((f) => (f.a === id || f.b === id) && f.g >= 3 && isActive(f.a) && isActive(f.b))
+    .map((f) => {
+      const w = f.a === id ? f.wa : f.wb;
+      return { o: f.a === id ? f.b : f.a, w, l: f.g - w, g: f.g, r: w / f.g };
+    });
+  const victim = foes.slice().sort((a, b) => b.r - a.r || b.g - a.g)[0];
+  const nemesis = foes.slice().sort((a, b) => a.r - b.r)[0];
+  return {
+    mate: mate ? { id: mate.ids.find((i) => i !== id)!, w: mate.w, g: mate.g } : null,
+    victim: victim && victim.r > 0.5 ? victim : null,
+    nemesis: nemesis && nemesis.r < 0.5 ? nemesis : null,
+  };
+}
+
 export const topEntries = <K extends string | number>(rec: Record<K, number>, n: number) =>
   (Object.entries(rec) as [K, number][]).sort((a, b) => b[1] - a[1]).slice(0, n);
 

@@ -5,7 +5,7 @@ const DAY = 864e5;
 
 const TITLES: Record<string, string> = {
   "/live": "Live",
-  "/history": "History",
+  "/history": "Past games",
   "/stats": "Stats",
   "/rivals": "Rivals",
   "/builds": "Builds",
@@ -17,6 +17,7 @@ const TITLES: Record<string, string> = {
 export function pageTitle(pathname: string) {
   const p = pathname.toLowerCase().replace(/\/+$/, "") || "/";
   if (p === "/") return `${SITE} · Custom games hub`;
+  if (p.startsWith("/stats/")) return `Player stats · ${SITE}`;
   return `${TITLES[p] ?? "Page not found"} · ${SITE}`;
 }
 

@@ -1,13 +1,14 @@
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
+import { FEATURES } from "../lib/features";
 
-const PAGES = [
+const PAGES: [to: string, label: string][] = [
   ["/live", "Live game"],
-  ["/history", "History"],
+  ["/history", "Past games"],
   ["/stats", "Stats"],
-  ["/rivals", "Rivals"],
-  ["/builds", "Builds"],
-] as const;
+  ...(FEATURES.rivals ? [["/rivals", "Rivals"] as [string, string]] : []),
+  ...(FEATURES.builds ? [["/builds", "Builds"] as [string, string]] : []),
+];
 
 export default function NotFound() {
   const { pathname } = useLocation();
