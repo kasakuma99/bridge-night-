@@ -25,6 +25,7 @@ using System.Management;
 using System.Net;
 using System.Net.Security;
 using System.Reflection;
+using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.RegularExpressions;
@@ -35,14 +36,14 @@ using System.Windows.Forms;
 [assembly: AssemblyTitle("Bridge Night Helper")]
 [assembly: AssemblyProduct("Bridge Night Helper")]
 [assembly: AssemblyDescription("Sends custom game picks and results to the Bridge Night site. Read-only towards the League client.")]
-[assembly: AssemblyVersion("0.3.1.0")]
-[assembly: AssemblyFileVersion("0.3.1.0")]
+[assembly: AssemblyVersion("0.4.0.0")]
+[assembly: AssemblyFileVersion("0.4.0.0")]
 
 namespace BridgeNight
 {
     static class Program
     {
-        public const string Version = "0.3.1";
+        public const string Version = "0.4.0";
         public const string DefaultServer = "https://kimgoxjydargqtbwolxz.supabase.co/functions/v1/helper";
 
         [STAThread]
@@ -627,9 +628,10 @@ namespace BridgeNight
                 {
                     g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
                     g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.AntiAliasGridFit;
-                    using (var bg = new SolidBrush(Color.FromArgb(11, 15, 20))) g.FillEllipse(bg, 0, 0, 31, 31);
+                    using (var bg = new SolidBrush(Theme.Card)) g.FillEllipse(bg, 0, 0, 31, 31);
+                    using (var ring = new Pen(Theme.Pink, 2)) g.DrawEllipse(ring, 1, 1, 29, 29);
                     using (var f = new Font("Segoe UI", 15, FontStyle.Bold, GraphicsUnit.Pixel))
-                    using (var fg = new SolidBrush(Color.FromArgb(191, 230, 255)))
+                    using (var fg = Theme.Sunset(new RectangleF(4, 0, 24, 32)))
                     {
                         var sf = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center };
                         g.DrawString("BN", f, fg, new RectangleF(0, 0, 32, 32), sf);
@@ -714,6 +716,94 @@ namespace BridgeNight
         }
     }
 
+    /// Colours of the helper's own look (Vice City sunset, same as the site's Helper page).
+    static class Theme
+    {
+        public static readonly Color Night = Color.FromArgb(0x12, 0x0a, 0x1f);
+        public static readonly Color Card = Color.FromArgb(0x1b, 0x0f, 0x2e);
+        public static readonly Color Step = Color.FromArgb(0x24, 0x15, 0x39);
+        public static readonly Color Hover = Color.FromArgb(0x3a, 0x23, 0x58);
+        public static readonly Color Edge = Color.FromArgb(0x36, 0x21, 0x4f);
+        public static readonly Color Line = Color.FromArgb(0x4a, 0x2f, 0x6b);
+        public static readonly Color Ink = Color.FromArgb(0xfb, 0xf1, 0xf7);
+        public static readonly Color Mute = Color.FromArgb(0xbc, 0xab, 0xd0);
+        public static readonly Color Pink = Color.FromArgb(0xff, 0x3e, 0x8f);
+        public static readonly Color PinkSoft = Color.FromArgb(0xff, 0x8f, 0xbc);
+        public static readonly Color Coral = Color.FromArgb(0xff, 0x6b, 0x5b);
+        public static readonly Color Amber = Color.FromArgb(0xff, 0xc0, 0x6a);
+        public static readonly Color OnAccent = Color.FromArgb(0x1a, 0x0a, 0x16);
+
+        /// Pink to coral to amber, left to right.
+        public static System.Drawing.Drawing2D.LinearGradientBrush Sunset(RectangleF r)
+        {
+            var b = new System.Drawing.Drawing2D.LinearGradientBrush(r, Pink, Amber, 0f);
+            var blend = new System.Drawing.Drawing2D.ColorBlend();
+            blend.Colors = new[] { Pink, Coral, Amber };
+            blend.Positions = new[] { 0f, .5f, 1f };
+            b.InterpolationColors = blend;
+            return b;
+        }
+
+        public static System.Drawing.Drawing2D.GraphicsPath Round(RectangleF r, float radius)
+        {
+            var d = Math.Min(radius * 2, Math.Min(r.Width, r.Height));
+            var p = new System.Drawing.Drawing2D.GraphicsPath();
+            p.AddArc(r.X, r.Y, d, d, 180, 90);
+            p.AddArc(r.Right - d, r.Y, d, d, 270, 90);
+            p.AddArc(r.Right - d, r.Bottom - d, d, d, 0, 90);
+            p.AddArc(r.X, r.Bottom - d, d, d, 90, 90);
+            p.CloseFigure();
+            return p;
+        }
+    }
+
+    /// Flat, rounded button; still a normal Button for clicks, Enter/Space and Tab.
+    class FlatButton : Button
+    {
+        readonly bool primary;
+        bool hover;
+
+        public FlatButton(string text, bool primary)
+        {
+            this.primary = primary;
+            Text = text;
+            SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer, true);
+            Font = new Font("Segoe UI", 10f, primary ? FontStyle.Bold : FontStyle.Regular);
+            Cursor = Cursors.Hand;
+            Size = new Size(TextRenderer.MeasureText(text, Font).Width + 36, 40);
+            Margin = new Padding(0, 0, 10, 0);
+        }
+
+        protected override void OnMouseEnter(EventArgs e) { hover = true; Invalidate(); base.OnMouseEnter(e); }
+        protected override void OnMouseLeave(EventArgs e) { hover = false; Invalidate(); base.OnMouseLeave(e); }
+
+        protected override void OnPaint(PaintEventArgs e)
+        {
+            var g = e.Graphics;
+            g.Clear(Parent != null ? Parent.BackColor : Theme.Night);
+            g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+            var r = new RectangleF(0.5f, 0.5f, Width - 1.5f, Height - 1.5f);
+            using (var path = Theme.Round(r, 10))
+            {
+                if (primary)
+                {
+                    using (var b = Theme.Sunset(r)) g.FillPath(b, path);
+                    if (hover) using (var b = new SolidBrush(Color.FromArgb(40, Color.White))) g.FillPath(b, path);
+                }
+                else
+                {
+                    using (var b = new SolidBrush(hover ? Theme.Hover : Theme.Step)) g.FillPath(b, path);
+                    using (var p = new Pen(Theme.Line)) g.DrawPath(p, path);
+                }
+            }
+            if (Focused && ShowFocusCues)
+                using (var ring = Theme.Round(new RectangleF(3, 3, Width - 7, Height - 7), 8))
+                using (var p = new Pen(primary ? Theme.OnAccent : Theme.Ink, 1.6f)) g.DrawPath(p, ring);
+            TextRenderer.DrawText(g, Text, Font, ClientRectangle, primary ? Theme.OnAccent : Theme.Ink,
+                TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
+        }
+    }
+
     class SettingsForm : Form
     {
         readonly Settings settings;
@@ -726,70 +816,194 @@ namespace BridgeNight
         readonly Action<bool> onPause;
         readonly Action<string> log;
 
+        static readonly string[][] SetupSteps =
+        {
+            new[] { "Paste token", "Make it on the site's Helper page, paste it below." },
+            new[] { "Save and test", "Click \"Save and test connection\"." },
+            new[] { "Play", "Keep the BN icon by the clock running. Custom games only." },
+        };
+
         public SettingsForm(Settings s, List<string> lines, string statusText, Action<bool> onPause, Action<string> log)
         {
             settings = s;
             this.onPause = onPause;
             this.log = log;
             Text = "Bridge Night Helper " + Program.Version;
-            Width = 620; Height = 560;
+            Width = 640; Height = 760;
             StartPosition = FormStartPosition.CenterScreen;
             Font = new Font("Segoe UI", 9.5f);
-            MinimumSize = new Size(520, 460);
+            MinimumSize = new Size(560, 680);
+            BackColor = Theme.Night;
+            ForeColor = Theme.Ink;
 
-            var layout = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, Padding = new Padding(12) };
-            layout.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+            var layout = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, Padding = new Padding(20, 16, 20, 14) };
             layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
 
+            var header = new Panel { Dock = DockStyle.Fill, Margin = new Padding(0) };
+            header.Paint += PaintHeader;
+            header.Resize += delegate { header.Invalidate(); };
+            layout.Controls.Add(header, 0, 0);
+
             status.AutoSize = true; status.Text = "Status: " + statusText; status.Font = new Font(Font, FontStyle.Bold);
-            layout.Controls.Add(status, 0, 0); layout.SetColumnSpan(status, 2);
+            status.ForeColor = Theme.Amber; status.Margin = new Padding(0, 0, 0, 10);
+            layout.Controls.Add(status, 0, 1);
 
-            layout.Controls.Add(new Label { Text = "Server URL", AutoSize = true, Anchor = AnchorStyles.Left }, 0, 1);
-            server.Text = s.Server; server.Dock = DockStyle.Fill;
-            layout.Controls.Add(server, 1, 1);
+            var steps = new Panel { Dock = DockStyle.Fill, Margin = new Padding(0, 0, 0, 12) };
+            steps.Paint += PaintSteps;
+            steps.Resize += delegate { steps.Invalidate(); };
+            layout.Controls.Add(steps, 0, 2);
 
-            layout.Controls.Add(new Label { Text = "Helper token", AutoSize = true, Anchor = AnchorStyles.Left }, 0, 2);
-            token.Text = s.Token; token.UseSystemPasswordChar = true; token.Dock = DockStyle.Fill;
-            layout.Controls.Add(token, 1, 2);
+            var fields = new TableLayoutPanel { AutoSize = true, Dock = DockStyle.Fill, ColumnCount = 2, Margin = new Padding(0) };
+            fields.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+            fields.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+            fields.Controls.Add(FieldLabel("Server URL"), 0, 0);
+            server.Text = s.Server; StyleBox(server);
+            fields.Controls.Add(server, 1, 0);
+            fields.Controls.Add(FieldLabel("Helper token"), 0, 1);
+            token.Text = s.Token; token.UseSystemPasswordChar = true; StyleBox(token);
+            fields.Controls.Add(token, 1, 1);
+            layout.Controls.Add(fields, 0, 3);
 
-            var hint = new Label { AutoSize = true, MaximumSize = new Size(560, 0), ForeColor = SystemColors.GrayText,
-                Text = "Get a token from an admin (Players page on the site, \"Helper tokens\"). It is stored encrypted for your Windows account." };
-            layout.Controls.Add(hint, 0, 3); layout.SetColumnSpan(hint, 2);
+            var hint = new Label { AutoSize = true, MaximumSize = new Size(580, 0), ForeColor = Theme.Mute, Margin = new Padding(0, 2, 0, 8),
+                Text = "Make your token on the site's Helper page (\"Your helper token\"). It is stored encrypted for your Windows account." };
+            layout.Controls.Add(hint, 0, 4);
 
-            paused.Text = "Pause sending"; paused.AutoSize = true; paused.Checked = s.Paused;
+            var checks = new FlowLayoutPanel { AutoSize = true, Dock = DockStyle.Fill, Margin = new Padding(0, 0, 0, 8) };
+            paused.Text = "Pause sending"; StyleCheck(paused); paused.Checked = s.Paused;
             paused.CheckedChanged += delegate { onPause(paused.Checked); };
-            layout.Controls.Add(paused, 0, 4); layout.SetColumnSpan(paused, 2);
-
-            autostart.Text = "Start with Windows"; autostart.AutoSize = true;
+            autostart.Text = "Start with Windows"; StyleCheck(autostart);
             try { autostart.Checked = Settings.Autostart; } catch { }
             autostart.CheckedChanged += delegate
             {
                 try { Settings.Autostart = autostart.Checked; } catch (Exception e) { MessageBox.Show("Could not change that: " + e.Message); }
             };
-            layout.Controls.Add(autostart, 0, 5); layout.SetColumnSpan(autostart, 2);
+            checks.Controls.Add(paused); checks.Controls.Add(autostart);
+            layout.Controls.Add(checks, 0, 5);
 
-            var buttons = new FlowLayoutPanel { AutoSize = true, Dock = DockStyle.Fill };
-            var save = new Button { Text = "Save", AutoSize = true };
-            save.Click += delegate { SaveSettings(); };
-            var test = new Button { Text = "Save and test connection", AutoSize = true };
+            var buttons = new FlowLayoutPanel { AutoSize = true, Dock = DockStyle.Fill, Margin = new Padding(0, 0, 0, 14) };
+            var test = new FlatButton("Save and test connection", true);
             test.Click += delegate { SaveSettings(); TestConnection(); };
-            buttons.Controls.Add(save); buttons.Controls.Add(test);
-            layout.Controls.Add(buttons, 0, 6); layout.SetColumnSpan(buttons, 2);
+            var save = new FlatButton("Save", false);
+            save.Click += delegate { SaveSettings(); };
+            buttons.Controls.Add(test); buttons.Controls.Add(save);
+            layout.Controls.Add(buttons, 0, 6);
 
-            layout.Controls.Add(new Label { Text = "Last messages", AutoSize = true }, 0, 7);
+            layout.Controls.Add(new Label { Text = "Last messages", AutoSize = true, ForeColor = Theme.Coral, Font = new Font(Font, FontStyle.Bold), Margin = new Padding(0, 0, 0, 6) }, 0, 7);
+            var logCard = new Panel { Dock = DockStyle.Fill, BackColor = Theme.Card, Padding = new Padding(10, 8, 6, 8), Margin = new Padding(0, 0, 0, 10) };
             logBox.Dock = DockStyle.Fill; logBox.HorizontalScrollbar = true; logBox.IntegralHeight = false;
+            logBox.BorderStyle = BorderStyle.None; logBox.BackColor = Theme.Card; logBox.ForeColor = Theme.Mute;
+            logBox.Font = new Font("Consolas", 9.5f);
             foreach (var l in lines) logBox.Items.Add(l);
-            layout.Controls.Add(logBox, 0, 8); layout.SetColumnSpan(logBox, 2);
-            layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-            for (var i = 0; i < 8; i++) layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-            layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+            logCard.Controls.Add(logBox);
+            layout.Controls.Add(logCard, 0, 8);
 
-            var about = new Label { AutoSize = true, MaximumSize = new Size(560, 0), ForeColor = SystemColors.GrayText,
+            var about = new Label { AutoSize = true, MaximumSize = new Size(580, 0), ForeColor = Theme.Mute,
                 Text = "Read-only: it only reads the League client on this PC and never controls it. Sends data for custom games only. Close it from the tray icon (right-click, Exit)." };
-            layout.Controls.Add(about, 0, 9); layout.SetColumnSpan(about, 2);
+            layout.Controls.Add(about, 0, 9);
+
+            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 74));  // header
+            layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));      // status
+            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 172)); // setup steps
+            for (var i = 0; i < 5; i++) layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+            layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));  // log
+            layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));      // about
 
             Controls.Add(layout);
             ScrollLog();
+        }
+
+        static Label FieldLabel(string text)
+        {
+            return new Label { Text = text, AutoSize = true, Anchor = AnchorStyles.Left, ForeColor = Theme.Mute, Margin = new Padding(0, 0, 12, 0) };
+        }
+
+        static void StyleBox(TextBox box)
+        {
+            box.Dock = DockStyle.Fill;
+            box.BorderStyle = BorderStyle.FixedSingle;
+            box.BackColor = Theme.Step;
+            box.ForeColor = Theme.Ink;
+            box.Font = new Font("Segoe UI", 10.5f);
+            box.Margin = new Padding(0, 4, 0, 4);
+        }
+
+        static void StyleCheck(CheckBox box)
+        {
+            box.AutoSize = true;
+            box.FlatStyle = FlatStyle.Flat;
+            box.FlatAppearance.BorderColor = Theme.Pink;
+            box.ForeColor = Theme.Ink;
+            box.Margin = new Padding(0, 0, 24, 0);
+        }
+
+        void PaintHeader(object sender, PaintEventArgs e)
+        {
+            var c = (Control)sender;
+            var g = e.Graphics;
+            g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+
+            using (var pillFont = new Font("Segoe UI", 9f, FontStyle.Bold))
+            {
+                var size = TextRenderer.MeasureText("Setup", pillFont);
+                var pill = new RectangleF(c.Width - size.Width - 22, 6, size.Width + 20, 26);
+                using (var path = Theme.Round(pill, 13))
+                using (var fill = new SolidBrush(Color.FromArgb(36, Theme.Pink)))
+                using (var border = new Pen(Theme.Pink))
+                {
+                    g.FillPath(fill, path);
+                    g.DrawPath(border, path);
+                }
+                TextRenderer.DrawText(g, "Setup", pillFont, Rectangle.Round(pill), Theme.PinkSoft,
+                    TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
+            }
+
+            using (var family = new FontFamily("Segoe UI"))
+            using (var title = new System.Drawing.Drawing2D.GraphicsPath())
+            {
+                title.AddString("Bridge Night Helper", family, (int)(FontStyle.Bold | FontStyle.Italic), 30f, new PointF(-2, 0), StringFormat.GenericTypographic);
+                var b = title.GetBounds();
+                using (var brush = Theme.Sunset(new RectangleF(b.X, b.Y, Math.Max(1, b.Width), Math.Max(1, b.Height)))) g.FillPath(brush, title);
+            }
+            TextRenderer.DrawText(g, "Version " + Program.Version + ": reads League, sends your custom games to Bridge Night", Font,
+                new Point(0, 46), Theme.Mute);
+        }
+
+        void PaintSteps(object sender, PaintEventArgs e)
+        {
+            var c = (Control)sender;
+            var g = e.Graphics;
+            g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+            using (var card = Theme.Round(new RectangleF(0.5f, 0.5f, c.Width - 1.5f, c.Height - 1.5f), 14))
+            using (var fill = new SolidBrush(Theme.Card))
+            using (var border = new Pen(Theme.Edge))
+            {
+                g.FillPath(fill, card);
+                g.DrawPath(border, card);
+            }
+            using (var numFont = new Font("Segoe UI", 11f, FontStyle.Bold))
+            using (var titleFont = new Font("Segoe UI", 10.5f, FontStyle.Bold))
+            {
+                for (var i = 0; i < SetupSteps.Length; i++)
+                {
+                    var y = 16 + i * 48;
+                    var badge = new RectangleF(16, y + 2, 32, 32);
+                    using (var b = Theme.Sunset(badge)) g.FillEllipse(b, badge);
+                    TextRenderer.DrawText(g, (i + 1).ToString(), numFont, Rectangle.Round(badge), Theme.OnAccent,
+                        TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
+                    TextRenderer.DrawText(g, SetupSteps[i][0], titleFont, new Point(62, y - 1), Theme.Ink);
+                    TextRenderer.DrawText(g, SetupSteps[i][1], Font, new Point(62, y + 18), Theme.Mute);
+                }
+            }
+        }
+
+        [DllImport("dwmapi.dll")]
+        static extern int DwmSetWindowAttribute(IntPtr hwnd, int attribute, ref int value, int size);
+
+        protected override void OnHandleCreated(EventArgs e)
+        {
+            base.OnHandleCreated(e);
+            // Dark title bar on Windows 10 20H1+ and 11; older versions just ignore it.
+            try { var on = 1; DwmSetWindowAttribute(Handle, 20, ref on, 4); } catch { }
         }
 
         void SaveSettings()

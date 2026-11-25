@@ -278,6 +278,30 @@ export const blueWinChance = (c: Computed, blue: string[], red: string[]) => {
   return mean(blue.map((id) => winChanceVs(r(id), opp)), 0.5);
 };
 
+export interface EloEntry {
+  match: Match;
+  won: boolean;
+  change: RatingChange;
+  /** Elo right after this game */
+  after: number;
+}
+
+/** One player's games with their Elo change and Elo after each game, oldest first. */
+export function eloLog(c: Computed, id: string): EloEntry[] {
+  const out: EloEntry[] = [];
+  let r = START_RATING;
+  for (const m of c.sorted) {
+    const change = c.changes[m.id]?.[id];
+    if (!change) continue;
+    r += change.delta;
+    out.push({ match: m, won: (m.blue.includes(id) ? "blue" : "red") === m.winner, change, after: r });
+  }
+  return out;
+}
+
+/** Elo won or lost over a player's last n games (0 without games). */
+export const eloTrend = (log: EloEntry[], n = 5) => log.slice(-n).reduce((a, e) => a + e.change.delta, 0);
+
 /* ---------- rivalries ---------- */
 
 export function rivalryVerb(streak: number) {
