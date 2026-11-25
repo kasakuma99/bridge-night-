@@ -82,7 +82,7 @@ export default function Helper() {
           Helper app
         </h1>
         <p className="hg-lead">
-          Optional. Fills in picks, K/D/A, items and the winner by itself, so nobody has to type. Just one player per game needs it; if
+          Shows your custom games live on the site and saves the results, so nobody has to type. Just one player per game needs it; if
           two people run it, the game is still only saved once.
         </p>
 
@@ -96,8 +96,8 @@ export default function Helper() {
           <li>
             <Eye aria-hidden />
             <span>
-              <b>Reads, never controls.</b> It reads the League client's local data on your own PC (the same things you already see on
-              screen) and never sends commands to the client.
+              <b>Reads, never controls.</b> It reads what the League client and the game offer to programs on your own PC, and never
+              sends commands to them.
             </span>
           </li>
           <li>
@@ -109,15 +109,14 @@ export default function Helper() {
           <li>
             <FastForward aria-hidden />
             <span>
-              <b>Moves the game along:</b> champ select, in game and result switch by themselves. The buttons on the site still work for
-              games where nobody runs the helper.
+              <b>Live:</b> both teams with champions, levels, K/D/A, items and summoner spells, the game clock and what happens.
             </span>
           </li>
           <li>
             <Trophy aria-hidden />
             <span>
-              <b>After the game:</b> sends K/D/A, items, damage and the winner for everyone. Players are matched by Riot ID; unknown
-              accounts are ignored.
+              <b>After the game:</b> the winner, how it ended, final stats and augments. Players are matched by Riot ID; others show as
+              guests, without their name.
             </span>
           </li>
         </ul>
@@ -206,8 +205,8 @@ export default function Helper() {
             title="Play"
             text={
               <>
-                Leave it running (BN icon next to the clock). It only does something in custom games: champions show on the{" "}
-                <Link to="/live">Live</Link> page when the game loads, the result is sent after the game.
+                Leave it running (BN icon next to the clock). It only does something in custom games: they show up on the{" "}
+                <Link to="/live">Live</Link> page by themselves and are saved when they end.
               </>
             }
             path={["BN tray icon", "Custom game"]}
@@ -274,10 +273,10 @@ export default function Helper() {
           </Box>
           <Box title="Result not counted">
             <li>
-              Check <b>Pending results</b> on the <Link to="/live">Live</Link> tab.
+              Look at the <Link to="/live">Live</Link> page: if League named no winner, <b>a member chooses</b> there.
             </li>
             <li>
-              A <b>member confirms</b> it there, then it counts.
+              At least one player needs a <b>Riot ID</b> on the Players page.
             </li>
           </Box>
           <Box title="Windows blocks it">
