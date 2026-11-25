@@ -192,11 +192,17 @@ Deno.serve(async (req) => {
 
   const { data: tok } = await db
     .from("helper_tokens")
-    .select("id,name")
+    .select("id,name,created_by")
     .eq("token_hash", await sha256(token))
     .is("revoked_at", null)
     .maybeSingle();
   if (!tok) return json(401, { ok: false, note: "unknown or revoked helper token" });
+  // The person who made the token must still be an approved member.
+  if (tok.created_by) {
+    const { data: m } = await db.from("members").select("role").eq("user_id", tok.created_by).maybeSingle();
+    if (!m || (m.role !== "member" && m.role !== "admin"))
+      return json(401, { ok: false, note: "the owner of this token is no longer a member" });
+  }
 
   const len = Number(req.headers.get("content-length") ?? "0");
   if (len > MAX_BODY) return json(413, { ok: false, note: "too much data" });
