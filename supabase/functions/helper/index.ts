@@ -1,5 +1,6 @@
 // Bridge Night helper endpoint.
-// The Windows helper app sends champ select picks, game phase changes and end-of-game stats here.
+// For helper apps before 0.5: only their end-of-game results still count. Live games come from helper 0.5 and newer,
+// through the "live" function. Champ select and game start are ignored here, so an old helper can't block the site.
 // Every request needs a helper token (created by an admin on the site). Only its SHA-256 hash is stored.
 // The service-role key never leaves Supabase: it's provided to this function by the platform.
 
@@ -38,18 +39,6 @@ const side = (v: unknown) => (v === "blue" || v === "red" ? v : undefined);
 const items = (v: unknown) =>
   Array.isArray(v) ? v.filter((x) => Number.isInteger(x) && x > 0 && x < 1_000_000).slice(0, 10) as number[] : undefined;
 
-interface LiveGame {
-  id: string;
-  phase: "draft" | "select" | "playing" | "result";
-  blue: string[];
-  red: string[];
-  captains?: { order: unknown[]; i: number };
-  stats: Record<string, Record<string, unknown>>;
-  lockedAt?: number;
-  startedAt?: number;
-  [k: string]: unknown;
-}
-
 /** riot id (lowercase) -> player id, only for active players */
 async function roster() {
   const [{ data: ids, error: e1 }, { data: pl, error: e2 }] = await Promise.all([
@@ -63,107 +52,7 @@ async function roster() {
   return m;
 }
 
-async function loadLive() {
-  const { data, error } = await db.from("live_game").select("id,data,updated_at").maybeSingle();
-  if (error) throw error;
-  return data as { id: string; data: LiveGame; updated_at: string } | null;
-}
-
-/** Saves the live game only if nobody changed it in the meantime. */
-async function saveLive(row: { id: string; updated_at: string }, data: LiveGame) {
-  const { data: upd, error } = await db
-    .from("live_game")
-    .update({ data, updated_at: new Date().toISOString() })
-    .eq("id", row.id)
-    .eq("updated_at", row.updated_at)
-    .select("id");
-  if (error) throw error;
-  return (upd ?? []).length > 0;
-}
-
-/** The known players from the helper, if they all belong to the live game. */
-function matchLive(L: LiveGame, playerIds: string[]) {
-  const inGame = new Set([...L.blue, ...L.red]);
-  return playerIds.length >= 1 && playerIds.every((p) => inGame.has(p));
-}
-
-/** No live game on the site yet: start one from the League lobby (our players on both sides needed). */
-async function startLiveFromLobby(picks: { pid: string; champion?: string; side?: "blue" | "red" }[]) {
-  const blue = picks.filter((p) => p.side === "blue").map((p) => p.pid);
-  const red = picks.filter((p) => p.side === "red").map((p) => p.pid);
-  if (!blue.length || !red.length) return { ok: true, note: "no live game on the site, and our players aren't on both sides" };
-  const stats: Record<string, Record<string, unknown>> = {};
-  for (const p of picks) stats[p.pid] = p.champion ? { champion: p.champion } : {};
-  const now = Date.now();
-  const id = crypto.randomUUID();
-  const data = {
-    id, phase: "select", size: Math.min(4, Math.max(blue.length, red.length)), blue, red, sitOut: [],
-    stats, dodgeLog: [], createdAt: now, lockedAt: now,
-  };
-  // singleton: if someone started a game on the site at the same moment, theirs wins
-  const { error } = await db.from("live_game").insert({ id, data, updated_at: new Date().toISOString() });
-  if (error) return { ok: true, note: "a live game was started at the same time" };
-  return { ok: true, note: "started the live game on the site" };
-}
-
 /* ---------- handlers ---------- */
-
-async function champSelect(body: Record<string, unknown>) {
-  const map = await roster();
-  // Fair play: champions are only accepted once the game is loading (everyone sees them on the loading screen).
-  // During champ select the site is shared by both teams, so picks there would reveal what the client hides.
-  const loading = body.stage === "loading";
-  const picks: { pid: string; champion?: string; side?: "blue" | "red" }[] = [];
-  const seen = new Set<string>();
-  for (const raw of Array.isArray(body.players) ? body.players.slice(0, 10) : []) {
-    const p = raw as Record<string, unknown>;
-    const pid = map.get(riot(p.riotId) ?? "");
-    if (pid && !seen.has(pid)) {
-      seen.add(pid);
-      picks.push({ pid, champion: loading ? str(p.champion, 40) : undefined, side: side(p.side) });
-    }
-  }
-  if (!picks.length) return { ok: true, note: "none of our players in this game" };
-  for (let attempt = 0; attempt < 3; attempt++) {
-    const row = await loadLive();
-    if (!row) return await startLiveFromLobby(picks);
-    const L = structuredClone(row.data);
-    if (L.phase !== "draft" && L.phase !== "select") return { ok: true, note: "live game is past champ select" };
-    if (!matchLive(L, picks.map((p) => p.pid))) return { ok: true, note: "players don't match the live game" };
-    if (L.phase === "draft") {
-      if (L.captains && L.captains.i < L.captains.order.length) return { ok: true, note: "captains are still picking" };
-      L.phase = "select";
-      delete L.captains;
-      L.lockedAt = Date.now();
-    }
-    for (const p of picks) {
-      const cur = L.stats[p.pid] ?? {};
-      if (p.champion) L.stats[p.pid] = { ...cur, champion: p.champion };
-    }
-    if (JSON.stringify(L) === JSON.stringify(row.data)) return { ok: true, note: "no change" };
-    if (await saveLive(row, L)) return { ok: true, note: "picks updated" };
-  }
-  return { ok: false, note: "the live game kept changing, try again" };
-}
-
-async function phase(body: Record<string, unknown>) {
-  if (body.phase !== "InProgress") return { ok: true, note: "phase ignored" };
-  const map = await roster();
-  const pids = (Array.isArray(body.players) ? body.players.slice(0, 10) : [])
-    .map((r) => map.get(riot(r) ?? ""))
-    .filter((x): x is string => !!x);
-  for (let attempt = 0; attempt < 3; attempt++) {
-    const row = await loadLive();
-    if (!row) return { ok: true, note: "no live game on the site" };
-    const L = structuredClone(row.data);
-    if (L.phase !== "select") return { ok: true, note: "live game is not in champ select" };
-    if (!matchLive(L, pids)) return { ok: true, note: "players don't match the live game" };
-    L.phase = "playing";
-    L.startedAt = Date.now();
-    if (await saveLive(row, L)) return { ok: true, note: "game started" };
-  }
-  return { ok: false, note: "the live game kept changing, try again" };
-}
 
 async function result(body: Record<string, unknown>, tokenId: string) {
   const gameId = str(String(body.gameId ?? ""), 40);
@@ -227,8 +116,10 @@ Deno.serve(async (req) => {
     .maybeSingle();
   if (!tok) return json(401, { ok: false, note: "unknown or revoked helper token" });
   // The person who made the token must still be an approved member.
-  if (tok.created_by) {
-    const { data: m } = await db.from("members").select("role").eq("user_id", tok.created_by).maybeSingle();
+  {
+    const { data: m } = tok.created_by
+      ? await db.from("members").select("role").eq("user_id", tok.created_by).maybeSingle()
+      : { data: null };
     if (!m || (m.role !== "member" && m.role !== "admin"))
       return json(401, { ok: false, note: "the owner of this token is no longer a member" });
   }
@@ -251,9 +142,8 @@ Deno.serve(async (req) => {
       case "hello":
         return json(200, { ok: true, note: `connected as "${tok.name}"` });
       case "champselect":
-        return json(200, await champSelect(body));
       case "phase":
-        return json(200, await phase(body));
+        return json(200, { ok: true, note: "live games need helper 0.5 or newer, get it on the Helper page" });
       case "result":
         return json(200, await result(body, tok.id));
       default:

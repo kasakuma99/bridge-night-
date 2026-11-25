@@ -126,7 +126,7 @@ export default function Helper() {
           <Step
             n={1}
             title="Log in with Discord and get approved"
-            text="Log in at the top right. An admin approves new members, then the helper can send games for you."
+            text="An admin approves new members, then the helper can send games for you. If you can read this on the live site, you're in."
             path={["Log in", "Discord", "Wait for approval"]}
           />
           <Step
