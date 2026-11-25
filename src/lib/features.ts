@@ -25,6 +25,8 @@ export interface Features {
   dodges: boolean;
   /** Random challenges. */
   challenges: boolean;
+  /** Only approved members see anything. Off: visitors can watch (the database must allow that too). */
+  privateSite: boolean;
   /** A page per player (/stats/:id). Off: the side card on the Stats page. */
   playerPages: boolean;
   /** Games with our players on one side only (alone, or against bots) are saved and counted. For testing: switch off before release. */
@@ -42,6 +44,7 @@ export const FEATURES: Features = {
   rerollLimit: false,
   dodges: false,
   challenges: false,
+  privateSite: true,
   playerPages: false,
   soloGames: true,
   ratings: false,
