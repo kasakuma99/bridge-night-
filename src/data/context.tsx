@@ -191,8 +191,9 @@ function SampleAuth({ children }: { children: ReactNode }) {
     ready: true,
     canLogin: false,
     setRole,
-    signIn: async () => {},
-    signOut: async () => {},
+    // Local preview: "logging in/out" just switches the View as role.
+    signIn: async () => setRole("member"),
+    signOut: async () => setRole("visitor"),
   };
   return <AuthCtx.Provider value={value}>{children}</AuthCtx.Provider>;
 }
@@ -225,8 +226,9 @@ function SupabaseAuth({ children }: { children: ReactNode }) {
         u
           ? {
               id: u.id,
-              name: String(claims.global_name || md.full_name || md.name || md.user_name || u.email?.split("@")[0] || "Member"),
-              avatar: typeof md.avatar_url === "string" ? md.avatar_url : undefined,
+              name: String(claims.global_name || md.full_name || md.name || md.user_name || u.email?.split("@")[0] || "Member").slice(0, 40),
+              // Metadata can be edited by the user themself: only show avatars from Discord's CDN.
+              avatar: typeof md.avatar_url === "string" && md.avatar_url.startsWith("https://cdn.discordapp.com/") ? md.avatar_url : undefined,
             }
           : null,
       );
