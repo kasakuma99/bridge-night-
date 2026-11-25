@@ -159,3 +159,4 @@ vite.config.ts.timestamp-*
 # Private local data (Riot IDs etc.) - never commit
 *.local.json
 supabase/.temp/
+!.env.sample

@@ -2,6 +2,7 @@ import { useRef, useState } from "react";
 import { Download, Trash2, Upload } from "lucide-react";
 import { SAMPLE_MODE, useAuth, useData } from "../data/context";
 import { Avatar, useConfirm, useToast } from "../components/ui";
+import { MembersPanel } from "../components/Members";
 import { StoreError } from "../data/store";
 import type { Player, Settings } from "../lib/types";
 import { RIOT_ID_RE, clampInt, isDiscordInvite, plural } from "../lib/util";
@@ -103,6 +104,7 @@ export default function Players() {
         <div className="stack2">
           <HouseRules settings={data.settings} disabled={!isMember} />
           <DiscordBox settings={data.settings} disabled={!isAdmin} />
+          {isAdmin && !SAMPLE_MODE && <MembersPanel />}
           {isAdmin && (
             <section className="panel">
               <h3>Backup</h3>

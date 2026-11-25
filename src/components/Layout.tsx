@@ -1,9 +1,48 @@
 import { useEffect, useRef } from "react";
 import { Link, NavLink, Outlet, useLocation } from "react-router-dom";
-import { MessageCircle } from "lucide-react";
+import { LogIn, LogOut, MessageCircle } from "lucide-react";
 import { SAMPLE_MODE, useAuth, useData, type Role } from "../data/context";
 import { isDiscordInvite } from "../lib/util";
-import { Logo } from "./ui";
+import { Logo, Skeleton, useToast } from "./ui";
+
+function Account() {
+  const { canLogin, ready, user, pending, signIn, signOut, isAdmin } = useAuth();
+  const toast = useToast();
+  if (!canLogin || !ready) return null;
+  if (!user)
+    return (
+      <button
+        className="btn sm"
+        type="button"
+        onClick={() => signIn().catch(() => toast("Could not start the Discord login. Try again."))}
+      >
+        <LogIn aria-hidden />
+        <span>Log in</span>
+      </button>
+    );
+  return (
+    <button
+      className="btn sm ghost"
+      type="button"
+      title={`Logged in as ${user.name}${isAdmin ? " (admin)" : pending ? " (waiting for approval)" : ""}. Click to log out.`}
+      onClick={() => void signOut().then(() => toast("Logged out"))}
+    >
+      {user.avatar ? <img src={user.avatar} alt="" width={20} height={20} style={{ borderRadius: 999 }} /> : <LogOut aria-hidden />}
+      <span>Log out</span>
+    </button>
+  );
+}
+
+function PendingNote() {
+  const { pending, user } = useAuth();
+  if (!pending || !user) return null;
+  return (
+    <p className="preview" role="status">
+      <i />
+      Hi {user.name}! You're logged in. An admin needs to approve you before you can make changes. This page unlocks by itself.
+    </p>
+  );
+}
 
 export const SITE_NAME = "Bridge Night";
 
@@ -29,7 +68,7 @@ function DiscordLink({ className, children, label }: { className?: string; child
 }
 
 export function Layout() {
-  const { data } = useData();
+  const { data, status, error } = useData();
   const { role, setRole } = useAuth();
   const loc = useLocation();
   const nav = useRef<HTMLElement>(null);
@@ -66,6 +105,7 @@ export function Layout() {
             <MessageCircle aria-hidden />
             <span>Join our Discord</span>
           </DiscordLink>
+          <Account />
         </div>
       </header>
       <main className="wrap" id="main" tabIndex={-1}>
@@ -83,7 +123,24 @@ export function Layout() {
             </label>
           </p>
         )}
-        <Outlet />
+        <PendingNote />
+        {status === "loading" ? (
+          <div aria-busy="true" aria-label="Loading">
+            <Skeleton h={48} />
+            <div style={{ height: 16 }} />
+            <Skeleton h={260} />
+          </div>
+        ) : status === "error" ? (
+          <section className="panel" role="alert">
+            <h2>Something went wrong</h2>
+            <p className="sub">{error}</p>
+            <button className="btn pri" type="button" onClick={() => window.location.reload()}>
+              Reload
+            </button>
+          </section>
+        ) : (
+          <Outlet />
+        )}
       </main>
       <footer>
         <div className="wrap">
