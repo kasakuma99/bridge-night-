@@ -94,6 +94,12 @@ export default function Teams() {
     setPrefs({ sitMode: m });
     clearDraft();
   };
+  // Random pick; every press picks again.
+  const shuffleSit = () => {
+    setPrefs({ sitMode: "random" });
+    setSeed(freshSeed());
+    clearDraft();
+  };
   const pickSit = (id: string) => {
     setPrefs({ sitPick: toggleSitPick(picks, id, extra) });
     clearDraft();
@@ -346,6 +352,7 @@ export default function Teams() {
           <SitOut
             mode={prefs.sitMode}
             onMode={setMode}
+            onShuffle={shuffleSit}
             extra={extra}
             selected={selected}
             out={outNow}
