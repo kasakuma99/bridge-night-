@@ -1,0 +1,815 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bridge Night Hub</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* VOICE everyday game companion that feels like a finished community site
+   IDEA the post-game lobby: Blue side vs Red side on an icy bridge at night
+   PICTURE the night-bridge banner and the live Blue vs Red board
+   COLOUR deep night slate, ice blue accent, team blue + team red, one colour per player
+   TYPE Outfit for headings and numbers + Plus Jakarta Sans for text
+   LAYOUT one header row on desktop (logo, nav, Discord); two rows on phones; content up to 1280px */
+:root{color-scheme:dark;--bg:#0b0f14;--s1:#121820;--s2:#18202a;--s3:#1f2934;--line:#232c38;--line2:#313d4b;--ink:#eef2f6;--mute:#97a4b3;--dim:#6f7d8c;--ice:#bfe6ff;--ice2:#8fcfff;--blue:#4f8cff;--red:#ff5a6e;--r:16px;--r2:12px;
+--disp:"Outfit",-apple-system,"Segoe UI",Roboto,sans-serif;--text:"Plus Jakarta Sans",-apple-system,"Segoe UI",Roboto,sans-serif}
+*{box-sizing:border-box;min-width:0}
+html,body{margin:0;background:var(--bg);color:var(--ink)}
+body{font:15.5px/1.55 var(--text);overflow-x:clip;-webkit-font-smoothing:antialiased}
+a{color:inherit}
+button,input,select{font:inherit;color:inherit}
+h1,h2,h3{font-family:var(--disp);font-weight:700;line-height:1.08;letter-spacing:-.015em;margin:0}
+h1{font-size:clamp(30px,4.6vw,44px)}
+h2{font-size:22px;font-weight:600}
+h3{font-size:18px;font-weight:600}
+.num{font-family:var(--disp);font-variant-numeric:tabular-nums}
+.wrap{max-width:1280px;margin:0 auto;padding:0 max(16px,4vw)}
+.bar{position:sticky;top:0;z-index:5;background:color-mix(in srgb,var(--bg) 88%,transparent);backdrop-filter:saturate(1.2) blur(10px);border-bottom:1px solid var(--line)}
+.bar .wrap{display:flex;align-items:center;gap:20px;min-height:64px}
+.mark{display:flex;align-items:center;gap:10px;text-decoration:none;font:700 21px var(--disp);letter-spacing:-.01em;white-space:nowrap}
+.mark svg{width:30px;height:30px;flex:none}
+.tabs{display:flex;gap:2px;overflow-x:auto;scrollbar-width:none;flex:1}
+.bar .dis{margin-left:auto}
+.tabs::-webkit-scrollbar{display:none}
+.tab{flex:none;display:inline-flex;align-items:center;gap:7px;padding:9px 13px;border-radius:10px;text-decoration:none;color:var(--mute);font-weight:600;font-size:15px}
+.tab:hover{color:var(--ink);background:var(--s1)}
+.tab[aria-current=page]{color:var(--ink);background:var(--s2)}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--red);display:none}
+.dot.on{display:inline-block;animation:blink 1.4s infinite}
+@keyframes blink{50%{opacity:.3}}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:44px;padding:0 18px;border-radius:12px;border:1px solid var(--line2);background:var(--s2);cursor:pointer;text-decoration:none;font-weight:600;white-space:nowrap;transition:background .15s,border-color .15s}
+.btn:hover{background:var(--s3)}
+.btn.pri{background:var(--ice);color:#0a1420;border-color:var(--ice)}
+.btn.pri:hover{background:#d6efff}
+.btn.blue{background:var(--blue);border-color:var(--blue);color:#fff}
+.btn.red{background:var(--red);border-color:var(--red);color:#fff}
+.btn.ghost{background:transparent}
+.btn.sm{min-height:36px;padding:0 12px;font-size:14px;border-radius:10px}
+.btn[disabled]{opacity:.45;cursor:not-allowed}
+.btn svg{width:18px;height:18px}
+:is(.btn,.chip,.tab,.icon,.dodge,.lbrow,.ch,.seg button):focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--ice);outline-offset:2px}
+.preview{margin:14px 0 0;display:inline-flex;gap:8px;align-items:center;font-size:13px;color:var(--mute);background:var(--s1);border:1px solid var(--line);padding:5px 12px;border-radius:999px}
+.preview i{width:6px;height:6px;border-radius:50%;background:var(--ice)}
+main{padding:18px 0 56px}
+.view{display:none}
+.view.on{display:block}
+.head{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:14px;margin:6px 0 18px}
+.sub{color:var(--mute);margin:6px 0 0}
+.panel{background:var(--s1);border:1px solid var(--line);border-radius:var(--r);padding:20px}
+.ph{display:flex;justify-content:space-between;align-items:baseline;gap:10px;margin-bottom:12px;flex-wrap:wrap}
+.ph .sub{margin:0;font-size:14px}
+.sec{margin:30px 0 12px}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{display:inline-flex;align-items:center;gap:9px;min-height:44px;padding:0 15px 0 6px;border-radius:999px;border:1px solid var(--line2);background:var(--s2);cursor:pointer;font-weight:600;transition:background .15s,border-color .15s}
+.chip[aria-pressed=true]{border-color:var(--ice);background:color-mix(in srgb,var(--ice) 13%,var(--s2))}
+.chip[aria-pressed=false]{color:var(--mute)}
+.chip[aria-pressed=false] .ava{opacity:.55}
+.ava{display:inline-grid;place-items:center;width:32px;height:32px;border-radius:50%;font:700 13px/1 var(--text);color:#fff;flex:none}
+.ava.lg{width:56px;height:56px;font-size:20px}
+.controls{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-top:16px;padding-top:16px;border-top:1px solid var(--line)}
+.seg{display:inline-flex;padding:3px;gap:2px;border:1px solid var(--line);border-radius:12px;background:var(--bg)}
+.seg button{min-height:38px;padding:0 14px;border:0;border-radius:9px;background:transparent;cursor:pointer;font-weight:600;color:var(--mute)}
+.seg button[aria-pressed=true]{background:var(--s3);color:var(--ink)}
+.seg button[disabled]{opacity:.35;cursor:not-allowed}
+.check{display:inline-flex;align-items:center;gap:8px;color:var(--mute);min-height:44px}
+.check input{width:18px;height:18px;accent-color:var(--ice)}
+.grow{flex:1}
+.board{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);gap:16px;align-items:stretch;margin-top:16px}
+.side{border-radius:var(--r);padding:18px;border:1px solid var(--line);background:var(--s1)}
+.side.b{background:linear-gradient(165deg,color-mix(in srgb,var(--blue) 22%,var(--s1)),var(--s1) 65%);border-color:color-mix(in srgb,var(--blue) 40%,var(--line))}
+.side.r{background:linear-gradient(195deg,color-mix(in srgb,var(--red) 20%,var(--s1)),var(--s1) 65%);border-color:color-mix(in srgb,var(--red) 40%,var(--line))}
+.side h3{display:flex;justify-content:space-between;align-items:baseline;gap:8px;flex-wrap:wrap;font-size:20px}
+.side h3 small{font:500 14px var(--text);color:var(--mute);white-space:nowrap}
+.pips{display:inline-flex;align-items:center;gap:5px;font:500 14px var(--text);color:var(--mute);white-space:nowrap}
+.pips i{width:11px;height:11px;border-radius:50%;border:2px solid var(--ice)}
+.pips i.full{background:var(--ice)}
+.vs{display:grid;place-items:center;font:700 30px var(--disp);color:var(--dim)}
+.pl{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:6px 12px;align-items:center;padding:11px 0;border-top:1px solid color-mix(in srgb,var(--line2) 60%,transparent)}
+.pl:first-of-type{border-top:0}
+.pl b{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600}
+.pl .rt{color:var(--mute);font-size:13px}
+.pl .champ{color:var(--ice);font-weight:600;white-space:nowrap}
+.pl select{grid-column:1/-1;width:100%;min-height:44px;font-size:16px;border-radius:10px;border:1px solid var(--line2);background:var(--bg);padding:0 10px}
+.kda{grid-column:1/-1;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.kda label{display:grid;gap:3px;font-size:12px;color:var(--mute)}
+.kda input{min-height:44px;font-size:16px;border-radius:10px;border:1px solid var(--line2);background:var(--bg);padding:0 12px;width:100%}
+.dodge{min-height:36px;padding:0 12px;border-radius:10px;border:1px solid color-mix(in srgb,var(--ice) 35%,var(--line2));background:transparent;color:var(--ice);font-weight:600;font-size:14px;cursor:pointer}
+.dodge[disabled]{opacity:.3;cursor:not-allowed}
+.rank{font:600 12px var(--text);color:var(--ice);margin-left:6px;padding:1px 6px;border-radius:6px;background:color-mix(in srgb,var(--ice) 14%,transparent)}
+.pop{animation:pop .35s ease-out both}
+@keyframes pop{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+@media(prefers-reduced-motion:reduce){.pop,.dot.on{animation:none}}
+.empty{display:grid;place-items:center;text-align:center;color:var(--mute);min-height:190px;border:1px dashed var(--line2);border-radius:var(--r);margin-top:16px;padding:24px}
+.empty h3{color:var(--ink);margin-bottom:4px}
+.sit{margin-top:12px;color:var(--mute);font-size:14px}
+.win{display:flex;flex-wrap:wrap;gap:10px;margin-top:16px}
+.win .btn{flex:1 1 200px}
+.hint{color:var(--mute);margin:0 0 10px}
+.feud{display:flex;gap:14px;align-items:center;padding:14px 18px;border-radius:var(--r);background:linear-gradient(90deg,color-mix(in srgb,var(--red) 16%,var(--s1)),var(--s1) 70%);border:1px solid color-mix(in srgb,var(--red) 32%,var(--line));margin-bottom:14px}
+.feud b{font:600 19px var(--disp)}
+.feud span{color:var(--mute);font-size:14px}
+.feud .rec{margin-left:auto;text-align:right;white-space:nowrap}
+.feud .rec b{display:block;font:700 24px var(--disp);font-variant-numeric:tabular-nums}
+.info{display:flex;gap:12px;align-items:center;padding:12px 16px;border-radius:var(--r2);border:1px solid var(--line);background:var(--s1);margin-bottom:14px;font-size:15px}
+.info.fresh{border-color:color-mix(in srgb,var(--ice) 40%,var(--line));background:color-mix(in srgb,var(--ice) 7%,var(--s1))}
+.info svg{width:22px;height:22px;flex:none;color:var(--ice)}
+.steps{display:flex;gap:6px;flex-wrap:wrap;margin:10px 0 0}
+.steps span{display:inline-flex;align-items:center;gap:7px;padding:6px 12px 6px 6px;border-radius:999px;border:1px solid var(--line);color:var(--mute);font-size:14px;font-weight:600}
+.steps span em{font-style:normal;display:inline-grid;place-items:center;width:22px;height:22px;border-radius:50%;background:var(--s3);font-size:12px}
+.steps span.on{border-color:var(--ice);color:var(--ink)}
+.steps span.on em{background:var(--ice);color:#0a1420}
+.steps span.done{color:var(--ice)}
+.timer{font:700 clamp(40px,8vw,60px)/1 var(--disp);font-variant-numeric:tabular-nums;color:var(--ice)}
+.hero{position:relative;overflow:hidden;border-radius:20px;border:1px solid var(--line);min-height:236px;display:flex;align-items:flex-start;margin-bottom:16px;isolation:isolate}
+.hero>svg{position:absolute;inset:0;width:100%;height:100%;z-index:-1}
+.hero .in{padding:26px 26px 84px;display:grid;gap:14px;width:100%}
+.hero h1{text-shadow:0 2px 18px rgba(0,0,0,.45)}
+.hchips{display:flex;flex-wrap:wrap;gap:8px}
+.hchip{display:inline-flex;align-items:center;gap:8px;padding:7px 13px;border-radius:999px;background:rgba(8,12,18,.66);border:1px solid rgba(191,230,255,.16);font-size:14px;backdrop-filter:blur(6px);white-space:nowrap}
+.hchip b{font-weight:700}
+.hchip i{width:8px;height:8px;border-radius:50%;background:var(--dim)}
+.hchip i.on{background:var(--ice);box-shadow:0 0 10px var(--ice)}
+.prob{margin-top:16px;display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:12px;align-items:center;font-weight:700;font-variant-numeric:tabular-nums}
+.prob .track{height:10px;border-radius:5px;background:var(--red);overflow:hidden}
+.prob .track i{display:block;height:100%;background:var(--blue);border-right:2px solid var(--bg)}
+.prob .bl{color:var(--blue)}.prob .rl{color:var(--red)}
+.prob small{grid-column:1/-1;color:var(--mute);font-weight:400;font-size:13px;text-align:center;margin-top:-4px}
+.kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:16px}
+.kpi{padding:16px 18px;border-radius:var(--r);background:var(--s1);border:1px solid var(--line);display:grid;gap:6px;align-content:start}
+.kpi .l{color:var(--mute);font-size:13px;font-weight:600}
+.kpi .v{display:flex;align-items:center;gap:10px;font:700 28px/1.1 var(--disp);font-variant-numeric:tabular-nums}
+.kpi .v .ava{width:28px;height:28px;font-size:12px}
+.kpi .s{color:var(--mute);font-size:13px}
+.statgrid{display:grid;grid-template-columns:minmax(0,1.45fr) minmax(0,1fr);gap:16px;align-items:start}
+.lb{list-style:none;margin:0;padding:0;display:grid;gap:4px}
+.lbhead,.lbrow{display:grid;grid-template-columns:28px minmax(0,1fr) 96px 64px 56px;gap:12px;align-items:center}
+.lbhead{color:var(--dim);font-size:12px;font-weight:600;padding:0 12px 6px}
+.lbhead span:nth-child(n+3),.lbrow>.c{text-align:right}
+.lbrow{width:100%;padding:10px 12px;border-radius:12px;border:1px solid transparent;background:transparent;text-align:left;cursor:pointer;transition:background .15s}
+.lbrow:hover{background:var(--s2)}
+.lbrow[aria-pressed=true]{background:var(--s2);border-color:var(--line2)}
+.lbrow .pos{font:700 16px var(--disp);color:var(--dim);text-align:center}
+.lbrow:first-child .pos{color:var(--ice)}
+.lbrow .who{display:flex;align-items:center;gap:11px}
+.lbrow .who b{display:block;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lbrow .who small{display:block;color:var(--mute);font-size:13px;font-variant-numeric:tabular-nums}
+.lbrow .c b{font:700 20px var(--disp);font-variant-numeric:tabular-nums}
+.lbrow .c small{display:block;color:var(--dim);font-size:12px}
+.form{display:inline-flex;gap:4px;justify-content:flex-end}
+.form i{width:10px;height:10px;border-radius:3px;background:var(--s3);border:1px solid var(--line2)}
+.form i.w{background:var(--ice);border-color:var(--ice)}
+.pcard{scroll-margin-top:130px;position:sticky;top:84px;display:grid;gap:16px}
+.pc-top{display:flex;align-items:center;gap:14px}
+.pc-top h2{font-size:26px}
+.pc-top .sub{margin:2px 0 0;font-size:14px}
+.pc-stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+.pc-stats div{padding:10px 12px;border-radius:12px;background:var(--s2)}
+.pc-stats small{display:block;color:var(--mute);font-size:12px;font-weight:600}
+.pc-stats b{font:700 20px var(--disp);font-variant-numeric:tabular-nums}
+.chart{position:relative;height:120px;border-radius:12px;background:var(--bg);border:1px solid var(--line);overflow:hidden}
+.chart svg{position:absolute;inset:0;width:100%;height:100%}
+.chart .cl{position:absolute;left:12px;top:8px;font-size:12px;color:var(--mute);font-weight:600}
+.chart .cr{position:absolute;right:12px;top:8px;font-size:12px;font-weight:700}
+.facts{display:grid;gap:0}
+.fact{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:11px 0;border-top:1px solid var(--line)}
+.fact:first-child{border-top:0}
+.fact span{color:var(--mute);font-size:14px}
+.fact b{font-weight:600;text-align:right}
+.grid4{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr));gap:14px}
+.opts{margin-top:12px;border-top:1px solid var(--line);padding-top:4px}
+.opts summary{display:inline-flex;align-items:center;gap:8px;min-height:40px;cursor:pointer;color:var(--mute);font-weight:600;font-size:14px;list-style:none}
+.opts summary::-webkit-details-marker{display:none}
+.opts summary::before{content:"";width:7px;height:7px;border-right:2px solid currentColor;border-bottom:2px solid currentColor;transform:rotate(-45deg);transition:transform .15s;margin:0 3px}
+.opts[open] summary::before{transform:rotate(45deg)}
+.opts summary:hover{color:var(--ink)}
+.opts .cnt{font-size:12px;color:var(--ice);background:color-mix(in srgb,var(--ice) 14%,transparent);padding:1px 8px;border-radius:999px}
+.optin{display:flex;flex-wrap:wrap;gap:8px 22px;align-items:center;padding:4px 0 6px}
+.pair{display:inline-flex;flex-wrap:wrap;align-items:center;gap:8px;color:var(--mute)}
+.pair select{min-height:40px;font-size:15px;border-radius:10px;border:1px solid var(--line2);background:var(--s2);padding:0 10px;color:var(--ink)}
+.optin .note{flex-basis:100%;margin:0}
+.side.turn{box-shadow:0 0 0 2px var(--ice)}
+.tag2{font:600 11px var(--text);letter-spacing:.02em;color:var(--mute);margin-left:6px;padding:1px 6px;border-radius:6px;border:1px solid var(--line2)}
+.picking{font:600 13px var(--text);color:var(--ice)}
+.draft{margin-top:16px}
+.draft .chip small{color:var(--mute);font-weight:500;margin-left:2px;font-variant-numeric:tabular-nums}
+.info .acts2{margin-left:auto;display:flex;gap:8px;flex-wrap:wrap}
+.linkbtn{display:inline-flex;align-items:center;gap:8px;min-height:40px;padding:0 4px;margin:-4px 0 12px;border:0;background:none;color:var(--mute);font-weight:600;font-size:14px;cursor:pointer}
+.linkbtn:hover{color:var(--ink)}
+.linkbtn svg,.info.rule svg,.info.bounty svg{width:20px;height:20px}
+.info.bounty{border-color:color-mix(in srgb,var(--red) 35%,var(--line));background:color-mix(in srgb,var(--red) 7%,var(--s1));margin:16px 0 0}
+.info.bounty svg{color:var(--red)}
+.badges{display:flex;flex-wrap:wrap;gap:6px}
+.bd{display:inline-flex;align-items:center;gap:6px;padding:5px 10px;border-radius:999px;background:var(--s2);border:1px solid var(--line2);font-size:13px;font-weight:600}
+.bd i{width:7px;height:7px;border-radius:50%;background:var(--ice)}
+.bd.gold i{background:#f2c46d}
+.chk{display:flex;align-items:center;gap:8px;color:var(--mute);font-size:14px;flex-basis:100%;min-height:36px}
+.chk input{width:18px;height:18px;accent-color:var(--ice)}
+.list{display:grid}
+.row{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:11px 0;border-top:1px solid var(--line)}
+.row:first-child{border-top:0}
+.row .m{color:var(--mute);font-size:14px;white-space:nowrap;font-variant-numeric:tabular-nums}
+.row .who{display:flex;align-items:center;gap:10px;font-weight:600}
+.match{display:grid;grid-template-columns:96px minmax(0,1fr) minmax(0,1fr) auto;gap:14px;align-items:center;padding:14px 18px;border-top:1px solid var(--line)}
+.match .when{color:var(--mute);font-size:14px}
+.match .when b{display:block;color:var(--ink);font:600 16px var(--disp)}
+.match .dl{grid-column:2/4;color:var(--mute);font-size:13px;margin-top:-6px}
+.team{display:flex;flex-wrap:wrap;gap:4px 14px;padding:9px 12px;border-radius:12px;font-size:14px;border:1px solid transparent}
+.team.w{background:color-mix(in srgb,var(--ice) 9%,transparent);border-color:color-mix(in srgb,var(--ice) 30%,transparent)}
+.team .tag{font-weight:700;width:100%;font-size:12px}
+.team.bt .tag{color:var(--blue)}
+.team.rt .tag{color:var(--red)}
+.team .c{color:var(--mute)}
+.team .k{color:var(--ice);font-variant-numeric:tabular-nums}
+.day{padding:10px 18px;background:var(--s2);color:var(--mute);font-size:13px;font-weight:700;border-top:1px solid var(--line)}
+.day:first-child{border-top:0;border-radius:var(--r) var(--r) 0 0}
+.more{display:flex;justify-content:center;padding:14px;border-top:1px solid var(--line)}
+.icon{display:inline-grid;place-items:center;width:40px;height:40px;border-radius:10px;border:1px solid var(--line2);background:transparent;cursor:pointer;color:var(--mute)}
+.icon:hover{color:var(--ink);background:var(--s2)}
+.icon svg{width:18px;height:18px}
+.filters{display:flex;flex-wrap:wrap;gap:10px}
+select.f,input.f{min-height:44px;font-size:16px;border-radius:12px;border:1px solid var(--line2);background:var(--s2);padding:0 14px}
+.h2h{display:grid;gap:4px}
+.h2hrow{display:grid;grid-template-columns:minmax(0,1fr) minmax(100px,1.6fr) minmax(0,1fr) minmax(140px,200px);gap:14px;align-items:center;padding:12px;border-radius:12px}
+.h2hrow:nth-child(odd){background:color-mix(in srgb,var(--s2) 55%,transparent)}
+.h2hrow .p{display:flex;align-items:center;gap:10px;font-weight:600}
+.h2hrow .p.r{justify-content:flex-end;text-align:right}
+.h2hrow .p b{font:700 18px var(--disp);font-variant-numeric:tabular-nums}
+.split{display:flex;height:8px;border-radius:4px;overflow:hidden;background:var(--s3)}
+.split i{display:block;height:100%}
+.h2hrow .st{color:var(--mute);font-size:13px;text-align:right}
+.champs{display:grid;grid-template-columns:repeat(auto-fill,minmax(118px,1fr));gap:8px;margin-top:14px;max-height:560px;overflow:auto;padding:2px}
+.ch{display:flex;flex-direction:column;align-items:center;gap:8px;padding:14px 6px;border-radius:14px;border:1px solid var(--line);background:var(--s1);cursor:pointer;font-size:13px;font-weight:600;text-align:center}
+.ch:hover{background:var(--s2)}
+.ch[aria-pressed=true]{border-color:var(--ice)}
+.ch .ava{width:44px;height:44px;font-size:15px;border-radius:12px}
+.links{display:flex;flex-wrap:wrap;gap:10px;margin-top:16px}
+.note{color:var(--dim);font-size:13px;margin-top:12px}
+.settings{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);gap:16px;align-items:start}
+.stack2{display:grid;gap:16px}
+.prow{display:grid;grid-template-columns:auto minmax(0,1fr) minmax(0,1fr) auto;gap:10px;align-items:center;padding:10px 0;border-top:1px solid var(--line)}
+.prow:first-child{border-top:0}
+.prow input{width:100%}
+.addf{display:flex;flex-wrap:wrap;gap:10px;margin-top:14px;align-items:end}
+.addf input{flex:1 1 150px}
+.addf label{display:grid;gap:5px;color:var(--mute);font-size:13px;font-weight:600;flex:1 1 130px}
+footer{border-top:1px solid var(--line);padding:30px 0 42px;color:var(--mute);font-size:14px}
+footer .wrap{display:grid;gap:12px}
+.foot{display:flex;flex-wrap:wrap;gap:10px 24px;align-items:center}
+.foot a{text-decoration:none}.foot a:hover{color:var(--ink)}
+.toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--ice);color:#0a1420;font-weight:600;padding:12px 18px;border-radius:12px;opacity:0;pointer-events:none;transition:opacity .2s;z-index:9;max-width:calc(100% - 32px);box-shadow:0 10px 30px rgba(0,0,0,.4)}
+.toast.on{opacity:1}
+.modal{position:fixed;inset:0;display:none;place-items:center;background:rgba(4,7,11,.72);z-index:8;padding:16px}
+.modal.on{display:grid}
+.modal .panel{max-width:420px;width:100%}
+@media(max-width:1000px){.statgrid,.settings{grid-template-columns:minmax(0,1fr)}.pcard{position:static}.kpis{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:860px){.bar .wrap{flex-wrap:wrap;gap:8px 12px;padding-top:10px}.tabs{order:3;flex-basis:100%;margin:0 -6px;padding-bottom:6px}}
+@media(max-width:640px){
+.board{grid-template-columns:minmax(0,1fr)}
+.vs{font-size:22px;padding:0}
+.hero{min-height:220px}.hero .in{padding:18px 18px 64px}.hchip{font-size:13px;padding:6px 10px}
+.match{grid-template-columns:minmax(0,1fr) auto;padding:14px}
+.match .team,.match .dl{grid-column:1/-1}
+.match .acts{grid-column:2;grid-row:1;justify-self:end}
+.dis span{display:none}
+.lbhead{display:none}
+.lbrow{grid-template-columns:24px minmax(0,1fr) auto;row-gap:6px}
+.lbrow .c.f{grid-column:2/3;grid-row:2;text-align:left}
+.lbrow .c.f .form{justify-content:flex-start}
+.lbrow .c.r{display:none}
+.lbrow .c.w{grid-row:1/3;grid-column:3}
+.pc-stats{grid-template-columns:repeat(2,minmax(0,1fr))}
+.h2hrow{grid-template-columns:minmax(0,1fr) minmax(0,1fr);row-gap:8px}
+.h2hrow .split{grid-column:1/-1;grid-row:2}
+.h2hrow .st{grid-column:1/-1;text-align:left}
+.prow{grid-template-columns:auto minmax(0,1fr) auto}
+.prow .riot{grid-column:2/3}
+.feud{padding:12px 14px}.feud b{font-size:17px}
+}
+</style>
+</head>
+<body>
+<header class="bar">
+  <div class="wrap">
+    <a class="mark" href="#teams" aria-label="Bridge Night home">
+      <svg viewBox="0 0 32 32" aria-hidden="true"><rect x="1" y="1" width="30" height="30" rx="9" fill="#18202a" stroke="#313d4b"/><path d="M6 22h20M9 22v-6l7-6 7 6v6" fill="none" stroke="#bfe6ff" stroke-width="2.2" stroke-linejoin="round"/><circle cx="16" cy="17" r="2.4" fill="#ff5a6e"/></svg>
+      Bridge Night
+    </a>
+    <nav class="tabs" aria-label="Sections">
+      <a class="tab" href="#teams">Teams</a><a class="tab" href="#live"><span class="dot" id="liveDot"></span>Live</a><a class="tab" href="#history">History</a><a class="tab" href="#stats">Stats</a><a class="tab" href="#rivals">Rivals</a><a class="tab" href="#builds">Builds</a><a class="tab" href="#players">Players</a>
+    </nav>
+    <a class="btn sm dis" id="discordBtn" href="#players"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"/></svg><span id="discordLbl">Join our Discord</span></a>
+  </div>
+</header>
+
+<main class="wrap">
+  <p class="preview"><i></i>Preview with sample players and games. Changes are saved in this browser only.</p>
+
+  <section class="view" id="v-teams">
+    <div class="hero" style="margin-top:14px">
+      <svg viewBox="0 0 1200 260" preserveAspectRatio="xMidYMax slice" aria-hidden="true">
+        <defs>
+          <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#16314f"/><stop offset=".7" stop-color="#0e1a29"/><stop offset="1" stop-color="#0b0f14"/></linearGradient>
+          <linearGradient id="icel" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#d9f0ff"/><stop offset="1" stop-color="#6f93b3"/></linearGradient>
+          <radialGradient id="moon" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="#e6f5ff"/><stop offset=".55" stop-color="#bfe6ff" stop-opacity=".35"/><stop offset="1" stop-color="#bfe6ff" stop-opacity="0"/></radialGradient>
+        </defs>
+        <rect width="1200" height="260" fill="url(#sky)"/>
+        <circle cx="930" cy="62" r="70" fill="url(#moon)"/><circle cx="930" cy="62" r="22" fill="#e9f6ff"/>
+        <path d="M0 170 L90 120 L160 150 L250 95 L330 140 L420 110 L520 160 L600 125 L700 150 L800 100 L880 135 L980 105 L1080 145 L1200 115 V260 H0Z" fill="#1a2c42"/>
+        <path d="M150 95 L250 95 L230 108 Z M780 100 L800 100 L820 112 Z" fill="#cfe7fb" opacity=".5"/>
+        <path d="M0 200 L120 160 L210 185 L330 150 L460 190 L560 165 L690 195 L820 160 L950 190 L1070 165 L1200 185 V260 H0Z" fill="#14233a"/>
+        <g fill="#0a1018" stroke="#2a3d55" stroke-width="2">
+          <path d="M-10 214 H1210 V230 H-10Z"/>
+          <path d="M140 230 Q210 175 280 230Z M420 230 Q490 175 560 230Z M700 230 Q770 175 840 230Z M980 230 Q1050 175 1120 230Z"/>
+        </g>
+        <path d="M-10 214 H1210" stroke="url(#icel)" stroke-width="3"/>
+        <g id="lamps"></g>
+        <rect y="230" width="1200" height="30" fill="#0b0f14"/>
+        <g id="snow" fill="#e9f6ff"></g>
+      </svg>
+      <div class="in">
+        <h1>Who plays tonight?</h1>
+        <div class="hchips" id="heroChips"></div>
+      </div>
+    </div>
+    <div id="feudTop"></div>
+    <p class="hint" id="modeHint">Tap the players who are in.</p>
+    <div class="panel">
+      <div class="chips" id="selChips"></div>
+      <div class="controls">
+        <div class="seg" role="group" aria-label="Team size"><button type="button" data-size="1">1v1</button><button type="button" data-size="2">2v2</button><button type="button" data-size="3">3v3</button><button type="button" data-size="4">4v4</button></div>
+        <div class="seg" role="group" aria-label="Team style"><button id="sR" type="button">Random</button><button id="sB" type="button">Balanced</button><button id="sC" type="button">Captains</button></div>
+        <span class="grow"></span>
+        <button class="btn pri" id="genBtn" type="button">Make teams</button>
+      </div>
+      <details class="opts" id="optBox"><summary>More options <span class="cnt" id="optCnt"></span></summary>
+        <div class="optin">
+          <label class="check"><input type="checkbox" id="noRep"> Avoid the teams from the last game</label>
+          <span class="pair">Keep apart <select id="ap1" aria-label="First player to keep apart"></select> and <select id="ap2" aria-label="Second player to keep apart"></select></span>
+          <p class="note">Keep apart puts two players on opposite teams. In Captains mode they become the two captains.</p>
+        </div>
+      </details>
+    </div>
+    <div id="boardOut"></div>
+  </section>
+
+  <section class="view" id="v-live">
+    <div class="head"><div><h1 id="liveTitle">Live game</h1><div class="steps" id="steps"></div></div><div id="liveTop"></div></div>
+    <div id="liveRule"></div>
+    <div id="liveOut"></div>
+  </section>
+
+  <section class="view" id="v-history">
+    <div class="head"><div><h1>Match history</h1><p class="sub" id="histSum"></p></div>
+      <div class="filters"><select class="f" id="fPlayer" aria-label="Filter by player"></select><select class="f" id="fMode" aria-label="Filter by mode"><option value="">All modes</option><option value="1">1v1</option><option value="2">2v2</option><option value="3">3v3</option><option value="4">4v4</option></select></div></div>
+    <div class="panel" style="padding:0" id="histList"></div>
+  </section>
+
+  <section class="view" id="v-stats">
+    <div class="head"><div><h1>Stats</h1><p class="sub" id="statSub"></p></div>
+      <div class="seg" role="group" aria-label="Time period"><button type="button" data-period="30">Last 30 days</button><button type="button" data-period="0">All time</button></div></div>
+    <div class="kpis" id="kpis"></div>
+    <div class="statgrid">
+      <section class="panel"><div class="ph"><h2>Leaderboard</h2><p class="sub" id="lbSub"></p></div>
+        <div class="lbhead" aria-hidden="true"><span></span><span>Player</span><span>Last 5</span><span>Rating</span><span>Wins</span></div>
+        <ol class="lb" id="lb"></ol>
+        <p class="note">Tap a player to see their profile. Rating starts at 1000 and changes after every game depending on how strong both teams were.</p></section>
+      <aside class="panel pcard" id="pcard"></aside>
+    </div>
+    <h2 class="sec">Highlights</h2>
+    <div class="grid4">
+      <div class="panel"><div class="ph"><h3>Records</h3><p class="sub" id="recSub"></p></div><div class="list" id="recs"></div></div>
+      <div class="panel"><div class="ph"><h3>Best duos</h3><p class="sub">3+ games together</p></div><div class="list" id="duos"></div></div>
+      <div class="panel"><div class="ph"><h3>Best trios</h3><p class="sub">3+ games together</p></div><div class="list" id="trios"></div></div>
+      <div class="panel"><div class="ph"><h3>Group favourites</h3><p class="sub">Most played</p></div><div class="list" id="favs"></div></div>
+      <div class="panel"><div class="ph"><h3>Awards this week</h3><p class="sub">Last 7 days</p></div><div class="list" id="awards"></div></div>
+      <div class="panel"><div class="ph"><h3>Monthly champions</h3><p class="sub">Most wins each month</p></div><div class="list" id="seasons"></div></div>
+    </div>
+  </section>
+
+  <section class="view" id="v-rivals">
+    <div class="head"><div><h1>Rivals</h1><p class="sub">Head-to-head results whenever two players ended up on opposite sides. A rivalry is called out once someone wins 3 in a row.</p></div></div>
+    <div id="feuds"></div>
+    <div class="panel"><div class="ph"><h2>All matchups</h2><p class="sub">Most played first</p></div><div class="h2h" id="h2h"></div></div>
+  </section>
+
+  <section class="view" id="v-builds">
+    <div class="head"><div><h1>Builds</h1><p class="sub">Pick a champion to open its ARAM Mayhem build on U.GG or Mobalytics.</p></div>
+      <input class="f" id="cSearch" type="search" placeholder="Search champion" aria-label="Search champion"></div>
+    <div class="panel" id="cPanel"></div>
+    <div class="champs" id="cGrid"></div>
+    <p class="note">The live site shows Riot's official champion icons. Link formats for names like Wukong or Nunu &amp; Willump are checked before launch.</p>
+  </section>
+
+  <section class="view" id="v-players">
+    <div class="head"><div><h1>Players &amp; settings</h1><p class="sub">On the live site only your group can make changes here, after logging in with Discord.</p></div></div>
+    <div class="settings">
+      <section class="panel"><div class="ph"><h2>Players</h2><p class="sub" id="pCount"></p></div><div id="pList"></div>
+        <form class="addf" id="addF"><input class="f" id="newName" placeholder="Name" aria-label="New player name" required maxlength="20"><input class="f" id="newRiot" placeholder="Riot ID (optional)" aria-label="Riot ID" maxlength="30"><button class="btn pri" type="submit">Add player</button></form>
+      </section>
+      <div class="stack2">
+        <section class="panel"><h3>House rules</h3><p class="sub">Dodges: after a long enough break, each team gets dodges in champ select for the first game of the night, from 1v1 to 4v4. Rerolls: how often you can reroll teams before a game.</p>
+          <form class="addf" id="ruleF"><label>Break needed (hours)<input class="f" id="ruleH" type="number" min="1" max="72" inputmode="numeric"></label><label>Dodges per team<input class="f" id="ruleD" type="number" min="0" max="5" inputmode="numeric"></label><label>Rerolls per game<select class="f" id="ruleR"><option value="-1">No limit</option><option value="0">None</option><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="5">5</option></select></label>
+          <label class="chk"><input type="checkbox" id="ruleFun"> Offer a random challenge rule in champ select (like "No Flash")</label><button class="btn" type="submit">Save rules</button></form></section>
+        <section class="panel"><h3>Discord</h3><p class="sub">Paste your server invite. The button in the header uses it.</p>
+          <form class="addf" id="discF"><input class="f" id="discUrl" type="url" placeholder="https://discord.gg/..." aria-label="Discord invite link"><button class="btn" type="submit">Save link</button></form></section>
+        <section class="panel"><h3>Sample data</h3><p class="sub">Bring back the sample players and games.</p><div class="addf"><button class="btn ghost" id="resetBtn" type="button">Reset sample data</button></div></section>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer><div class="wrap">
+  <div class="foot"><span class="mark" style="font-size:18px"><svg viewBox="0 0 32 32" aria-hidden="true" style="width:24px;height:24px"><rect x="1" y="1" width="30" height="30" rx="9" fill="#18202a" stroke="#313d4b"/><path d="M6 22h20M9 22v-6l7-6 7 6v6" fill="none" stroke="#bfe6ff" stroke-width="2.2" stroke-linejoin="round"/><circle cx="16" cy="17" r="2.4" fill="#ff5a6e"/></svg>Bridge Night</span><a href="#players" id="footDisc">Discord</a><a href="#stats">Stats</a><a href="#rivals">Rivals</a><a href="#builds">Builds</a><span>Fan project, made by friends for friends.</span></div>
+  <div>Bridge Night was created under Riot Games' "Legal Jibber Jabber" policy using assets owned by Riot Games. Riot Games does not endorse or sponsor this project.</div>
+</div></footer>
+
+<div class="toast" id="toast" role="status"></div>
+<div class="modal" id="modal"><div class="panel"><h3 id="mTitle">Delete?</h3><p class="sub" id="mText"></p><div class="win"><button class="btn ghost" id="mNo" type="button">Cancel</button><button class="btn red" id="mYes" type="button">Delete</button></div></div></div>
+
+<script>
+{
+const CHAMPS="Aatrox,Ahri,Akali,Akshan,Alistar,Ambessa,Amumu,Anivia,Annie,Aphelios,Ashe,Aurelion Sol,Aurora,Azir,Bard,Bel'Veth,Blitzcrank,Brand,Braum,Briar,Caitlyn,Camille,Cassiopeia,Cho'Gath,Corki,Darius,Diana,Dr. Mundo,Draven,Ekko,Elise,Evelynn,Ezreal,Fiddlesticks,Fiora,Fizz,Galio,Gangplank,Garen,Gnar,Gragas,Graves,Gwen,Hecarim,Heimerdinger,Hwei,Illaoi,Irelia,Ivern,Janna,Jarvan IV,Jax,Jayce,Jhin,Jinx,K'Sante,Kai'Sa,Kalista,Karma,Karthus,Kassadin,Katarina,Kayle,Kayn,Kennen,Kha'Zix,Kindred,Kled,Kog'Maw,LeBlanc,Lee Sin,Leona,Lillia,Lissandra,Lucian,Lulu,Lux,Malphite,Malzahar,Maokai,Master Yi,Mel,Milio,Miss Fortune,Mordekaiser,Morgana,Naafiri,Nami,Nasus,Nautilus,Neeko,Nidalee,Nilah,Nocturne,Nunu & Willump,Olaf,Orianna,Ornn,Pantheon,Poppy,Pyke,Qiyana,Quinn,Rakan,Rammus,Rek'Sai,Rell,Renata Glasc,Renekton,Rengar,Riven,Rumble,Ryze,Samira,Sejuani,Senna,Seraphine,Sett,Shaco,Shen,Shyvana,Singed,Sion,Sivir,Skarner,Smolder,Sona,Soraka,Swain,Sylas,Syndra,Tahm Kench,Taliyah,Talon,Taric,Teemo,Thresh,Tristana,Trundle,Tryndamere,Twisted Fate,Twitch,Udyr,Urgot,Varus,Vayne,Veigar,Vel'Koz,Vex,Vi,Viego,Viktor,Vladimir,Volibear,Warwick,Wukong,Xayah,Xerath,Xin Zhao,Yasuo,Yone,Yorick,Yunara,Yuumi,Zac,Zed,Zeri,Ziggs,Zilean,Zoe,Zyra".split(",");
+const KEY="bridge-night-proto-5";
+const HOUR=36e5,DAY=864e5;
+const $=id=>document.getElementById(id);
+const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const uid=()=>Math.random().toString(36).slice(2,9);
+const rnd=n=>Math.floor(Math.random()*n);
+const shuffle=a=>{a=a.slice();for(let i=a.length-1;i>0;i--){const j=rnd(i+1);[a[i],a[j]]=[a[j],a[i]]}return a};
+const hue=s=>{let h=0;for(const c of String(s))h=(h*31+c.charCodeAt(0))%360;return h};
+const initials=n=>String(n).replace(/[^A-Za-z ]/g,"").split(" ").filter(Boolean).map(w=>w[0]).join("").slice(0,2).toUpperCase()||"?";
+const PAL=["#3b74d6","#c8496a","#2f9c86","#8e63d2","#c66a3a","#4f9a3e","#b8478f","#3e8db8","#a3633f","#6d6fd8"];
+const ava=(n,cls="")=>{const i=S&&S.players?S.players.findIndex(p=>p.name===n):-1;const bg=i>=0?PAL[i%PAL.length]:`hsl(${hue(n)} 45% 38%)`;return`<span class="ava ${cls}" style="background:${bg}">${esc(initials(n))}</span>`};
+const ICON={trash:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg>',swap:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 4 3 8l4 4M3 8h14M17 20l4-4-4-4M21 16H7"/></svg>',clock:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>',dice:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="4"/><circle cx="9" cy="9" r="1.2" fill="currentColor"/><circle cx="15" cy="15" r="1.2" fill="currentColor"/><circle cx="15" cy="9" r="1.2" fill="currentColor"/><circle cx="9" cy="15" r="1.2" fill="currentColor"/></svg>',target:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.2" fill="currentColor"/></svg>'};
+const FUN=["Full AP builds, even on AD champions","Full AD builds, even on mages","No Flash","Tank items only","No boots","Always take the leftmost augment","Trade champions with a teammate before the game","No champion rerolls","Everyone takes Mark (snowball)","No Heal or Barrier"];
+const combos=(arr,k)=>{if(k===0)return[[]];if(arr.length<k)return[];const[h,...t]=arr;return[...combos(t,k-1).map(c=>[h,...c]),...combos(t,k)]};
+const hrs=ms=>{const h=Math.floor(ms/HOUR);return h>=48?Math.round(h/24)+" days":h>=1?h+"h":Math.max(1,Math.round(ms/6e4))+" min"};
+const mmss=ms=>{const s=Math.max(0,Math.floor(ms/1e3));return`${Math.floor(s/60)}:${String(s%60).padStart(2,"0")}`};
+
+function seed(){
+  let s=51;const r=()=>(s=s*16807%2147483647)/2147483647;
+  const names=[["Samu",""],["Nick",""],["Francesco",""],["Lenny",""],["Phillip",""],["Tosh",""],["Mantas",""]];
+  const players=names.map(([name,riot],i)=>({id:"p"+i,name,riot}));
+  const skill=[.66,.4,.55,.5,.52,.47,.5];
+  const matches=[];const now=Date.now();const d0=new Date();d0.setHours(0,0,0,0);const eve=(daysAgo,f)=>d0.getTime()-daysAgo*DAY+19*HOUR+f*4.5*HOUR;
+  const pickChamp=()=>CHAMPS[Math.floor(r()*CHAMPS.length)];
+  const mk=(blue,red,winner,t)=>{const champs={},kda={};[...blue,...red].forEach(p=>{champs[p]=pickChamp();const sk=skill[+p.slice(1)];const won=(winner==="blue")===blue.includes(p);kda[p]=[Math.floor(r()*10+sk*8+(won?3:0)),Math.floor(r()*8+3-(won?2:0)),Math.floor(r()*20+12)]});matches.push({id:uid(),date:t,mode:blue.length,blue,red,winner,champs,kda,dodges:[],mins:Math.floor(14+r()*12)})};
+  for(let i=0;i<26;i++){
+    const ids=players.map(p=>p.id);for(let k=ids.length-1;k>0;k--){const j=Math.floor(r()*(k+1));[ids[k],ids[j]]=[ids[j],ids[k]]}
+    const size=r()<.6?3:2;const pool=ids.slice(0,size*2);
+    const blue=pool.slice(0,size),red=pool.slice(size);
+    const sk=t=>t.reduce((a,p)=>a+skill[+p.slice(1)],0)/t.length;
+    mk(blue,red,r()<.5+(sk(blue)-sk(red))*1.6?"blue":"red",eve(38-i,r()));
+  }
+  mk(["p0","p2"],["p1","p4"],"blue",eve(4,.2));
+  mk(["p1","p3","p5"],["p0","p2","p4"],"red",eve(4,.45));
+  mk(["p0","p5"],["p1","p3"],"blue",eve(2,.3));
+  mk(["p1","p2","p4"],["p0","p3","p5"],"red",eve(2,.55));
+  matches[21].rule=FUN[2];matches[25].rule=FUN[0];matches[28].rule=FUN[5];
+  return{players,matches,sel:players.map(p=>p.id),size:3,style:"random",noRep:true,live:null,last:null,sit:{},discord:"",chosen:"",rule:{hours:12,dodges:2,rerolls:2,fun:true},period:30,apart:["",""],rrMap:{}};
+}
+const hot=window.claude&&window.claude.hot;
+let S;
+function load(data){
+  if(data&&data.players)return data;
+  try{const j=localStorage.getItem(KEY);if(j){const d=JSON.parse(j);if(d&&d.players)return d}}catch(e){}
+  return seed();
+}
+function save(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
+const P=id=>S.players.find(p=>p.id===id);
+const pname=id=>(P(id)||{name:"Former player"}).name;
+const lastGame=()=>S.matches.reduce((a,m)=>Math.max(a,m.date),0);
+function ruleNow(){const last=lastGame();const gap=last?Date.now()-last:Infinity;const need=S.rule.hours*HOUR;return{fresh:gap>=need,gap,left:need-gap}}
+
+function compute(){
+  const blank=id=>({id,rating:1000,g:0,w:0,l:0,streak:0,best:0,champs:{},wch:{},under:0,bounty:0,crowns:0,hist:[1000]});
+  const st={};S.players.forEach(p=>st[p.id]=blank(p.id));
+  const ensure=id=>st[id]||(st[id]=blank(id));
+  const pairs={},groups={},champ={},months={};
+  for(const m of S.matches.slice().sort((a,b)=>a.date-b.date)){
+    const sides={blue:m.blue,red:m.red};
+    const avg=t=>t.reduce((a,p)=>a+ensure(p).rating,0)/t.length;
+    const eb=1/(1+10**((avg(m.red)-avg(m.blue))/400));
+    const pw=m.winner==="blue"?eb:1-eb;
+    const hunted=sides[m.winner==="blue"?"red":"blue"].some(p=>ensure(p).streak>=3);
+    const dt=new Date(m.date),mk=dt.getFullYear()+"-"+dt.getMonth();
+    const mo=months[mk]=months[mk]||{key:mk,t:new Date(dt.getFullYear(),dt.getMonth(),1).getTime(),p:{}};
+    for(const side of["blue","red"]){
+      const won=m.winner===side;const d=32*((won?1:0)-(side==="blue"?eb:1-eb));
+      for(const p of sides[side]){const x=ensure(p);x.rating+=d;x.hist.push(x.rating);x.g++;won?x.w++:x.l++;x.streak=won?(x.streak>0?x.streak+1:1):(x.streak<0?x.streak-1:-1);
+        const c=m.champs&&m.champs[p];
+        if(won){x.best=Math.max(x.best,x.streak);if(c)x.wch[c]=1;if(pw<.35)x.under++;if(hunted)x.bounty++}
+        const mp=mo.p[p]=mo.p[p]||{g:0,w:0};mp.g++;if(won)mp.w++;
+        if(c){x.champs[c]=(x.champs[c]||0)+1;champ[c]=champ[c]||{g:0,w:0};champ[c].g++;if(won)champ[c].w++}}
+      const t=sides[side];for(const k of[2,3])if(t.length>=k)for(const c of combos(t.slice().sort(),k)){const key=c.join(",");groups[key]=groups[key]||{ids:c,g:0,w:0};groups[key].g++;if(won)groups[key].w++}
+    }
+    for(const a of m.blue)for(const b of m.red){const[x,y]=a<b?[a,b]:[b,a];const key=x+","+y;pairs[key]=pairs[key]||{a:x,b:y,res:[]};pairs[key].res.push(m.winner==="blue"?a:b)}
+  }
+  const h2h=Object.values(pairs).map(p=>{const wa=p.res.filter(w=>w===p.a).length;let n=0;const last=p.res[p.res.length-1];for(let i=p.res.length-1;i>=0&&p.res[i]===last;i--)n++;return{...p,wa,wb:p.res.length-wa,leader:last,streak:n,g:p.res.length}});
+  const now=new Date(),cur=now.getFullYear()+"-"+now.getMonth();
+  const top=mo=>{const e=Object.entries(mo.p).filter(([id,v])=>v.g>=3&&P(id)).sort((a,b)=>b[1].w-a[1].w||b[1].w/b[1].g-a[1].w/a[1].g)[0];return e?{t:mo.t,id:e[0],w:e[1].w,g:e[1].g,cur:mo.key===cur}:null};
+  const seasons=Object.values(months).map(top).filter(Boolean).sort((a,b)=>b.t-a.t);
+  seasons.filter(x=>!x.cur).forEach(x=>ensure(x.id).crowns++);
+  return{st,groups:Object.values(groups),h2h,champ,seasons};
+}
+let C;
+function feudText(f){const w=pname(f.leader),l=pname(f.leader===f.a?f.b:f.a);const verb=f.streak>=6?"owns":f.streak>=4?"is dominating":"has the upper hand on";return{t:`${w} ${verb} ${l}`,s:`${f.streak} wins in a row head-to-head`}}
+function feuds(){return C.h2h.filter(f=>f.streak>=3&&P(f.a)&&P(f.b)).sort((a,b)=>b.streak-a.streak)}
+const feudHTML=f=>{const x=feudText(f);const lw=f.leader===f.a?f.wa:f.wb,ll=f.g-lw;return`<div class="feud pop">${ava(pname(f.leader))}<div><b>${esc(x.t)}</b><br><span>${esc(x.s)}</span></div><div class="rec"><b>${lw}–${ll}</b><span>all time</span></div></div>`};
+const ruleHTML=()=>{const r=ruleNow();if(!S.rule.dodges)return"";return r.fresh?`<div class="info fresh">${ICON.clock}<div><b>Fresh night.</b> ${lastGame()?`Last game was ${esc(hrs(r.gap))} ago, so`:"First game ever, so"} each team gets ${S.rule.dodges} dodge${S.rule.dodges>1?"s":""} in the next game.</div></div>`:`<div class="info">${ICON.clock}<div>Last game was ${esc(hrs(r.gap))} ago. No dodges right now; they come back after a ${S.rule.hours}h break (in ${esc(hrs(r.left))}).</div></div>`};
+
+const rrKey=()=>S.sel.filter(P).sort().join(",")+"|"+S.size;
+function rrLeft(){const lim=S.rule.rerolls;if(lim==null||lim<0)return Infinity;const n=(S.rrMap||{})[rrKey()]||0;return n?lim-(n-1):lim}
+function canMake(){const n=(S.rrMap||{})[rrKey()]||0;return !n||rrLeft()>0}
+const tkey=(A,B)=>[A.slice().sort().join(","),B.slice().sort().join(",")].sort().join("|");
+function makeTeams(){
+  const size=S.size;let pool=S.sel.filter(P);let sit=[];
+  if(pool.length>2*size){pool=shuffle(pool).sort((a,b)=>(S.sit[b]||0)-(S.sit[a]||0));sit=pool.slice(2*size);pool=pool.slice(0,2*size)}
+  S.rrMap=S.rrMap||{};const k=rrKey();S.rrMap[k]=(S.rrMap[k]||0)+1;
+  const prev=S.live&&S.live.phase==="draft"&&!S.live.cap?tkey(S.live.blue,S.live.red):null;
+  const[a1,a2]=S.apart||[];const apart=a1&&a2&&a1!==a2&&pool.includes(a1)&&pool.includes(a2)?[a1,a2]:null;
+  const base={sit,size,phase:"draft",champs:{},kda:{},dodges:{blue:0,red:0},max:0,dlog:[],created:Date.now(),started:0,fun:""};
+  if(S.style==="captains"){
+    const caps=apart?apart.slice():shuffle(pool).slice(0,2);if(Math.random()<.5)caps.reverse();
+    const rest=shuffle(pool.filter(x=>!caps.includes(x)));
+    const first=rating(caps[0])<=rating(caps[1])?"blue":"red",second=first==="blue"?"red":"blue";
+    const order=rest.map((_,i)=>((i+1)>>1)&1?second:first);
+    S.live={...base,blue:[caps[0]],red:[caps[1]],cap:{pool:rest,order,i:0,log:[]}};return;
+  }
+  const first=pool[0],rest=pool.slice(1);
+  let parts=combos(rest,size-1).map(c=>{const A=[first,...c];return[A,pool.filter(x=>!A.includes(x))]});
+  const keep=f=>{const x=parts.filter(f);if(x.length)parts=x};
+  if(apart)keep(([A])=>A.includes(apart[0])!==A.includes(apart[1]));
+  if(S.noRep&&S.last){const lk=tkey(S.last.blue,S.last.red);keep(p=>tkey(...p)!==lk)}
+  if(prev)keep(p=>tkey(...p)!==prev);
+  let pick;
+  if(S.style==="balanced"){const avg=t=>t.reduce((a,p)=>a+rating(p),0)/t.length;const d=p=>Math.abs(avg(p[0])-avg(p[1]));const best=Math.min(...parts.map(d));const near=parts.filter(p=>d(p)<=best+12);pick=near[rnd(near.length)]}
+  else pick=parts[rnd(parts.length)];
+  if(Math.random()<.5)pick=[pick[1],pick[0]];
+  S.live={...base,blue:shuffle(pick[0]),red:shuffle(pick[1])};
+}
+const draftOpen=L=>!!(L&&L.cap&&L.cap.i<L.cap.order.length);
+function lockTeams(){const L=S.live;S.rrMap={};const r=ruleNow();const n=r.fresh?S.rule.dodges:0;L.phase="select";L.fresh=r.fresh;L.gap=r.gap;L.max=n;L.dodges={blue:n,red:n};L.created=Date.now()}
+
+const rating=id=>Math.round(C.st[id]?C.st[id].rating:1000);
+const rankOf=id=>{const r=Object.values(C.st).filter(x=>P(x.id)&&x.g).sort((a,b)=>b.rating-a.rating);const i=r.findIndex(x=>x.id===id);return i<0?99:i+1};
+const probHTML=L=>{const pb=Math.round(100/(1+10**((avgR(L.red)-avgR(L.blue))/400)));return`<div class="prob"><span class="bl">Blue ${pb}%</span><div class="track" role="img" aria-label="Win chance Blue ${pb} percent, Red ${100-pb} percent"><i style="width:${pb}%"></i></div><span class="rl">${100-pb}% Red</span><small>Win chance from ratings</small></div>`};
+const avgR=t=>Math.round(t.reduce((a,p)=>a+rating(p),0)/t.length);
+function renderTeams(){
+  const n=S.sel.filter(P).length;
+  const maxS=Math.max(1,Math.min(4,Math.floor(n/2)));
+  if(!S.sizeSet||S.size>maxS)S.size=Math.min(maxS,3);
+  document.querySelectorAll("[data-size]").forEach(b=>{const k=+b.dataset.size;b.setAttribute("aria-pressed",String(k===S.size));b.disabled=n<2*k});
+  $("sR").setAttribute("aria-pressed",S.style==="random");$("sB").setAttribute("aria-pressed",S.style==="balanced");$("sC").setAttribute("aria-pressed",S.style==="captains");
+  $("noRep").checked=!!S.noRep;
+  {const ap=S.apart||["",""];for(const[j,el]of[[0,$("ap1")],[1,$("ap2")]])el.innerHTML=`<option value="">Nobody</option>`+S.players.map(p=>`<option value="${esc(p.id)}"${p.id===ap[j]?" selected":""}>${esc(p.name)}</option>`).join("");
+  const on=(S.noRep?1:0)+(ap[0]&&ap[1]&&ap[0]!==ap[1]?1:0);$("optCnt").textContent=on?`${on} on`:"";$("optCnt").hidden=!on}
+  $("selChips").innerHTML=S.players.map(p=>`<button type="button" class="chip" data-sel="${esc(p.id)}" aria-pressed="${S.sel.includes(p.id)}">${ava(p.name)}${esc(p.name)}</button>`).join("");
+  const need=S.size*2;
+  $("modeHint").textContent=n<2?"Pick at least 2 players.":n>need?`${n} players in, ${n-need} ${n-need>1?"sit":"sits"} out this game. Sit-outs rotate.`:`${n} players, ${S.size}v${S.size}.`;
+  const L=S.live,busy=L&&L.phase!=="draft";
+  {const re=L&&L.phase==="draft",left=rrLeft(),ok=canMake();const g=$("genBtn");g.disabled=n<2||(!busy&&!ok);
+  g.textContent=!busy&&!ok?"No rerolls left":re?(left===Infinity?"Reroll":`Reroll · ${left} left`):"Make teams"}
+  const fs=feuds();$("feudTop").innerHTML=fs.length?feudHTML(fs[0]):"";
+  {const r=ruleNow();const lg=lastGame();const month=S.matches.filter(m=>m.date>=Date.now()-30*DAY).length;const lead=Object.values(C.st).filter(x=>P(x.id)&&x.g).sort((a,b)=>b.rating-a.rating)[0];
+  $("heroChips").innerHTML=[busy?`<span class="hchip"><i class="on"></i>Game in progress</span>`:S.rule.dodges?(r.fresh?`<span class="hchip"><i class="on"></i>Dodges on · <b>${S.rule.dodges}</b> per team</span>`:`<span class="hchip"><i></i>Dodges back in <b>${esc(hrs(r.left))}</b></span>`):"",lg?`<span class="hchip">Last game <b>${esc(hrs(Date.now()-lg))}</b> ago</span>`:"",`<span class="hchip"><b>${month}</b> games in 30 days</span>`,lead?`<span class="hchip">Top rated <b>${esc(pname(lead.id))}</b></span>`:""].join("");}
+  if(busy){$("boardOut").innerHTML=`<div class="empty"><div><h3>A game is running</h3><p class="sub">${esc(L.blue.map(pname).join(", "))} vs ${esc(L.red.map(pname).join(", "))}</p><div class="win" style="justify-content:center"><a class="btn pri" href="#live">Open live game</a><button class="btn ghost" type="button" data-cancel="1">Cancel game</button></div></div></div>`;return}
+  if(!L){$("boardOut").innerHTML=`<div class="empty"><div><h3>No teams yet</h3><p class="sub">Pick who's playing and hit Make teams.</p></div></div>`;return}
+  const dr=draftOpen(L),turn=dr?L.cap.order[L.cap.i]:"";
+  const side=(t,cls,label,k)=>`<div class="side ${cls}${turn===k?" turn":""}${dr?"":" pop"}"><h3>${label}${turn===k?`<span class="picking">Picking</span>`:`<small>avg ${avgR(t)}</small>`}</h3>${t.map((id,j)=>`<div class="pl">${ava(pname(id))}<div><b>${esc(pname(id))}${L.cap&&j===0?`<span class="tag2">Captain</span>`:""}${rankOf(id)<=3?`<span class="rank">#${rankOf(id)}</span>`:""}</b><div class="rt">Rating ${rating(id)} · ${C.st[id]?C.st[id].w:0}–${C.st[id]?C.st[id].l:0}</div></div></div>`).join("")}</div>`;
+  const sitP=L.sit.length?`<p class="sit">Sitting out: ${L.sit.map(id=>esc(pname(id))).join(", ")}</p>`:"";
+  const board=`<div class="board">${side(L.blue,"b","Blue side","blue")}<div class="vs">VS</div>${side(L.red,"r","Red side","red")}</div>`;
+  if(dr){const cp=L.cap,capId=turn==="blue"?L.blue[0]:L.red[0];
+    $("boardOut").innerHTML=`${board}${sitP}<div class="panel draft"><div class="ph"><h3>${esc(pname(capId))} picks for ${turn==="blue"?"Blue":"Red"}</h3><p class="sub">Pick ${cp.i+1} of ${cp.order.length}${cp.i===0?" · lower rated captain goes first":""}</p></div>
+    <div class="chips">${cp.pool.map(id=>`<button type="button" class="chip" data-cpick="${esc(id)}" aria-pressed="false">${ava(pname(id))}${esc(pname(id))}<small>${rating(id)}</small></button>`).join("")}</div>
+    <div class="win"><button class="btn ghost" type="button" data-cundo="1"${cp.i?"":" disabled"}>Undo last pick</button></div></div>`;return}
+  const hunt=[...L.blue,...L.red].filter(id=>C.st[id]&&C.st[id].streak>=3).sort((a,b)=>C.st[b].streak-C.st[a].streak)[0];
+  const bounty=hunt?`<div class="info bounty">${ICON.target}<div><b>Bounty on ${esc(pname(hunt))}.</b> ${C.st[hunt].streak} wins in a row. ${L.blue.includes(hunt)?"Red":"Blue"} side can end it tonight.</div></div>`:"";
+  $("boardOut").innerHTML=`${board}${sitP}${bounty}
+  ${probHTML(L)}<div class="win"><button class="btn pri" type="button" data-lock="1">Lock teams and go to champ select</button></div>`;
+}
+
+function renderLive(){
+  const L=S.live,on=L&&L.phase!=="draft";
+  $("liveDot").classList.toggle("on",!!on);
+  const ph=["select","playing","result"],names={select:"Champ select",playing:"In game",result:"Result"};
+  const i=on?ph.indexOf(L.phase):-1;
+  $("steps").innerHTML=ph.map((p,k)=>`<span class="${k===i?"on":k<i?"done":""}"><em>${k<i?"✓":k+1}</em>${names[p]}</span>`).join("");
+  if(!on){$("liveTitle").textContent="Live game";$("liveTop").innerHTML="";$("liveRule").innerHTML=ruleHTML();$("liveOut").innerHTML=`<div class="empty"><div><h3>No game running</h3><p class="sub">Make teams first, then lock them to start champ select.</p><div class="win" style="justify-content:center"><a class="btn pri" href="#teams">Make teams</a></div></div></div>`;return}
+  $("liveTitle").textContent=L.phase==="select"?"Champ select":L.phase==="playing"?"Game in progress":"Enter the result";
+  $("liveTop").innerHTML=L.phase==="playing"?`<div class="timer" id="timer">${mmss(Date.now()-L.started)}</div>`:"";
+  $("liveRule").innerHTML=!S.rule.dodges?"":L.fresh?`<div class="info fresh">${ICON.clock}<div><b>Dodges are on.</b> ${L.gap===Infinity?"First game ever":`Last game was ${esc(hrs(L.gap))} ago`}, so each team has ${L.max} dodge${L.max>1?"s":""} this game, whatever the team size.</div></div>`:`<div class="info">${ICON.clock}<div>No dodges this game: the last one was only ${esc(hrs(L.gap))} before. Dodges come back after a ${S.rule.hours}h break.</div></div>`;
+  if(S.rule.fun!==false||L.fun){const sel=L.phase==="select";
+    $("liveRule").innerHTML+=L.fun?`<div class="info rule">${ICON.dice}<div>Challenge this game: <b>${esc(L.fun)}</b></div>${sel?`<div class="acts2"><button class="btn sm ghost" type="button" data-spin="1">Spin again</button><button class="btn sm ghost" type="button" data-unspin="1">Remove</button></div>`:""}</div>`:sel?`<button class="linkbtn" type="button" data-spin="1">${ICON.dice}Spin a random challenge (optional)</button>`:""}
+  const opts=sel=>`<option value="">Pick champion</option>`+CHAMPS.map(c=>`<option${c===sel?" selected":""}>${esc(c)}</option>`).join("");
+  const pips=sideK=>L.max?`<span class="pips" aria-label="${L.dodges[sideK]} dodges left">${Array.from({length:L.max},(_,k)=>`<i class="${k<L.dodges[sideK]?"full":""}"></i>`).join("")} ${L.dodges[sideK]} left</span>`:`<small>no dodges</small>`;
+  const row=(id,sideK)=>{const c=L.champs[id];const k=L.kda[id]||["","",""];
+    if(L.phase==="select")return`<div class="pl">${ava(pname(id))}<div><b>${esc(pname(id))}</b><div class="rt">${c?"Locked in":"Picking…"}</div></div><button class="dodge" type="button" data-dodge="${esc(id)}" ${L.dodges[sideK]>0&&c?"":"disabled"}>Dodge</button><select data-pick="${esc(id)}" aria-label="Champion for ${esc(pname(id))}">${opts(c)}</select></div>`;
+    if(L.phase==="playing")return`<div class="pl">${ava(pname(id))}<div><b>${esc(pname(id))}</b><div class="rt">Rating ${rating(id)}</div></div><span class="champ">${esc(c||"–")}</span></div>`;
+    return`<div class="pl">${ava(pname(id))}<div><b>${esc(pname(id))}</b><div class="rt">${esc(c||"No champion")}</div></div><span></span><div class="kda">${["Kills","Deaths","Assists"].map((lab,j)=>`<label>${lab}<input type="number" min="0" max="99" inputmode="numeric" data-kda="${esc(id)}" data-j="${j}" value="${esc(k[j])}"></label>`).join("")}</div></div>`};
+  const side=(t,cls,label,sideK)=>`<div class="side ${cls}"><h3>${label}${L.phase==="select"?pips(sideK):`<small>avg ${avgR(t)}</small>`}</h3>${t.map(id=>row(id,sideK)).join("")}</div>`;
+  const picked=[...L.blue,...L.red].filter(id=>L.champs[id]).length,total=L.blue.length+L.red.length;
+  const log=L.dlog.length?`<p class="sit">Dodges used: ${L.dlog.map(d=>`${esc(pname(d.pid))} (${esc(d.champ)})`).join(", ")}</p>`:"";
+  const acts=L.phase==="select"?`<button class="btn pri" type="button" data-start="1">${picked<total?`Start game (${picked}/${total} picked)`:"All locked in, start game"}</button><button class="btn ghost" type="button" data-cancel="1">Cancel game</button>`
+    :L.phase==="playing"?`<button class="btn pri" type="button" data-over="1">Game over, enter result</button><button class="btn ghost" type="button" data-back="select">Back to champ select</button>`
+    :`<button class="btn blue" type="button" data-win="blue">Blue won</button><button class="btn red" type="button" data-win="red">Red won</button>`;
+  $("liveOut").innerHTML=`<div class="board">${side(L.blue,"b","Blue side","blue")}<div class="vs">VS</div>${side(L.red,"r","Red side","red")}</div>${log}<div class="win">${acts}</div>${L.phase==="result"?`<p class="note">K/D/A is optional. Leave it empty if you didn't check the scoreboard.</p>`:""}`;
+}
+
+let histN=20;
+function renderHistory(){
+  const fp=$("fPlayer").value,fm=$("fMode").value;
+  $("fPlayer").innerHTML=`<option value="">All players</option>`+S.players.map(p=>`<option value="${esc(p.id)}"${p.id===fp?" selected":""}>${esc(p.name)}</option>`).join("");
+  const list=S.matches.slice().sort((a,b)=>b.date-a.date).filter(m=>(!fp||m.blue.includes(fp)||m.red.includes(fp))&&(!fm||String(m.mode)===fm));
+  $("histSum").textContent=`${S.matches.length} games logged${list.length!==S.matches.length?`, ${list.length} match the filter`:""}.`;
+  const team=(m,side)=>`<div class="team ${side==="blue"?"bt":"rt"}${m.winner===side?" w":""}"><span class="tag">${side==="blue"?"Blue":"Red"}${m.winner===side?" · won":""}</span>${m[side].map(id=>{const k=m.kda&&m.kda[id];return`<span>${esc(pname(id))}${m.champs&&m.champs[id]?` <span class="c">${esc(m.champs[id])}</span>`:""}${k&&k.some(v=>v!==""&&v!=null)?` <span class="k">${k.map(v=>esc(v===""||v==null?"–":v)).join("/")}</span>`:""}</span>`}).join("")}</div>`;
+  const fmt=t=>new Date(t).toLocaleTimeString(undefined,{hour:"2-digit",minute:"2-digit"});
+  const dkey=t=>new Date(t).toDateString();const today=dkey(Date.now()),yest=dkey(Date.now()-DAY);let prev="";
+  const dayHead=m=>{const k=dkey(m.date);if(k===prev)return"";prev=k;const n=list.filter(x=>dkey(x.date)===k).length;return`<div class="day">${k===today?"Today":k===yest?"Yesterday":esc(new Date(m.date).toLocaleDateString(undefined,{weekday:"long",day:"numeric",month:"long"}))} · ${n} game${n>1?"s":""}</div>`};
+  const shown=list.slice(0,histN);
+  $("histList").innerHTML=list.length?shown.map(m=>`${dayHead(m)}<div class="match"><div class="when"><b>${esc(fmt(m.date))}</b>${m.mode}v${m.mode}${m.mins?` · ${m.mins} min`:""}</div>${team(m,"blue")}${team(m,"red")}<div class="acts"><button class="icon" type="button" data-flip="${esc(m.id)}" aria-label="Swap winner" title="Swap winner">${ICON.swap}</button> <button class="icon" type="button" data-del="${esc(m.id)}" aria-label="Delete match" title="Delete match">${ICON.trash}</button></div>${(m.dodges&&m.dodges.length)||m.rule?`<div class="dl">${[m.rule?`Challenge: ${esc(m.rule)}`:"",m.dodges&&m.dodges.length?`Dodged: ${m.dodges.map(d=>`${esc(pname(d.pid))} (${esc(d.champ)})`).join(", ")}`:""].filter(Boolean).join(" · ")}</div>`:""}</div>`).join(""):`<div class="empty" style="margin:0;border:0"><div><h3>No games here</h3><p class="sub">Finish a live game and it shows up here.</p></div></div>`;
+  addMore(list.length-shown.length);
+}
+
+function addMore(n){if(n>0){const d=document.createElement("div");d.className="more";d.innerHTML=`<button class="btn" type="button" data-more="1">Show ${Math.min(20,n)} more games</button>`;$("histList").appendChild(d)}}
+function formOf(id,n){return S.matches.filter(m=>m.blue.includes(id)||m.red.includes(id)).sort((a,b)=>b.date-a.date).slice(0,n).map(m=>(m.blue.includes(id)?"blue":"red")===m.winner)}
+const formHTML=(id,n)=>{const f=formOf(id,n).reverse();return`<span class="form" aria-label="Last ${f.length} games: ${f.filter(Boolean).length} wins">${f.map(w=>`<i class="${w?"w":""}"></i>`).join("")}</span>`};
+function renderStats(){
+  const since=S.period?Date.now()-S.period*DAY:0;
+  document.querySelectorAll("[data-period]").forEach(b=>b.setAttribute("aria-pressed",String(+b.dataset.period===S.period)));
+  const ps={};S.players.forEach(p=>ps[p.id]={id:p.id,g:0,w:0,k:0,d:0,a:0,kn:0});
+  const ms=S.matches.filter(m=>m.date>=since);let best=null;
+  for(const m of ms)for(const side of["blue","red"])for(const id of m[side]){const x=ps[id];if(!x)continue;x.g++;if(m.winner===side)x.w++;const k=m.kda&&m.kda[id];
+    if(k&&k.every(v=>v!==""&&v!=null)){x.kn++;x.k+=+k[0];x.d+=+k[1];x.a+=+k[2];if(!best||+k[0]>best.k)best={id,k:+k[0],c:m.champs&&m.champs[id]}}}
+  const rows=Object.values(ps).filter(x=>x.g).sort(S.period?(a,b)=>b.w-a.w||b.w/b.g-a.w/a.g||rating(b.id)-rating(a.id):(a,b)=>rating(b.id)-rating(a.id));
+  const per=S.period?`the last ${S.period} days`:"all time";
+  $("statSub").textContent=`${ms.length} game${ms.length===1?"":"s"} in ${per}.`;
+  $("lbSub").textContent=S.period?"Sorted by wins":"Sorted by rating";
+  const all=Object.values(C.st).filter(x=>P(x.id)&&x.g);
+  const topW=rows.slice().sort((a,b)=>b.w-a.w)[0],topR=all.slice().sort((a,b)=>b.rating-a.rating)[0],hot=all.filter(x=>x.streak>0).sort((a,b)=>b.streak-a.streak)[0];
+  const kpi=(l,v,s)=>`<div class="kpi"><span class="l">${l}</span><span class="v">${v}</span><span class="s">${s}</span></div>`;
+  $("kpis").innerHTML=kpi("Games played",`${ms.length}`,S.period?`in the last ${S.period} days`:"since the start")
+    +kpi("Most wins",topW?`${ava(pname(topW.id))}${esc(pname(topW.id))}`:"–",topW?`${topW.w} wins in ${esc(per)}`:"No games yet")
+    +kpi("Highest rating",topR?`${ava(pname(topR.id))}${esc(pname(topR.id))}`:"–",topR?`${rating(topR.id)} rating`:"No games yet")
+    +kpi("Hottest streak",hot?`${ava(pname(hot.id))}${esc(pname(hot.id))}`:"–",hot?`${hot.streak} wins in a row`:"Nobody is on a streak");
+  if(!S.focus||!P(S.focus)||!rows.some(x=>x.id===S.focus))S.focus=rows[0]?rows[0].id:null;
+  $("lb").innerHTML=rows.length?rows.map((x,i)=>`<li><button type="button" class="lbrow" data-focus="${esc(x.id)}" aria-pressed="${x.id===S.focus}"><span class="pos">${i+1}</span><span class="who">${ava(pname(x.id))}<span><b>${esc(pname(x.id))}</b><small>${x.w}–${x.g-x.w} · ${Math.round(x.w/x.g*100)}%</small></span></span><span class="c f">${formHTML(x.id,5)}</span><span class="c r"><b>${rating(x.id)}</b></span><span class="c w"><b>${S.period?x.w:Math.round(x.w/x.g*100)+"%"}</b><small>${S.period?"wins":"win rate"}</small></span></button></li>`).join(""):`<li class="empty" style="margin:0">No games in this period yet.</li>`;
+  if(S.period){const h=document.querySelectorAll(".lbhead span");h[4].textContent="Wins"}else{const h=document.querySelectorAll(".lbhead span");h[4].textContent="Win rate"}
+  renderCard();
+  const f1=v=>v.toFixed(1);
+  const kr=Object.values(ps).filter(x=>x.kn>=3).map(x=>({id:x.id,r:(x.k+x.a)/Math.max(1,x.d)})).sort((a,b)=>b.r-a.r)[0];
+  const mostK=Object.values(ps).filter(x=>x.kn).sort((a,b)=>b.k-a.k)[0];
+  const bestWR=Object.values(ps).filter(x=>x.g>=5).sort((a,b)=>b.w/b.g-a.w/a.g)[0];
+  const rec=(l,id,v)=>`<div class="row"><span>${esc(l)}</span><span class="m">${esc(pname(id))} · ${esc(v)}</span></div>`;
+  $("recSub").textContent=S.period?`Last ${S.period} days`:"All time";
+  $("recs").innerHTML=[best&&rec("Most kills in a game",best.id,`${best.k}${best.c?` on ${best.c}`:""}`),kr&&rec("Best KDA",kr.id,kr.r.toFixed(2)),mostK&&rec("Most kills",mostK.id,`${mostK.k}`),bestWR&&rec("Best win rate",bestWR.id,`${Math.round(bestWR.w/bestWR.g*100)}%`)].filter(Boolean).join("")||`<p class="sub">Enter K/D/A after games to unlock records.</p>`;
+  const grp=k=>C.groups.filter(g=>g.ids.length===k&&g.g>=3&&g.ids.every(P)).sort((a,b)=>b.w/b.g-a.w/a.g||b.g-a.g).slice(0,4);
+  const gl=k=>{const g=grp(k);return g.length?g.map(x=>`<div class="row"><span>${x.ids.map(id=>esc(pname(id))).join(" + ")}</span><span class="m">${Math.round(x.w/x.g*100)}% · ${x.w}–${x.g-x.w}</span></div>`).join(""):`<p class="sub">Not enough games together yet.</p>`};
+  $("duos").innerHTML=gl(2);$("trios").innerHTML=gl(3);
+  const fav=Object.entries(C.champ).sort((a,b)=>b[1].g-a[1].g).slice(0,5);
+  renderAwards();
+  $("favs").innerHTML=fav.length?fav.map(([c,v])=>`<div class="row"><span class="who">${ava(c)}${esc(c)}</span><span class="m">${v.g} games · ${Math.round(v.w/v.g*100)}%</span></div>`).join(""):`<p class="sub">Pick champions in live games to see this.</p>`;
+}
+function renderAwards(){
+  const since=Date.now()-7*DAY;const ps={};
+  for(const m of S.matches)if(m.date>=since)for(const side of["blue","red"])for(const id of m[side]){if(!P(id))continue;const x=ps[id]=ps[id]||{id,g:0,w:0,k:0,d:0,a:0,kn:0};x.g++;if(m.winner===side)x.w++;const k=m.kda&&m.kda[id];if(k&&k.every(v=>v!==""&&v!=null)){x.kn++;x.k+=+k[0];x.d+=+k[1];x.a+=+k[2]}}
+  const v=Object.values(ps);const top=(arr,f)=>arr.slice().sort(f)[0];
+  const mvp=top(v.filter(x=>x.g>=2),(a,b)=>b.w-a.w||b.w/b.g-a.w/a.g),kd=v.filter(x=>x.kn);
+  const kills=top(kd,(a,b)=>b.k-a.k),deaths=top(kd,(a,b)=>b.d-a.d),kda=top(kd.filter(x=>x.kn>=2),(a,b)=>(b.k+b.a)/Math.max(1,b.d)-(a.k+a.a)/Math.max(1,a.d));
+  const row=(l,x,val)=>x?`<div class="row"><span>${esc(l)}</span><span class="m">${esc(pname(x.id))} · ${esc(val)}</span></div>`:"";
+  $("awards").innerHTML=v.length?[row("MVP",mvp,mvp&&`${mvp.w} win${mvp.w===1?"":"s"}`),row("Most kills",kills,kills&&String(kills.k)),row("Best KDA",kda,kda&&((kda.k+kda.a)/Math.max(1,kda.d)).toFixed(2)),row("Most deaths",deaths,deaths&&String(deaths.d))].join(""):`<p class="sub">No games in the last 7 days.</p>`;
+  const mon=t=>new Date(t).toLocaleDateString(undefined,{month:"long"});
+  $("seasons").innerHTML=C.seasons.length?C.seasons.slice(0,4).map(x=>`<div class="row"><span class="who">${ava(pname(x.id))}<span>${esc(pname(x.id))}<br><small style="color:var(--mute);font-weight:500">${esc(mon(x.t))}${x.cur?" so far":""}</small></span></span><span class="m">${x.w} wins · ${x.g} games</span></div>`).join(""):`<p class="sub">Play 3+ games in a month to crown a champion.</p>`;
+}
+function badges(id){const x=C.st[id];if(!x)return[];const b=[];const nc=Object.keys(x.wch).length;
+  if(x.crowns)b.push(["Monthly champion",x.crowns>1?`Won ${x.crowns} months`:"Won a month",1]);
+  if(x.best>=5)b.push(["On fire",`Best streak: ${x.best} wins`]);
+  if(x.bounty)b.push(["Bounty hunter",`Ended ${x.bounty} win streak${x.bounty>1?"s":""}`]);
+  if(x.under)b.push(["Giant slayer",`${x.under} upset win${x.under>1?"s":""} as the underdog`]);
+  if(nc>=8)b.push(["Champion pool",`Won with ${nc} different champions`]);
+  const ms=[100,50,25].find(t=>x.g>=t);if(ms)b.push([`${ms} games`,`${x.g} games played`]);
+  return b}
+function renderCard(){
+  const id=S.focus;const el=$("pcard");
+  if(!id){el.innerHTML=`<p class="sub">Play a game to see player profiles.</p>`;return}
+  const x=C.st[id],p=P(id);const h=x.hist;const ch=Math.round(h[h.length-1]-h[Math.max(0,h.length-6)]);
+  let k=0,d=0,a=0,n=0;for(const m of S.matches){const v=m.kda&&m.kda[id];if(v&&v.every(t=>t!==""&&t!=null)){k+=+v[0];d+=+v[1];a+=+v[2];n++}}
+  const mate=C.groups.filter(g=>g.ids.length===2&&g.ids.includes(id)&&g.g>=3).sort((a,b)=>b.w/b.g-a.w/a.g)[0];
+  const foes=C.h2h.filter(f=>(f.a===id||f.b===id)&&f.g>=3&&P(f.a)&&P(f.b)).map(f=>{const mine=f.a===id?f.wa:f.wb;return{o:f.a===id?f.b:f.a,w:mine,l:f.g-mine,r:mine/f.g}});
+  const nem=foes.slice().sort((a,b)=>a.r-b.r)[0],vic=foes.slice().sort((a,b)=>b.r-a.r)[0];
+  const champs=Object.entries(x.champs).sort((a,b)=>b[1]-a[1]).slice(0,3);
+  const hs=h.slice(-30),mn=Math.min(...hs)-8,mx=Math.max(...hs)+8;
+  const pt=(v,i)=>`${(i/Math.max(1,hs.length-1)*300).toFixed(1)},${(100-(v-mn)/(mx-mn)*84-8).toFixed(1)}`;
+  const line=hs.map(pt).join(" ");const up=ch>=0;
+  el.innerHTML=`<div class="pc-top">${ava(p.name,"lg")}<div><h2>${esc(p.name)}</h2><p class="sub">${p.riot?esc(p.riot)+" · ":""}#${rankOf(id)} by rating · ${formHTML(id,10)}</p></div></div>
+  ${(()=>{const b=badges(id);return b.length?`<div class="badges">${b.map(([t,d,g])=>`<span class="bd${g?" gold":""}" title="${esc(d)}"><i></i>${esc(t)}</span>`).join("")}</div>`:""})()}
+  <div class="pc-stats"><div><small>Rating</small><b>${rating(id)}</b></div><div><small>Win rate</small><b>${x.g?Math.round(x.w/x.g*100):0}%</b></div><div><small>Games</small><b>${x.g}</b></div><div><small>Avg KDA</small><b>${n?((k+a)/Math.max(1,d)).toFixed(2):"–"}</b></div></div>
+  <div class="chart"><span class="cl">Rating, last ${hs.length-1} games</span><span class="cr" style="color:${up?"var(--ice)":"var(--red)"}">${up?"+":""}${ch} last 5</span><svg viewBox="0 0 300 100" preserveAspectRatio="none" aria-hidden="true"><polygon points="0,100 ${line} 300,100" fill="${up?"rgba(191,230,255,.10)":"rgba(255,90,110,.10)"}"/><polyline points="${line}" fill="none" stroke="${up?"var(--ice)":"var(--red)"}" stroke-width="2.2" vector-effect="non-scaling-stroke" stroke-linejoin="round"/></svg></div>
+  <div class="facts">
+    <div class="fact"><span>Record</span><b>${x.w}–${x.l}${x.streak>1?` · ${x.streak} win streak`:x.streak<-1?` · ${-x.streak} losses in a row`:""}</b></div>
+    <div class="fact"><span>Best teammate</span><b>${mate?`${esc(pname(mate.ids.find(i=>i!==id)))} · ${Math.round(mate.w/mate.g*100)}% together`:"Not enough games"}</b></div>
+    <div class="fact"><span>Favourite victim</span><b>${vic&&vic.r>.5?`${esc(pname(vic.o))} · ${vic.w}–${vic.l}`:"Nobody yet"}</b></div>
+    <div class="fact"><span>Toughest opponent</span><b>${nem&&nem.r<.5?`${esc(pname(nem.o))} · ${nem.w}–${nem.l}`:"Nobody yet"}</b></div>
+    <div class="fact"><span>Most played</span><b>${champs.length?champs.map(([c,v])=>`${esc(c)} (${v})`).join(", "):"No champions logged"}</b></div>
+    ${n?`<div class="fact"><span>Average K / D / A</span><b>${(k/n).toFixed(1)} / ${(d/n).toFixed(1)} / ${(a/n).toFixed(1)}</b></div>`:""}
+  </div>`;
+}
+function renderRivals(){
+  const fs=feuds();$("feuds").innerHTML=fs.length?fs.map(feudHTML).join(""):`<div class="empty" style="min-height:110px;margin:0 0 16px"><p>No streaks right now. Somebody win three in a row.</p></div>`;
+  const col=id=>{const i=S.players.findIndex(p=>p.id===id);return i>=0?PAL[i%PAL.length]:"#555"};
+  const rows=C.h2h.filter(f=>P(f.a)&&P(f.b)).sort((a,b)=>b.g-a.g);
+  $("h2h").innerHTML=rows.length?rows.map(f=>`<div class="h2hrow"><span class="p">${ava(pname(f.a))}<span>${esc(pname(f.a))}</span><b>${f.wa}</b></span><span class="split" role="img" aria-label="${esc(pname(f.a))} ${f.wa}, ${esc(pname(f.b))} ${f.wb}"><i style="width:${f.wa/f.g*100}%;background:${col(f.a)}"></i><i style="width:${f.wb/f.g*100}%;background:${col(f.b)}"></i></span><span class="p r"><b>${f.wb}</b><span>${esc(pname(f.b))}</span>${ava(pname(f.b))}</span><span class="st">${f.g} games · ${f.streak>1?`${esc(pname(f.leader))} won the last ${f.streak}`:`${esc(pname(f.leader))} won the last one`}</span></div>`).join(""):`<p class="sub">Play some games to see matchups.</p>`;
+}
+const uggSlug=c=>({"Nunu & Willump":"nunu","Renata Glasc":"renata"}[c]||c.toLowerCase().replace(/[^a-z]/g,""));
+const mobaSlug=c=>({"Nunu & Willump":"nunu","Renata Glasc":"renata"}[c]||c.toLowerCase().replace(/['.&]/g,"").trim().replace(/\s+/g,"-"));
+function renderBuilds(){
+  const q=$("cSearch").value.trim().toLowerCase();
+  const list=CHAMPS.filter(c=>c.toLowerCase().includes(q));
+  $("cGrid").innerHTML=list.map(c=>`<button type="button" class="ch" data-c="${esc(c)}" aria-pressed="${c===S.chosen}">${ava(c)}${esc(c)}</button>`).join("")||`<p class="sub">No champion matches "${esc(q)}".</p>`;
+  const c=S.chosen;
+  if(!c){const fav=Object.entries(C.champ).sort((a,b)=>b[1].g-a[1].g).slice(0,6);$("cPanel").innerHTML=`<h3>Your group plays these most</h3><div class="chips" style="margin-top:12px">${fav.map(([n])=>`<button type="button" class="chip" data-c="${esc(n)}">${ava(n)}${esc(n)}</button>`).join("")}</div>`;return}
+  const v=C.champ[c];const mine=S.players.map(p=>({p,n:(C.st[p.id]&&C.st[p.id].champs[c])||0})).filter(x=>x.n).sort((a,b)=>b.n-a.n);
+  $("cPanel").innerHTML=`<div class="who" style="gap:14px">${ava(c)}<div><h2>${esc(c)}</h2><p class="sub" style="margin:2px 0 0">${v?`${v.g} group games · ${Math.round(v.w/v.g*100)}% wins${mine.length?` · most by ${esc(mine[0].p.name)}`:""}`:"Nobody in the group has played this yet."}</p></div></div>
+  <div class="links"><a class="btn pri" href="https://u.gg/lol/champions/aram-mayhem/${encodeURIComponent(uggSlug(c))}-aram-mayhem" target="_blank" rel="noopener">Build on U.GG</a><a class="btn" href="https://mobalytics.gg/lol/champions/${encodeURIComponent(mobaSlug(c))}/mayhem-builds" target="_blank" rel="noopener">Build on Mobalytics</a></div>`;
+}
+
+function renderPlayers(){
+  $("pCount").textContent=`${S.players.length} player${S.players.length===1?"":"s"}`;
+  $("pList").innerHTML=S.players.length?S.players.map(p=>`<div class="prow">${ava(p.name)}<input class="f" value="${esc(p.name)}" data-name="${esc(p.id)}" aria-label="Name" maxlength="20"><input class="f riot" value="${esc(p.riot)}" data-riot="${esc(p.id)}" placeholder="Riot ID" aria-label="Riot ID" maxlength="30"><button class="icon" type="button" data-rm="${esc(p.id)}" aria-label="Remove ${esc(p.name)}">${ICON.trash}</button></div>`).join(""):`<p class="sub">No players yet.</p>`;
+  $("discUrl").value=S.discord||"";$("ruleH").value=S.rule.hours;$("ruleD").value=S.rule.dodges;$("ruleR").value=String(S.rule.rerolls??2);$("ruleFun").checked=S.rule.fun!==false;
+}
+function renderDiscord(){
+  const ok=/^https:\/\/(discord\.gg|discord\.com)\//.test(S.discord||"");
+  for(const el of[$("discordBtn"),$("footDisc")]){el.href=ok?S.discord:"#players";if(ok){el.target="_blank";el.rel="noopener"}else el.removeAttribute("target")}
+  $("discordLbl").textContent=ok?"Join our Discord":"Add Discord link";
+}
+
+function all(){C=compute();renderTeams();renderLive();renderHistory();renderStats();renderRivals();renderBuilds();renderPlayers();renderDiscord();save()}
+const VIEWS=["teams","live","history","stats","rivals","builds","players"];
+function route(){const v=(location.hash||"#teams").slice(1);const ok=VIEWS.includes(v)?v:"teams";
+  document.querySelectorAll(".view").forEach(s=>s.classList.toggle("on",s.id==="v-"+ok));
+  document.querySelectorAll(".tab").forEach(t=>{if(t.getAttribute("href")==="#"+ok){t.setAttribute("aria-current","page");const n=t.parentElement;if(n.scrollWidth>n.clientWidth)n.scrollTo({left:t.offsetLeft-n.clientWidth/2+t.offsetWidth/2,behavior:"smooth"})}else t.removeAttribute("aria-current")})}
+const go=h=>{if(location.hash==="#"+h)route();else location.hash=h;window.scrollTo(0,0)};
+let tt;function toast(m){const t=$("toast");t.textContent=m;t.classList.add("on");clearTimeout(tt);tt=setTimeout(()=>t.classList.remove("on"),2400)}
+let mAct=null;function ask(title,text,yes,fn){$("mTitle").textContent=title;$("mText").textContent=text;$("mYes").textContent=yes;mAct=fn;$("modal").classList.add("on");$("mNo").focus()}
+$("mNo").onclick=()=>$("modal").classList.remove("on");
+document.addEventListener("keydown",e=>{if(e.key==="Escape"&&$("modal").classList.contains("on"))$("modal").classList.remove("on")});
+$("modal").addEventListener("click",e=>{if(e.target===$("modal"))$("modal").classList.remove("on")});
+$("mYes").onclick=()=>{$("modal").classList.remove("on");if(mAct)mAct();mAct=null};
+
+document.addEventListener("click",e=>{
+  const b=e.target.closest("button");if(!b)return;const L=S.live;
+  if(b.dataset.sel){const id=b.dataset.sel;S.sel=S.sel.includes(id)?S.sel.filter(x=>x!==id):[...S.sel,id];if(L&&L.phase==="draft")S.live=null;all()}
+  else if(b.dataset.size){S.size=+b.dataset.size;S.sizeSet=true;if(L&&L.phase==="draft")S.live=null;all()}
+  else if(b.id==="sR"||b.id==="sB"||b.id==="sC"){S.style={sR:"random",sB:"balanced",sC:"captains"}[b.id];all()}
+  else if(b.dataset.cpick&&draftOpen(L)){const id=b.dataset.cpick,cp=L.cap,k=cp.order[cp.i];if(cp.pool.includes(id)){cp.pool=cp.pool.filter(x=>x!==id);L[k].push(id);cp.log.push(id);cp.i++;all()}}
+  else if(b.dataset.cundo&&L&&L.cap&&L.cap.i){const cp=L.cap;const id=cp.log.pop();cp.i--;const k=cp.order[cp.i];L[k]=L[k].filter(x=>x!==id);cp.pool.push(id);all()}
+  else if(b.dataset.spin&&L){const opts=FUN.filter(f=>f!==L.fun);L.fun=opts[rnd(opts.length)];all();toast("Challenge: "+L.fun)}
+  else if(b.dataset.unspin&&L){L.fun="";all()}
+  else if(b.id==="genBtn"){if(L&&L.phase!=="draft"){ask("A game is still running","Cancel it and make new teams? The running game is not saved.","Make new teams",()=>{S.live=null;makeTeams();all()})}else{makeTeams();all()}}
+  else if(b.dataset.lock&&L){lockTeams();all();go("live");toast(L.max?`Champ select: ${L.max} dodges per team`:"Champ select started")}
+  else if(b.dataset.dodge&&L){const id=b.dataset.dodge;const sideK=L.blue.includes(id)?"blue":"red";if(L.dodges[sideK]>0&&L.champs[id]){L.dodges[sideK]--;L.dlog.push({pid:id,champ:L.champs[id],side:sideK});delete L.champs[id];all();toast(`${pname(id)} dodged. ${sideK==="blue"?"Blue":"Red"} has ${L.dodges[sideK]} left`)}}
+  else if(b.dataset.start&&L){L.phase="playing";L.started=Date.now();all();toast("Game started. Good luck")}
+  else if(b.dataset.over&&L){L.phase="result";L.mins=Math.max(1,Math.round((Date.now()-L.started)/6e4));all()}
+  else if(b.dataset.back&&L){L.phase=b.dataset.back;all()}
+  else if(b.dataset.cancel){ask("Cancel this game?","Teams, picks and dodges are thrown away. Nothing is saved to the history.","Cancel game",()=>{S.live=null;S.rrMap={};all();go("teams");toast("Game cancelled")})}
+  else if(b.dataset.win&&L){const m={id:uid(),date:Date.now(),mode:L.size,blue:L.blue,red:L.red,winner:b.dataset.win,champs:{...L.champs},kda:{...L.kda},dodges:L.dlog.slice(),mins:L.mins||0};if(L.fun)m.rule=L.fun;
+    const hunted=(m.winner==="blue"?m.red:m.blue).filter(id=>C.st[id]&&C.st[id].streak>=3).sort((a,b)=>C.st[b].streak-C.st[a].streak)[0];const hs=hunted?C.st[hunted].streak:0;
+    S.matches.push(m);S.last={blue:m.blue,red:m.red};L.sit.forEach(id=>S.sit[id]=(S.sit[id]||0)+1);[...L.blue,...L.red].forEach(id=>S.sit[id]=0);S.live=null;all();go("history");const opp=(x,y)=>(m.blue.includes(x)&&m.red.includes(y))||(m.red.includes(x)&&m.blue.includes(y));const f=feuds().find(f=>opp(f.a,f.b)&&(m.winner==="blue"?m.blue:m.red).includes(f.leader));toast(hunted?`Bounty claimed! ${pname(hunted)}'s ${hs}-win streak is over`:f?feudText(f).t+"!":(m.winner==="blue"?"Blue":"Red")+" side win saved")}
+  else if(b.dataset.focus){S.focus=b.dataset.focus;document.querySelectorAll(".lbrow").forEach(r=>r.setAttribute("aria-pressed",String(r.dataset.focus===S.focus)));renderCard();save();if(window.innerWidth<=1000)$("pcard").scrollIntoView({behavior:"smooth",block:"start"})}
+  else if(b.dataset.more){histN+=20;renderHistory()}
+  else if(b.dataset.flip){const m=S.matches.find(x=>x.id===b.dataset.flip);if(m){m.winner=m.winner==="blue"?"red":"blue";all();toast("Winner swapped")}}
+  else if(b.dataset.del){const id=b.dataset.del;ask("Delete this game?","Ratings and stats are recalculated without it.","Delete",()=>{S.matches=S.matches.filter(x=>x.id!==id);all();toast("Game deleted")})}
+  else if(b.dataset.period!=null){S.period=+b.dataset.period;renderStats();save()}
+  else if(b.dataset.c){S.chosen=b.dataset.c;all();$("cPanel").scrollIntoView({behavior:"smooth",block:"nearest"})}
+  else if(b.dataset.rm){const id=b.dataset.rm;ask(`Remove ${pname(id)}?`,"Their past games stay in the history.","Remove",()=>{S.players=S.players.filter(p=>p.id!==id);S.sel=S.sel.filter(x=>x!==id);if(S.live&&[...S.live.blue,...S.live.red].includes(id))S.live=null;all();toast("Player removed")})}
+  else if(b.id==="resetBtn"){ask("Reset sample data?","Your changes in this prototype are replaced with the sample players and games.","Reset",()=>{try{localStorage.removeItem(KEY)}catch(e){}S=seed();all();toast("Sample data restored")})}
+});
+document.addEventListener("change",e=>{
+  const t=e.target;const L=S.live;
+  if(t.dataset.pick&&L){if(t.value)L.champs[t.dataset.pick]=t.value;else delete L.champs[t.dataset.pick];renderLive();save()}
+  else if(t.dataset.kda&&L){const id=t.dataset.kda;L.kda[id]=L.kda[id]||["","",""];const v=t.value===""?"":Math.max(0,Math.min(99,Math.floor(+t.value)||0));L.kda[id][+t.dataset.j]=v;t.value=v;save()}
+  else if(t.id==="noRep"){S.noRep=t.checked;renderTeams();save()}
+  else if(t.id==="ap1"||t.id==="ap2"){S.apart=S.apart||["",""];S.apart[t.id==="ap1"?0:1]=t.value;if(S.apart[0]&&S.apart[0]===S.apart[1]){S.apart[t.id==="ap1"?1:0]="";toast("Pick two different players")}renderTeams();save()}
+  else if(t.dataset.name){const p=P(t.dataset.name);const v=t.value.trim().slice(0,20);if(p&&v&&!S.players.some(o=>o!==p&&o.name.toLowerCase()===v.toLowerCase())){p.name=v;all()}else{if(v)toast("That name is already taken");renderPlayers()}}
+  else if(t.dataset.riot){const p=P(t.dataset.riot);if(p){p.riot=t.value.trim().slice(0,30);save()}}
+  else if(t.id==="fPlayer"||t.id==="fMode"){histN=20;renderHistory()}
+});
+$("cSearch").addEventListener("input",renderBuilds);
+$("addF").addEventListener("submit",e=>{e.preventDefault();const n=$("newName").value.trim().slice(0,20);if(!n)return;if(S.players.some(o=>o.name.toLowerCase()===n.toLowerCase())){toast(`${n} is already on the list`);return}const p={id:uid(),name:n.slice(0,20),riot:$("newRiot").value.trim().slice(0,30)};S.players.push(p);S.sel.push(p.id);$("newName").value="";$("newRiot").value="";all();toast(`${p.name} added`)});
+$("ruleF").addEventListener("submit",e=>{e.preventDefault();const h=Math.max(1,Math.min(72,Math.floor(+$("ruleH").value)||12));const d=Math.max(0,Math.min(5,Math.floor(+$("ruleD").value)||0));S.rule={hours:h,dodges:d,rerolls:+$("ruleR").value,fun:$("ruleFun").checked};all();toast("House rules saved")});
+$("discF").addEventListener("submit",e=>{e.preventDefault();const v=$("discUrl").value.trim();if(v&&!/^https:\/\/(discord\.gg|discord\.com)\//.test(v)){toast("That doesn't look like a Discord invite link");return}S.discord=v;all();toast(v?"Discord link saved":"Discord link removed")});
+window.addEventListener("hashchange",route);
+const tick=setInterval(()=>{const t=$("timer");if(t&&S.live&&S.live.phase==="playing")t.textContent=mmss(Date.now()-S.live.started)},1000);
+
+function scene(){let q=7;const r=()=>(q=q*16807%2147483647)/2147483647;let sn="";for(let i=0;i<70;i++){sn+=`<circle cx="${(r()*1200).toFixed(0)}" cy="${(r()*225).toFixed(0)}" r="${(r()*1.6+.4).toFixed(1)}" opacity="${(r()*.6+.2).toFixed(2)}"/>`}$("snow").innerHTML=sn;
+  let lm="";for(let x=70;x<1200;x+=140){lm+=`<rect x="${x-2}" y="196" width="4" height="18" fill="#2a3d55"/><circle cx="${x}" cy="194" r="9" fill="#bfe6ff" opacity=".18"/><circle cx="${x}" cy="194" r="3.5" fill="#e9f6ff"/>`}$("lamps").innerHTML=lm}
+function start(data){scene();S=load(data);if(!S.rule)S.rule={hours:12,dodges:2};if(S.period==null)S.period=30;if(S.rule.rerolls==null)S.rule.rerolls=2;if(S.rule.fun==null)S.rule.fun=true;if(!S.apart)S.apart=["",""];if(!S.rrMap)S.rrMap={};if(hot&&hot.snapshot)hot.snapshot(()=>S);all();route()}
+if(hot&&hot.ready)hot.ready(start);else start(hot&&hot.data||{});
+}
+</script>
+</body>
+</html>
