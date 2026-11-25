@@ -39,7 +39,7 @@ export default function Helper() {
           <p className="sub">The helper is coming soon. When it's ready, the download and its fingerprint (SHA-256) appear here.</p>
           <div>
             <button className="btn pri" type="button" disabled>
-              <Download aria-hidden /> Download for Windows (coming soon)
+              <Download aria-hidden /> Download (coming soon)
             </button>
           </div>
         </div>

@@ -163,7 +163,7 @@ export default function Stats() {
                           </small>
                         </span>
                       </span>
-                      <span className="c f">
+                      <span className="c fm">
                         <Form id={x.id} n={5} />
                       </span>
                       <span className="c s xs">
@@ -324,7 +324,7 @@ function Profile({ id }: { id: string }) {
   const change = Math.round(h[h.length - 1] - h[Math.max(0, h.length - 6)]);
   const mn = Math.min(...h) - 8;
   const mx = Math.max(...h) + 8;
-  const line = h.map((v, i) => `${((i / Math.max(1, h.length - 1)) * 300).toFixed(1)},${(100 - ((v - mn) / (mx - mn)) * 84 - 8).toFixed(1)}`).join(" ");
+  const line = h.map((v, i) => `${((i / Math.max(1, h.length - 1)) * 300).toFixed(1)},${(100 - ((v - mn) / (mx - mn)) * 66 - 8).toFixed(1)}`).join(" ");
   const up = change >= 0;
   const bs = badges(x);
 

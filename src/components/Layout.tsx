@@ -17,12 +17,12 @@ const NAV = [
   ["/players", "Players"],
 ] as const;
 
-function DiscordLink({ className, children }: { className?: string; children: React.ReactNode }) {
+function DiscordLink({ className, children, label }: { className?: string; children: React.ReactNode; label?: string }) {
   const { data } = useData();
   const url = data.settings.discordUrl;
   if (!isDiscordInvite(url)) return null;
   return (
-    <a className={className} href={url} target="_blank" rel="noopener noreferrer">
+    <a className={className} href={url} target="_blank" rel="noopener noreferrer" aria-label={label}>
       {children}
     </a>
   );
@@ -62,7 +62,7 @@ export function Layout() {
               </NavLink>
             ))}
           </nav>
-          <DiscordLink className="btn sm dis">
+          <DiscordLink className="btn sm dis" label="Join our Discord (opens in a new tab)">
             <MessageCircle aria-hidden />
             <span>Join our Discord</span>
           </DiscordLink>

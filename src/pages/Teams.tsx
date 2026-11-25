@@ -380,7 +380,7 @@ function Draft({ L, onLock }: { L: LiveGame; onLock: () => void }) {
       </div>
       {L.sitOut.length > 0 && <p className="sit">Sitting out: {L.sitOut.map(pname).join(", ")}</p>}
       {open ? (
-        <div className="panel" style={{ marginTop: 16 }}>
+        <div className="panel" style={{ marginTop: 16 }} data-testid="captain-pick">
           <div className="ph">
             <h3>
               {pname(turn === "blue" ? L.blue[0] : L.red[0])} picks for {turn === "blue" ? "Blue" : "Red"}
