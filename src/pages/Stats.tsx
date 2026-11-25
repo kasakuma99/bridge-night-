@@ -1,37 +1,17 @@
 import { useMemo } from "react";
-import { useSearchParams } from "react-router-dom";
-import { Award, Crown, Flame, Shield, Sparkles, Swords, Target } from "lucide-react";
+import { Link } from "react-router-dom";
 import { useData, usePrefs } from "../data/context";
-import { Avatar, ChampAvatar, Form, ItemIcon } from "../components/ui";
-import { FEATURES, POINTS_NAME, byWins, shownPoints, visibleBadges } from "../lib/features";
-import {
-  badges,
-  kdaRatio,
-  periodStats,
-  profile,
-  rating,
-  records,
-  topEntries,
-  weeklyAwards,
-  type Badge,
-} from "../lib/stats";
+import { Avatar, ChampAvatar, Form } from "../components/ui";
+import { FEATURES, POINTS_NAME, byWins, shownPoints } from "../lib/features";
+import { kdaRatio, periodStats, rating, records, weeklyAwards } from "../lib/stats";
 import { DAY, fmtMonth, plural } from "../lib/util";
 
 const pct = (w: number, g: number) => (g ? Math.round((w / g) * 100) : 0);
 const f1 = (v: number) => v.toFixed(1);
 
-const BADGE_ICON: Record<string, typeof Award> = {
-  "Monthly champion": Crown,
-  "On fire": Flame,
-  "Bounty hunter": Target,
-  "Giant slayer": Swords,
-  "Champion pool": Sparkles,
-};
-
 export default function Stats() {
   const { data, c, now, pname, isActive } = useData();
   const { prefs, setPrefs } = usePrefs();
-  const [params, setParams] = useSearchParams();
   const period = prefs.period;
   const since = period ? now - period * DAY : 0;
   const per = period ? `the last ${period} days` : "all time";
@@ -51,8 +31,6 @@ export default function Stats() {
   const topR = all.slice().sort((a, b) => b.rating - a.rating)[0];
   const topS = all.filter((x) => x.bestStreak > 0).sort((a, b) => b.bestStreak - a.bestStreak)[0];
   const hot = all.filter((x) => x.streak > 0).sort((a, b) => b.streak - a.streak)[0];
-  const asked = params.get("player");
-  const focus = asked && c.st[asked] && isActive(asked) ? asked : sorted[0]?.id;
 
   const rec = useMemo(() => records(data.matches, since, isActive), [data.matches, since, isActive]);
   const aw = useMemo(() => weeklyAwards(data.matches, now, isActive), [data.matches, now, isActive]);
@@ -129,7 +107,6 @@ export default function Stats() {
         {kpi("Hottest streak", hot ? who(hot.id) : "–", hot ? `${hot.streak} wins in a row` : "Nobody is on a streak")}
       </div>
 
-      <div className="statgrid">
         <section className="panel" aria-labelledby="lb-h">
           <div className="ph">
             <h2 id="lb-h">Leaderboard</h2>
@@ -150,15 +127,7 @@ export default function Stats() {
                 const s = c.st[x.id];
                 return (
                   <li key={x.id}>
-                    <button
-                      type="button"
-                      className="lbrow"
-                      aria-pressed={x.id === focus}
-                      onClick={() => {
-                        setParams({ player: x.id }, { replace: true });
-                        if (window.innerWidth <= 1000) document.getElementById("pcard")?.scrollIntoView({ behavior: "smooth", block: "start" });
-                      }}
-                    >
+                    <Link className="lbrow" to={`/stats/${x.id}`}>
                       <span className="pos">{i + 1}</span>
                       <span className="who">
                         <Avatar id={x.id} />
@@ -185,7 +154,7 @@ export default function Stats() {
                         <b>{period ? x.w : `${pct(x.w, x.g)}%`}</b>
                         <small>{period ? "wins" : "win rate"}</small>
                       </span>
-                    </button>
+                    </Link>
                   </li>
                 );
               })
@@ -196,15 +165,11 @@ export default function Stats() {
             )}
           </ol>
           <p className="note">
-            Tap a player to see their profile.
+            Click a player to see all their stats.
             {FEATURES.ratings &&
               " Everyone starts at 1000. After each game you're compared with every opponent: beating stronger players gives more, beating weaker players less, and losing to stronger players costs less. The first 10 games count a bit more. Losers who surrender lose 5 extra; 3+ wins in a row and ending a bounty give a small bonus. Every game counts at least 3. Kills and deaths don't change the rating. It always counts all games."}
           </p>
         </section>
-        <aside className="panel pcard" id="pcard" aria-label="Player profile">
-          {focus ? <Profile id={focus} /> : <p className="sub">Play a game to see player profiles.</p>}
-        </aside>
-      </div>
 
       <h2 className="sec">Highlights</h2>
       <div className="grid4">
@@ -302,139 +267,5 @@ export default function Stats() {
         </div>
       </div>
     </section>
-  );
-}
-
-function BadgeChip({ b }: { b: Badge }) {
-  const Icon = BADGE_ICON[b.title] ?? Shield;
-  return (
-    <span className={`bd${b.gold ? " gold" : ""}`} title={b.detail}>
-      <Icon aria-hidden />
-      {b.title}
-      <span className="sr-only">: {b.detail}</span>
-    </span>
-  );
-}
-
-function Profile({ id }: { id: string }) {
-  const { c, pname, player, isActive } = useData();
-  const x = c.st[id];
-  const p = player(id);
-  const rankList = Object.values(c.st)
-    .filter((s) => isActive(s.id) && s.g)
-    .sort((a, b) => b.rating - a.rating);
-  const rank = rankList.findIndex((s) => s.id === id) + 1;
-  const pr = profile(c, id, isActive);
-  const champs = topEntries(x.champs, 3);
-  const items = topEntries(x.items, 6);
-  const h = x.hist.slice(-31);
-  const change = Math.round(h[h.length - 1] - h[Math.max(0, h.length - 6)]);
-  const mn = Math.min(...h) - 8;
-  const mx = Math.max(...h) + 8;
-  const line = h.map((v, i) => `${((i / Math.max(1, h.length - 1)) * 300).toFixed(1)},${(100 - ((v - mn) / (mx - mn)) * 66 - 8).toFixed(1)}`).join(" ");
-  const up = change >= 0;
-  const bs = visibleBadges(badges(x));
-
-  return (
-    <>
-      <div className="pc-top">
-        <Avatar id={id} lg />
-        <div>
-          <h2>{p?.name}</h2>
-          <p className="sub">
-            {FEATURES.ratings && <span>#{rank} by rating · </span>}
-            <Form id={id} n={10} />
-          </p>
-        </div>
-      </div>
-      {bs.length > 0 && (
-        <div className="badges" aria-label="Badges">
-          {bs.map((b) => (
-            <BadgeChip key={b.title} b={b} />
-          ))}
-        </div>
-      )}
-      <div className="pc-stats">
-        <div>
-          <small>{POINTS_NAME}</small>
-          <b>{shownPoints(rating(c, id))}</b>
-        </div>
-        <div>
-          <small>Win rate</small>
-          <b>{pct(x.w, x.g)}%</b>
-        </div>
-        <div>
-          <small>Games</small>
-          <b>{x.g}</b>
-        </div>
-        <div>
-          <small>Avg KDA</small>
-          <b>{x.kdaGames ? kdaRatio(x.k, x.d, x.a).toFixed(2) : "–"}</b>
-        </div>
-      </div>
-      {FEATURES.ratings && (
-        <div className="chart">
-          <span className="cl">Rating, last {h.length - 1} games</span>
-          <span className="cr" style={{ color: up ? "var(--color-ice)" : "var(--color-red)" }}>
-            {up ? "+" : ""}
-            {change} last 5
-          </span>
-          <svg viewBox="0 0 300 100" preserveAspectRatio="none" role="img" aria-label={`Rating chart, now ${rating(c, id)}`}>
-            <polygon points={`0,100 ${line} 300,100`} fill={up ? "rgba(191,230,255,.10)" : "rgba(255,90,110,.10)"} />
-            <polyline
-              points={line}
-              fill="none"
-              stroke={up ? "var(--color-ice)" : "var(--color-red)"}
-              strokeWidth="2.2"
-              vectorEffect="non-scaling-stroke"
-              strokeLinejoin="round"
-            />
-          </svg>
-        </div>
-      )}
-      <div>
-        <div className="fact">
-          <span>Record</span>
-          <b>
-            {x.w}–{x.l}
-            {x.streak > 1 ? ` · ${x.streak} win streak` : x.streak < -1 ? ` · ${-x.streak} losses in a row` : ""}
-          </b>
-        </div>
-        <div className="fact">
-          <span>Best teammate</span>
-          <b>{pr.mate ? `${pname(pr.mate.id)} · ${pct(pr.mate.w, pr.mate.g)}% together` : "Not enough games"}</b>
-        </div>
-        <div className="fact">
-          <span>Favourite victim</span>
-          <b>{pr.victim ? `${pname(pr.victim.o)} · ${pr.victim.w}–${pr.victim.l}` : "Nobody yet"}</b>
-        </div>
-        <div className="fact">
-          <span>Toughest opponent</span>
-          <b>{pr.nemesis ? `${pname(pr.nemesis.o)} · ${pr.nemesis.w}–${pr.nemesis.l}` : "Nobody yet"}</b>
-        </div>
-        <div className="fact">
-          <span>Most played</span>
-          <b>{champs.length ? champs.map(([n, v]) => `${n} (${v})`).join(", ") : "No champions logged"}</b>
-        </div>
-        {x.kdaGames > 0 && (
-          <div className="fact">
-            <span>Average K / D / A</span>
-            <b>
-              {f1(x.k / x.kdaGames)} / {f1(x.d / x.kdaGames)} / {f1(x.a / x.kdaGames)}
-            </b>
-          </div>
-        )}
-        {items.length > 0 && (
-          <div className="fact">
-            <span>Most bought items</span>
-            <span className="itemrow">
-              {items.map(([it]) => (
-                <ItemIcon key={it} id={+it} />
-              ))}
-            </span>
-          </div>
-        )}
-      </div>
-    </>
   );
 }

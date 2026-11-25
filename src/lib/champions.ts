@@ -29,6 +29,10 @@ const ID_EXCEPTIONS: Record<string, string> = {
 /** Best guess of the Data Dragon id from a display name (only used for the fallback list). */
 export const guessId = (name: string) => ID_EXCEPTIONS[name] ?? name.replace(/[^A-Za-z0-9]/g, "");
 
+const NAME_BY_ID = new Map(FALLBACK_CHAMPIONS.map((n) => [guessId(n).toLowerCase(), n]));
+/** English display name for a Data Dragon id ("MonkeyKing" -> "Wukong"), whatever language the client uses. */
+export const championFromId = (id: string, fallback?: string) => NAME_BY_ID.get(id.toLowerCase()) ?? (fallback || id);
+
 /* Build-site slugs. Both sites use one word for these, not the full name. */
 const SHORT: Record<string, string> = { "Nunu & Willump": "nunu", "Renata Glasc": "renata", Wukong: "wukong" };
 
@@ -44,22 +48,26 @@ export const mobaUrl = (name: string) => `https://mobalytics.gg/lol/champions/${
 /* ---------- Data Dragon ---------- */
 
 const DD = "https://ddragon.leagueoflegends.com";
-const CACHE_KEY = "bn-ddragon-v1";
+const CACHE_KEY = "bn-ddragon-v2";
 const CACHE_MS = 12 * 36e5;
 
 export interface DDragon {
   version: string | null;
   champions: Champion[];
   items: Record<number, string>;
+  /** Summoner spells by number. */
+  spells: Record<number, { id: string; name: string }>;
 }
 
 export const fallbackDDragon = (): DDragon => ({
   version: null,
   champions: FALLBACK_CHAMPIONS.map((name) => ({ name, id: guessId(name) })),
   items: SAMPLE_ITEM_NAMES,
+  spells: {},
 });
 
 export const champIcon = (v: string | null, id: string) => (v ? `${DD}/cdn/${v}/img/champion/${id}.png` : null);
+export const spellIcon = (v: string | null, id: string) => (v ? `${DD}/cdn/${v}/img/spell/${id}.png` : null);
 export const itemIcon = (v: string | null, id: number) => (v ? `${DD}/cdn/${v}/img/item/${id}.png` : null);
 
 export async function loadDDragon(signal?: AbortSignal): Promise<DDragon> {
@@ -71,18 +79,59 @@ export async function loadDDragon(signal?: AbortSignal): Promise<DDragon> {
   }
   const versions: string[] = await (await fetch(`${DD}/api/versions.json`, { signal })).json();
   const v = versions[0];
-  const [ch, it] = await Promise.all([
+  const [ch, it, sp] = await Promise.all([
     fetch(`${DD}/cdn/${v}/data/en_US/champion.json`, { signal }).then((r) => r.json()),
     fetch(`${DD}/cdn/${v}/data/en_US/item.json`, { signal }).then((r) => r.json()),
+    fetch(`${DD}/cdn/${v}/data/en_US/summoner.json`, { signal }).then((r) => r.json()),
   ]);
   const champions: Champion[] = Object.values(ch.data as Record<string, { id: string; name: string }>)
     .map((c) => ({ id: c.id, name: c.name }))
     .sort((a, b) => a.name.localeCompare(b.name));
   const items: Record<number, string> = {};
   for (const [id, x] of Object.entries(it.data as Record<string, { name: string }>)) items[+id] = x.name;
-  const data: DDragon = { version: v, champions, items };
+  const spells: DDragon["spells"] = {};
+  for (const x of Object.values(sp.data as Record<string, { id: string; key: string; name: string }>)) spells[+x.key] = { id: x.id, name: x.name };
+  const data: DDragon = { version: v, champions, items, spells };
   try {
     localStorage.setItem(CACHE_KEY, JSON.stringify({ at: Date.now(), data }));
+  } catch {
+    /* storage full: fine */
+  }
+  return data;
+}
+
+/* ---------- augments (Community Dragon: Data Dragon doesn't have them) ---------- */
+
+const CD = "https://raw.communitydragon.org/latest/plugins/rcp-be-lol-game-data/global/default";
+const AUG_KEY = "bn-augments-v1";
+
+export interface Augment {
+  name: string;
+  icon: string | null;
+  rarity: string;
+}
+
+export const augmentIconUrl = (path: string) =>
+  /^\/lol-game-data\/assets\//i.test(path) ? CD + path.slice("/lol-game-data/assets".length).toLowerCase() : null;
+
+export async function loadAugments(): Promise<Record<number, Augment>> {
+  try {
+    const c = JSON.parse(localStorage.getItem(AUG_KEY) || "null");
+    if (c && Date.now() - c.at < CACHE_MS) return c.data;
+  } catch {
+    /* ignore */
+  }
+  const raw: unknown = await (await fetch(`${CD}/v1/cherry-augments.json`)).json();
+  const data: Record<number, Augment> = {};
+  for (const x of Array.isArray(raw) ? raw : [])
+    if (typeof x?.id === "number")
+      data[x.id] = {
+        name: String(x.nameTRA || x.augmentNameId || `Augment ${x.id}`),
+        icon: augmentIconUrl(String(x.augmentSmallIconPath ?? "")),
+        rarity: String(x.rarity ?? "").replace(/^k/, "").toLowerCase(),
+      };
+  try {
+    localStorage.setItem(AUG_KEY, JSON.stringify({ at: Date.now(), data }));
   } catch {
     /* storage full: fine */
   }

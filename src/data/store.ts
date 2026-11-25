@@ -1,7 +1,9 @@
-import type { AppData, LiveGame, Match, Player, Settings, Side } from "../lib/types";
+import { FEATURES } from "../lib/features";
+import { applyFeed, decideFeed } from "../lib/live";
+import type { AppData, LiveFeed, LiveGame, Match, Player, Settings, Side } from "../lib/types";
 import { DEFAULT_SETTINGS } from "../lib/types";
 import { uid } from "../lib/util";
-import { emptyData, sampleData } from "./sample";
+import { emptyData } from "./sample";
 
 export interface StoreState {
   status: "loading" | "ready" | "error";
@@ -22,6 +24,10 @@ export interface DataStore {
   removePlayer(id: string): Promise<void>;
   saveSettings(s: Settings): Promise<void>;
   setLive(live: LiveGame | null): Promise<void>;
+  /** The newest look at the game in League. Finished games are saved on their own. */
+  setFeed(feed: LiveFeed | null): Promise<void>;
+  /** A member says who won a game that League named no winner for, or that it doesn't count. */
+  decideFeed(feedId: string, choice: Side | "skip"): Promise<void>;
   /** Saves the live game once. Returns null if it was already saved (double tap, second device). */
   saveResult(liveId: string, winner: Side): Promise<Match | null>;
   flipWinner(matchId: string): Promise<void>;
@@ -33,7 +39,10 @@ export interface DataStore {
 
 export class StoreError extends Error {}
 
-const KEY = "bn-data-v2";
+const KEY = "bn-data-v4";
+/** Older local data: the players (with their Riot IDs) and the games really played are kept, dummy games are not. */
+const OLD_KEYS = ["bn-data-v3", "bn-data-v2"];
+const isPlayed = (m: Match) => /^g\d+$/.test(m.id) && !(+m.gameId! >= 7_000_000_000 && +m.gameId! < 7_000_200_000);
 const NAME_MAX = 20;
 
 export function validName(name: string, players: Player[], selfId?: string) {
@@ -70,7 +79,16 @@ export class LocalStore implements DataStore {
     } catch {
       /* fall through */
     }
-    return this.sample ? sampleData() : emptyData();
+    const fresh = emptyData();
+    try {
+      for (const key of OLD_KEYS) {
+        const old = JSON.parse(localStorage.getItem(key) || "null");
+        if (isAppData(old)) return { ...fresh, players: old.players, matches: old.matches.filter(isPlayed), feed: old.feed ?? null };
+      }
+    } catch {
+      /* nothing to keep */
+    }
+    return fresh;
   }
   private set(s: StoreState, persist = true) {
     this.state = s;
@@ -122,6 +140,15 @@ export class LocalStore implements DataStore {
   }
   async setLive(live: LiveGame | null) {
     this.update((d) => ({ ...d, live }));
+  }
+  async setFeed(feed: LiveFeed | null) {
+    const next = applyFeed(this.state.data, feed, FEATURES.soloGames);
+    if (next !== this.state.data) this.update(() => next);
+  }
+  async decideFeed(feedId: string, choice: Side | "skip") {
+    const next = decideFeed(this.state.data, feedId, choice, FEATURES.soloGames);
+    if (next === this.state.data) throw new StoreError("This game already has a result");
+    this.update(() => next);
   }
   async saveResult(liveId: string, winner: Side) {
     const d = this.state.data;
@@ -176,6 +203,6 @@ export class LocalStore implements DataStore {
     }));
   }
   async resetSample() {
-    this.update(() => sampleData());
+    this.update(() => emptyData());
   }
 }

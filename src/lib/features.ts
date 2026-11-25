@@ -25,6 +25,8 @@ export interface Features {
   dodges: boolean;
   /** Random challenges. */
   challenges: boolean;
+  /** Games with our players on one side only (alone, or against bots) are saved and counted. For testing: switch off before release. */
+  soloGames: boolean;
   /** Calculated Elo ratings. Off: everyone has a fixed number of Papi Points. */
   ratings: boolean;
 }
@@ -38,6 +40,7 @@ export const FEATURES: Features = {
   rerollLimit: false,
   dodges: false,
   challenges: false,
+  soloGames: true,
   ratings: false,
 };
 

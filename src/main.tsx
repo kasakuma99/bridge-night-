@@ -16,8 +16,10 @@ import { FEATURES } from "./lib/features";
 import Teams from "./pages/Teams";
 import TeamsClassic from "./pages/TeamsClassic";
 import Live from "./pages/Live";
+import LiveClassic from "./pages/LiveClassic";
 import History from "./pages/History";
 import Stats from "./pages/Stats";
+import PlayerStats from "./pages/PlayerStats";
 import Rivals from "./pages/Rivals";
 import Builds from "./pages/Builds";
 import Players from "./pages/Players";
@@ -36,9 +38,10 @@ createRoot(document.getElementById("root")!).render(
                   <Routes>
                     <Route element={<Layout />}>
                       <Route index element={FEATURES.classicTeams ? <TeamsClassic /> : <Teams />} />
-                      <Route path="live" element={<Live />} />
+                      <Route path="live" element={FEATURES.classicTeams ? <LiveClassic /> : <Live />} />
                       <Route path="history" element={<History />} />
                       <Route path="stats" element={<Stats />} />
+                      <Route path="stats/:id" element={<PlayerStats />} />
                       {FEATURES.rivals && <Route path="rivals" element={<Rivals />} />}
                       {FEATURES.builds && <Route path="builds" element={<Builds />} />}
                       <Route path="players" element={<Players />} />

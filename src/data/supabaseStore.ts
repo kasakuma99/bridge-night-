@@ -281,6 +281,14 @@ export class SupabaseStore implements DataStore {
     return job;
   }
 
+  // The live game from League needs its own table first (T40).
+  async setFeed() {
+    throw new StoreError("Live games are not connected to the database yet");
+  }
+  async decideFeed() {
+    throw new StoreError("Live games are not connected to the database yet");
+  }
+
   async saveResult(liveId: string, winner: Side) {
     await this.liveQueue; // make sure the last picks / K/D/A reached the database first
     const id = (await this.run(this.sb.rpc("save_live_result", { p_live_id: liveId, p_winner: winner }), "Could not save the result")) as

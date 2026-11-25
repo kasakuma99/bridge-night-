@@ -140,20 +140,20 @@ export default function Players() {
           )}
           {SAMPLE_MODE && isAdmin && (
             <section className="panel">
-              <h3>Sample data</h3>
-              <p className="sub">Local development only. Bring back the sample players and games.</p>
+              <h3>Local data</h3>
+              <p className="sub">Local development only. Removes all local games and brings back the six sample players.</p>
               <div className="addf">
                 <button
                   className="btn ghost"
                   type="button"
                   onClick={async () => {
-                    if (await confirm({ title: "Reset sample data?", text: "Your changes are replaced with the sample players and games.", yes: "Reset" })) {
+                    if (await confirm({ title: "Reset local data?", text: "All local games and changes are removed, also Riot IDs.", yes: "Reset" })) {
                       await store.resetSample();
-                      toast("Sample data restored");
+                      toast("Local data reset");
                     }
                   }}
                 >
-                  Reset sample data
+                  Reset local data
                 </button>
               </div>
             </section>

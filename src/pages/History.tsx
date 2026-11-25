@@ -1,50 +1,40 @@
-import { useState } from "react";
-import { ArrowLeftRight, Trash2 } from "lucide-react";
-import { useAuth, useData } from "../data/context";
-import { Empty, ItemIcon, useConfirm, useToast } from "../components/ui";
+import { useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
+import { ChevronDown } from "lucide-react";
+import { useData } from "../data/context";
+import { GameTable, usePlayerName } from "../components/GameBoard";
+import { ChampAvatar, Empty } from "../components/ui";
 import { FEATURES } from "../lib/features";
+import { hasAugments, matchEnd, matchPlayers, sizeLabel } from "../lib/live";
 import { hasKda } from "../lib/stats";
 import { TEAM_SIZES } from "../lib/teams";
 import type { Match, Side } from "../lib/types";
-import { DAY, dayKey, fmtDayLong, fmtTime, plural } from "../lib/util";
+import { DAY, dayKey, fmtDayLong, fmtTime, mmss, plural } from "../lib/util";
 
 export default function History() {
-  const { data, store, pname, active, now, c } = useData();
-  const { isMember } = useAuth();
-  const toast = useToast();
-  const confirm = useConfirm();
+  const { data, pname, active, now, c } = useData();
+  const [params] = useSearchParams();
+  // /history?game=... opens that game (linked from the Live page).
+  const asked = params.get("game");
+  const [open, setOpen] = useState<string | null>(asked);
   const [fp, setFp] = useState("");
   const [fm, setFm] = useState("");
   const [shown, setShown] = useState(20);
+  const name = usePlayerName();
+
+  useEffect(() => {
+    if (asked) document.getElementById(`game-${asked}`)?.scrollIntoView({ block: "center" });
+  }, [asked]);
 
   const list = data.matches
     .slice()
     .sort((a, b) => b.playedAt - a.playedAt)
     .filter((m) => (!fp || m.blue.includes(fp) || m.red.includes(fp)) && (!fm || String(m.mode) === fm));
-  const page = list.slice(0, shown);
+  const page = list.slice(0, Math.max(shown, list.findIndex((m) => m.id === asked) + 1));
   const today = dayKey(now);
   const yest = dayKey(now - DAY);
   const perDay = new Map<string, number>();
   for (const m of list) perDay.set(dayKey(m.playedAt), (perDay.get(dayKey(m.playedAt)) ?? 0) + 1);
-
-  const del = async (m: Match) => {
-    if (await confirm({ title: "Delete this game?", text: `${FEATURES.ratings ? "Ratings and stats" : "Stats"} are recalculated without it.`, yes: "Delete" })) {
-      await store.deleteMatch(m.id);
-      toast("Game deleted");
-    }
-  };
-  const flip = async (m: Match) => {
-    const yes = await confirm({
-      title: "Swap the winner?",
-      text: `${m.winner === "blue" ? "Red" : "Blue"} side will be saved as the winner. ${FEATURES.ratings ? "Ratings" : "Stats"} are recalculated.`,
-      yes: "Swap winner",
-      danger: false,
-    });
-    if (yes) {
-      await store.flipWinner(m.id);
-      toast("Winner swapped");
-    }
-  };
 
   const team = (m: Match, s: Side) => (
     <div className={`team ${s === "blue" ? "bt" : "rt"}${m.winner === s ? " w" : ""}`}>
@@ -52,49 +42,44 @@ export default function History() {
         {s === "blue" ? "Blue" : "Red"}
         {m.winner === s && " · won"}
       </span>
-      {m[s].map((id) => {
-        const st = m.stats[id];
-        const rc = FEATURES.ratings ? c.changes[m.id]?.[id] : undefined;
-        const why = rc
-          ? [
-              `Game ${rc.base > 0 ? "+" : ""}${rc.base}`,
-              rc.streak ? `win streak +${rc.streak}` : "",
-              rc.bounty ? `bounty +${rc.bounty}` : "",
-              rc.ff ? `surrender ${rc.ff}` : "",
-            ]
-              .filter(Boolean)
-              .join(", ")
-          : "";
-        return (
-          <div key={id} className="tp">
-            <span>{pname(id)}</span>
-            {rc && (
-              <span
-                className="k"
-                title={`Rating ${rc.delta > 0 ? "+" : ""}${rc.delta} (${why})`}
-                aria-label={`Rating change ${rc.delta > 0 ? "plus" : "minus"} ${Math.abs(rc.delta)}`}
-                style={{ color: rc.delta > 0 ? "var(--color-ice)" : "var(--color-mute)", fontWeight: 600 }}
-              >
-                {rc.delta > 0 ? "+" : "−"}
-                {Math.abs(rc.delta)}
-              </span>
-            )}
-            {st?.champion && <span className="c">{st.champion}</span>}
-            {hasKda(st) && (
-              <span className="k">
-                {st.kills}/{st.deaths}/{st.assists}
-              </span>
-            )}
-            {st?.items && st.items.length > 0 && (
-              <span className="itemrow" aria-label={`Items of ${pname(id)}`}>
-                {st.items.map((it, i) => (
-                  <ItemIcon key={i} id={it} />
-                ))}
-              </span>
-            )}
-          </div>
-        );
-      })}
+      {matchPlayers(m)
+        .filter((p) => p.side === s)
+        .map((p) => {
+          const rc = FEATURES.ratings && p.playerId ? c.changes[m.id]?.[p.playerId] : undefined;
+          const why = rc
+            ? [
+                `Game ${rc.base > 0 ? "+" : ""}${rc.base}`,
+                rc.streak ? `win streak +${rc.streak}` : "",
+                rc.bounty ? `bounty +${rc.bounty}` : "",
+                rc.ff ? `surrender ${rc.ff}` : "",
+              ]
+                .filter(Boolean)
+                .join(", ")
+            : "";
+          return (
+            <div key={p.key} className="tp">
+              {p.champion ? <ChampAvatar name={p.champion} sq size={28} /> : <span className="ava sq unknown small" aria-hidden>?</span>}
+              <span>{name(p)}</span>
+              {rc && (
+                <span
+                  className="k"
+                  title={`Rating ${rc.delta > 0 ? "+" : ""}${rc.delta} (${why})`}
+                  aria-label={`Rating change ${rc.delta > 0 ? "plus" : "minus"} ${Math.abs(rc.delta)}`}
+                  style={{ color: rc.delta > 0 ? "var(--color-ice)" : "var(--color-mute)", fontWeight: 600 }}
+                >
+                  {rc.delta > 0 ? "+" : "−"}
+                  {Math.abs(rc.delta)}
+                </span>
+              )}
+              {p.champion && <span className="c">{p.champion}</span>}
+              {hasKda(p) && (
+                <span className="k">
+                  {p.kills}/{p.deaths}/{p.assists}
+                </span>
+              )}
+            </div>
+          );
+        })}
     </div>
   );
 
@@ -143,45 +128,53 @@ export default function History() {
                 </div>
               ) : null;
             prevDay = k;
-            const loser = m.winner === "blue" ? "Red" : "Blue";
+            const length = m.durationSec ? mmss(m.durationSec * 1000) : m.durationMin ? `${m.durationMin} min` : "";
             const extra = [
-              m.surrender && `${loser} surrendered${m.surrender === "early" ? " early" : ""} (FF)`,
+              matchEnd(m),
+              m.gameMode,
               FEATURES.challenges && m.challenge && `Challenge: ${m.challenge}`,
               FEATURES.dodges && m.dodges.length > 0 && `Dodged: ${m.dodges.map((d) => `${pname(d.playerId)}${d.champion ? ` (${d.champion})` : ""}`).join(", ")}`,
             ].filter(Boolean);
+            const isOpen = open === m.id;
             return (
-              <div key={m.id}>
+              <div key={m.id} id={`game-${m.id}`}>
                 {head}
-                <article className="match" aria-label={`${m.blue.length}v${m.red.length} at ${fmtTime(m.playedAt)}, ${m.winner} won`}>
+                <article className="match" aria-label={`${sizeLabel(m)} at ${fmtTime(m.playedAt)}, ${m.winner} won`}>
                   <div className="when">
                     <b>{fmtTime(m.playedAt)}</b>
-                    {m.blue.length}v{m.red.length}
-                    {m.durationMin ? ` · ${m.durationMin} min` : ""}
+                    {sizeLabel(m)}
+                    {length && ` · ${length}`}
                   </div>
                   {team(m, "blue")}
                   {team(m, "red")}
                   <div className="acts">
-                    {isMember && (
-                      <>
-                        <button className="icon" type="button" onClick={() => flip(m)} aria-label="Swap winner" title="Swap winner">
-                          <ArrowLeftRight aria-hidden />
-                        </button>
-                        <button className="icon" type="button" onClick={() => del(m)} aria-label="Delete match" title="Delete match">
-                          <Trash2 aria-hidden />
-                        </button>
-                      </>
-                    )}
+                    <button
+                      className="btn sm ghost dd"
+                      type="button"
+                      aria-expanded={isOpen}
+                      aria-controls={`details-${m.id}`}
+                      aria-label={`Details of the game at ${fmtTime(m.playedAt)}`}
+                      onClick={() => setOpen(isOpen ? null : m.id)}
+                    >
+                      Details
+                      <ChevronDown aria-hidden />
+                    </button>
                   </div>
                   {extra.length > 0 && <div className="dl">{extra.join(" · ")}</div>}
+                  {isOpen && (
+                    <div className="details" id={`details-${m.id}`}>
+                      <GameTable players={matchPlayers(m)} winner={m.winner} augments={hasAugments(m.gameMode, matchPlayers(m))} />
+                    </div>
+                  )}
                 </article>
               </div>
             );
           })
         )}
-        {list.length > shown && (
+        {list.length > page.length && (
           <div className="more">
             <button className="btn" type="button" onClick={() => setShown((n) => n + 20)}>
-              Show {Math.min(20, list.length - shown)} more games
+              Show {Math.min(20, list.length - page.length)} more games
             </button>
           </div>
         )}

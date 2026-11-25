@@ -76,5 +76,18 @@ export function sampleData(now = Date.now()): AppData {
   matches[30].challenge = CHALLENGES[5];
   matches[29].dodges = [{ playerId: "p1", champion: "Yuumi", side: "blue", at: matches[29].playedAt - 30 * 6e4 }];
   matches[29].stats.p1.champion = "Ezreal";
+  // The newest games have what the live page collects.
+  const ends = ["nexus", "ff", "nexus", "left", "nexus"] as const;
+  const augs = [1205, 1141, 1002, 1004, 1006, 1007, 1009, 1018];
+  matches.slice(-5).forEach((m, i) => {
+    m.end = ends[i];
+    if (m.end === "ff" || m.end === "left") m.surrender = "ff";
+    m.durationSec = (m.durationMin ?? 18) * 60 + i * 11;
+    m.gameMode = "ARAM: Mayhem";
+    m.map = "Howling Abyss";
+    [...m.blue, ...m.red].forEach((p, k) => {
+      m.stats[p] = { ...m.stats[p], level: 14 + ((i + k) % 5), spells: [4, [32, 7, 21, 3][(i + k) % 4]], augments: [0, 1, 2, 3].map((x) => augs[(i + k * 3 + x) % augs.length]) };
+    });
+  });
   return { players, matches, live: null, settings: { ...DEFAULT_SETTINGS } };
 }
