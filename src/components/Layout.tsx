@@ -110,7 +110,7 @@ export function Layout() {
         </div>
       </header>
       <main className="wrap" id="main" tabIndex={-1}>
-        {SAMPLE_MODE && (
+        {SAMPLE_MODE && !loc.search.includes("shot") && (
           <p className="preview">
             <i />
             Local preview with sample players and games. Changes are saved in this browser only.
