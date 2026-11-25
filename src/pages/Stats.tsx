@@ -190,8 +190,10 @@ export default function Stats() {
             )}
           </ol>
           <p className="note">
-            Tap a player to see their profile. Rating starts at 1000 and changes after every game depending on how strong both teams
-            were. It always counts all games.
+            Tap a player to see their profile. Everyone starts at 1000. After each game you're compared with every opponent: beating
+            stronger players gives more, beating weaker players less, and losing to stronger players costs less. The first 10 games
+            count a bit more. Losers who surrender lose 5 extra; 3+ wins in a row and ending a bounty give a small bonus. Every game
+            counts at least 3. Kills and deaths don't change the rating. It always counts all games.
           </p>
         </section>
         <aside className="panel pcard" id="pcard" aria-label="Player profile">

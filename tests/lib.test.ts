@@ -1,5 +1,5 @@
 import { describe, expect, it, beforeAll } from "vitest";
-import { compute, rating, rivalries, rivalryVerb, badges, records, weeklyAwards, bountyTarget, expected } from "../src/lib/stats";
+import { compute, rating, rivalries, rivalryVerb, badges, records, weeklyAwards, bountyTarget, expected, ratingChange, winChanceVs, FF_PENALTY } from "../src/lib/stats";
 import { makeTeams, snakeOrder, sitPriority, rerollsLeft, canDraft, rerollKey, defaultSize, maxSize, captainPick, captainUndo, teamKey } from "../src/lib/teams";
 import { dodgeStatus } from "../src/lib/dodges";
 import { uggUrl, mobaUrl, guessId } from "../src/lib/champions";
@@ -24,21 +24,56 @@ const match = (blue: string[], red: string[], winner: Side, extra: Partial<Match
 });
 
 describe("ratings", () => {
-  it("starts at 1000 and moves 16 points for an even game (K=32)", () => {
+  const base = { games: 20, streak: 0, endedBounty: false, surrendered: false };
+  it("starts at 1000; an even first game moves 20 points (placement K=40)", () => {
     const c = compute([match(["a"], ["b"], "blue")], players);
-    expect(rating(c, "a")).toBe(1016);
-    expect(rating(c, "b")).toBe(984);
+    expect(rating(c, "a")).toBe(1020);
+    expect(rating(c, "b")).toBe(980);
     expect(rating(c, "c")).toBe(1000);
   });
-  it("uses team average vs team average", () => {
-    const c = compute([match(["a"], ["b"], "blue"), match(["a", "c"], ["b", "d"], "red")], players);
-    // a+c avg 1008 vs b+d avg 992: expected ~0.523 for blue
-    const e = expected(1008, 992);
-    expect(rating(c, "c")).toBe(Math.round(1000 - 32 * e));
+  it("after placement an even game moves 16 points (K=32)", () => {
+    expect(ratingChange({ ...base, rating: 1000, opponents: [1000], won: true }).delta).toBe(16);
+    expect(ratingChange({ ...base, rating: 1000, opponents: [1000], won: false }).delta).toBe(-16);
   });
-  it("is recalculated from the match list (deleting a game undoes it)", () => {
+  it("the favourite wins less and the underdog loses less", () => {
+    const favWins = ratingChange({ ...base, rating: 1100, opponents: [1000], won: true }).delta;
+    const dogWins = ratingChange({ ...base, rating: 1000, opponents: [1100], won: true }).delta;
+    const dogLoses = ratingChange({ ...base, rating: 1000, opponents: [1100], won: false }).delta;
+    const favLoses = ratingChange({ ...base, rating: 1100, opponents: [1000], won: false }).delta;
+    expect(favWins).toBe(12);
+    expect(dogWins).toBe(20);
+    expect(dogLoses).toBe(-12);
+    expect(favLoses).toBe(-20);
+  });
+  it("compares each player with every opponent, not team averages", () => {
+    // Same team, different ratings: the stronger player gains less for the same win.
+    const strong = ratingChange({ ...base, rating: 1200, opponents: [1000, 1000], won: true }).delta;
+    const weak = ratingChange({ ...base, rating: 900, opponents: [1000, 1000], won: true }).delta;
+    expect(strong).toBeLessThan(weak);
+    expect(winChanceVs(1000, [900, 1100])).toBeCloseTo((expected(1000, 900) + expected(1000, 1100)) / 2);
+  });
+  it("surrendering costs 5 extra, only for the losers", () => {
+    expect(ratingChange({ ...base, rating: 1000, opponents: [1000], won: false, surrendered: true }).delta).toBe(-21);
+    expect(ratingChange({ ...base, rating: 1000, opponents: [1000], won: true, surrendered: true }).delta).toBe(16);
+    const c = compute([match(["a"], ["b"], "blue", { surrender: "ff" })], players);
+    expect(rating(c, "b")).toBe(1000 - 20 - FF_PENALTY);
+  });
+  it("gives a small win streak bonus and a bounty bonus", () => {
+    expect(ratingChange({ ...base, rating: 1000, opponents: [1000], won: true, streak: 1 }).streak).toBe(0);
+    expect(ratingChange({ ...base, rating: 1000, opponents: [1000], won: true, streak: 2 }).streak).toBe(1);
+    expect(ratingChange({ ...base, rating: 1000, opponents: [1000], won: true, streak: 9 }).streak).toBe(3);
+    expect(ratingChange({ ...base, rating: 1000, opponents: [1000], won: true, endedBounty: true }).bounty).toBe(3);
+  });
+  it("every game counts at least 3 points", () => {
+    expect(ratingChange({ ...base, rating: 1600, opponents: [1000], won: true }).delta).toBe(3);
+    expect(ratingChange({ ...base, rating: 1000, opponents: [1600], won: false }).delta).toBe(-3);
+  });
+  it("records the change per game and recalculates from the match list", () => {
     const ms = [match(["a"], ["b"], "blue"), match(["a"], ["b"], "blue")];
-    expect(rating(compute(ms.slice(0, 1), players), "a")).toBe(1016);
+    const c = compute(ms, players);
+    expect(c.changes[ms[0].id].a.delta).toBe(20);
+    expect(c.changes[ms[0].id].b.delta).toBe(-20);
+    expect(rating(compute(ms.slice(0, 1), players), "a")).toBe(1020);
   });
 });
 

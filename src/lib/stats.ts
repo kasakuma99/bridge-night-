@@ -1,11 +1,60 @@
 import type { Match, Player, Side } from "./types";
 import { DAY, combos, monthKey } from "./util";
 
+/* ---------- rating (Elo, per player) ----------
+ * Everyone starts at 1000. After each game every player gets their own change:
+ *  - Each player is compared with every opponent one by one (no team average). Beating stronger players
+ *    gives more, beating weaker players gives less; losing to stronger players costs less, to weaker more.
+ *  - Placement: the first 10 games move faster (K 40), after that K 32.
+ *  - Surrender (FF): the losing team loses 5 extra.
+ *  - Win streak bonus: +1 for the 3rd win in a row, +2 for the 4th, +3 from the 5th on.
+ *  - Bounty: ending someone's streak of 3+ wins gives the winners +3.
+ *  - Every game counts: at least +3 for a win and at least -3 for a loss.
+ * Kills and deaths don't change the rating.
+ */
 export const START_RATING = 1000;
 export const K_FACTOR = 32;
+export const K_PLACEMENT = 40;
+export const PLACEMENT_GAMES = 10;
+export const FF_PENALTY = 5;
+export const BOUNTY_BONUS = 3;
+export const MIN_CHANGE = 3;
 
 export const expected = (a: number, b: number) => 1 / (1 + 10 ** ((b - a) / 400));
-const avg = (xs: number[]) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : START_RATING);
+const mean = (xs: number[], fallback: number) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : fallback);
+
+/** Chance that a player with this rating beats these opponents: their pairwise chances, averaged. */
+export const winChanceVs = (r: number, opponents: number[]) => mean(opponents.map((o) => expected(r, o)), 0.5);
+
+export interface RatingChange {
+  delta: number;
+  base: number;
+  streak: number;
+  bounty: number;
+  ff: number;
+}
+
+/** One player's rating change for one game. */
+export function ratingChange(o: {
+  rating: number;
+  games: number;
+  opponents: number[];
+  won: boolean;
+  /** win streak before this game (>0 = wins in a row) */
+  streak: number;
+  endedBounty: boolean;
+  surrendered: boolean;
+}): RatingChange {
+  const k = o.games < PLACEMENT_GAMES ? K_PLACEMENT : K_FACTOR;
+  let base = Math.round(k * ((o.won ? 1 : 0) - winChanceVs(o.rating, o.opponents)));
+  if (o.won) base = Math.max(MIN_CHANGE, base);
+  else base = Math.min(-MIN_CHANGE, base);
+  const nextStreak = o.won ? (o.streak > 0 ? o.streak + 1 : 1) : 0;
+  const streak = o.won && nextStreak >= 3 ? Math.min(3, nextStreak - 2) : 0;
+  const bounty = o.won && o.endedBounty ? BOUNTY_BONUS : 0;
+  const ff = !o.won && o.surrendered ? -FF_PENALTY : 0;
+  return { delta: base + streak + bounty + ff, base, streak, bounty, ff };
+}
 
 export interface PlayerStat {
   id: string;
@@ -69,6 +118,8 @@ export interface Computed {
   monthly: MonthChampion[];
   /** matches sorted oldest first */
   sorted: Match[];
+  /** rating change per match and player (match id -> player id -> change) */
+  changes: Record<string, Record<string, RatingChange>>;
 }
 
 export const hasKda = (s?: { kills?: number; deaths?: number; assists?: number }) =>
@@ -105,24 +156,42 @@ export function compute(matches: Match[], players: Player[], now = Date.now()): 
   const groups: Record<string, Group> = {};
   const pairs: Record<string, { a: string; b: string; res: string[] }> = {};
   const champ: Record<string, ChampStat> = {};
+  const changes: Record<string, Record<string, RatingChange>> = {};
   const months: Record<string, Record<string, { g: number; w: number }>> = {};
   const sorted = matches.slice().sort((a, b) => a.playedAt - b.playedAt);
 
   for (const m of sorted) {
     const sides: Record<Side, string[]> = { blue: m.blue, red: m.red };
-    const eb = expected(avg(m.blue.map((p) => ensure(p).rating)), avg(m.red.map((p) => ensure(p).rating)));
-    const winProb = m.winner === "blue" ? eb : 1 - eb;
     const loser: Side = m.winner === "blue" ? "red" : "blue";
+    // Ratings before this game, so the order of players doesn't matter.
+    const before: Record<string, number> = {};
+    for (const p of [...m.blue, ...m.red]) before[p] = ensure(p).rating;
+    const teamChance = (side: Side) => {
+      const opp = sides[side === "blue" ? "red" : "blue"].map((p) => before[p]);
+      return mean(sides[side].map((p) => winChanceVs(before[p], opp)), 0.5);
+    };
+    const winProb = teamChance(m.winner);
     const bounty = sides[loser].some((p) => ensure(p).streak >= 3);
     const mk = monthKey(m.playedAt);
     const mo = (months[mk] ??= {});
+    const ch: Record<string, RatingChange> = (changes[m.id] = {});
 
     for (const side of ["blue", "red"] as Side[]) {
       const won = m.winner === side;
-      const delta = K_FACTOR * ((won ? 1 : 0) - (side === "blue" ? eb : 1 - eb));
+      const opponents = sides[side === "blue" ? "red" : "blue"].map((p) => before[p]);
       for (const p of sides[side]) {
         const x = ensure(p);
-        x.rating += delta;
+        const change = ratingChange({
+          rating: before[p],
+          games: x.g,
+          opponents,
+          won,
+          streak: x.streak,
+          endedBounty: bounty,
+          surrendered: !!m.surrender,
+        });
+        ch[p] = change;
+        x.rating += change.delta;
         x.hist.push(x.rating);
         x.g++;
         if (won) x.w++;
@@ -191,14 +260,19 @@ export function compute(matches: Match[], players: Player[], now = Date.now()): 
   monthly.sort((a, b) => (a.month < b.month ? 1 : -1));
   for (const x of monthly) if (!x.current) ensure(x.id).crowns++;
 
-  return { st, groups: Object.values(groups), h2h, champ, monthly, sorted };
+  return { st, groups: Object.values(groups), h2h, champ, monthly, sorted, changes };
 }
 
 export const rating = (c: Computed, id: string) => Math.round(c.st[id]?.rating ?? START_RATING);
+/** Team strength shown next to a team: the plain mean of its players' ratings. */
 export const teamAvg = (c: Computed, ids: string[]) =>
   Math.round(ids.reduce((a, id) => a + rating(c, id), 0) / Math.max(1, ids.length));
-export const blueWinChance = (c: Computed, blue: string[], red: string[]) =>
-  expected(teamAvg(c, blue), teamAvg(c, red));
+/** Blue's chance to win, from the same per-player comparisons the rating uses. */
+export const blueWinChance = (c: Computed, blue: string[], red: string[]) => {
+  const r = (id: string) => c.st[id]?.rating ?? START_RATING;
+  const opp = red.map(r);
+  return mean(blue.map((id) => winChanceVs(r(id), opp)), 0.5);
+};
 
 /* ---------- rivalries ---------- */
 
