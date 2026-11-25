@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<!-- Preview of the helper window (not part of the build). Mirrors UiWindow.cs: same 96-dpi positions, sizes,
+     colours and fonts, with sample data. Smart App Control blocks loading the freshly built exe, so this is how
+     the window is screenshotted:  render.ps1  (headless Chrome, one PNG per page). Page: window.html#status|setup|settings|log|about -->
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  :root {
+    --sidebar: #120821; --nav-active: #24123a; --surface: #1a0f2a; --border: #3d2559; --input: #120a1f;
+    --raised: #2a1840; --ink: #f6eefc; --mute: #b7a6cc; --on-accent: #1a0a16;
+    --pink: #ff3e8f; --coral: #ff6b5b; --orange: #ff9f45; --amber: #ffc06a; --teal: #4fd8e8;
+    --sunset: linear-gradient(90deg, var(--pink), var(--coral), var(--orange));
+  }
+  * { box-sizing: border-box; margin: 0; }
+  html, body { width: 960px; height: 620px; overflow: hidden; background: var(--sidebar); }
+  body { font: 13.33px "Segoe UI"; color: var(--ink); position: relative; }
+  .abs { position: absolute; }
+  .t { position: absolute; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding-left: 2px; line-height: 1.3; }
+  .wrap { white-space: normal; }
+  .mid { display: flex; align-items: center; }
+  .right { justify-content: flex-end; padding-right: 2px; }
+  .body { font-size: 13.33px; } .small { font-size: 12px; } .strong { font: 600 13.33px "Segoe UI"; }
+  .caps { font: 600 11px "Segoe UI"; color: var(--mute); }
+  .big { font: 600 18.67px "Segoe UI"; } .huge { font: 600 34.67px "Segoe UI"; } .h1 { font: 600 24px "Segoe UI"; }
+  .mute { color: var(--mute); } .ink { color: var(--ink); } .amber { color: var(--amber); } .coral { color: var(--coral); }
+  .glyph { font: 14.67px "Segoe MDL2 Assets"; }
+
+  /* sidebar */
+  #side { left: 0; top: 0; width: 220px; height: 620px; background: var(--sidebar); border-right: 1px solid var(--border); }
+  .mark { position: absolute; border-radius: 24%; border: solid transparent;
+    background: linear-gradient(#2d0f4a, #120821) padding-box, linear-gradient(45deg, var(--pink), var(--coral), var(--orange)) border-box;
+    display: flex; align-items: center; justify-content: center; }
+  .mark span, .grad { background: linear-gradient(90deg, var(--pink), var(--coral), var(--orange)); -webkit-background-clip: text; color: transparent; }
+  .mark span { font-weight: 700; font-style: italic; letter-spacing: -.02em; }
+  .nav { position: absolute; left: 12px; width: 196px; height: 42px; }
+  .nav .bg { position: absolute; inset: 3px; border-radius: 8px; }
+  .nav.sel .bg { background: var(--nav-active); }
+  .nav.sel .bar { position: absolute; left: 3px; top: 12px; width: 3px; height: 18px; border-radius: 2px; background: linear-gradient(var(--pink), var(--coral), var(--orange)); }
+  .nav .g { position: absolute; left: 16px; width: 24px; top: 0; height: 42px; display: flex; align-items: center; justify-content: center; color: var(--mute); }
+  .nav .l { position: absolute; left: 50px; top: 0; height: 42px; display: flex; align-items: center; color: var(--mute); }
+  .nav.sel .g { color: var(--orange); } .nav.sel .l { color: var(--ink); font-weight: 600; }
+  .dot { position: absolute; display: flex; align-items: center; padding-left: 20px; white-space: nowrap; }
+  .dot::before { content: ""; position: absolute; left: 1px; width: 10px; height: 10px; border-radius: 50%; background: var(--c);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--c) 24%, transparent); }
+
+  /* pages */
+  .page { position: absolute; left: 220px; top: 0; width: 740px; height: 620px; display: none;
+    background:
+      radial-gradient(ellipse 444px 198px at 50% 100%, rgba(255,192,106,.43), rgba(255,122,61,0)),
+      linear-gradient(180deg, #1a0b2e 0%, #2d0f4a 38%, #c2185b 68%, #ff3e8f 82%, #ff7a3d 93%, #ffb347 100%); }
+  .page.on { display: block; }
+  .card { position: absolute; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; }
+  .card > * { margin-left: -1px; margin-top: -1px; }
+  .card.glow { border: 1.5px solid transparent; background: linear-gradient(var(--surface), var(--surface)) padding-box, var(--sunset) border-box; }
+  .card .caps { position: absolute; left: 22px; top: 16px; letter-spacing: 0; }
+  .divider { position: absolute; height: 1px; background: var(--border); }
+  .btn { position: absolute; height: 42px; padding: 3px; }
+  .btn > div { height: 36px; border-radius: 8px; display: flex; align-items: center; justify-content: center; padding: 0 21px;
+    font: 600 13.33px "Segoe UI"; background: var(--raised); border: 1px solid var(--border); color: var(--ink); white-space: nowrap; }
+  .btn.primary > div { background: var(--sunset); border: 0; color: var(--on-accent); }
+  .row { position: absolute; display: flex; gap: 2px; right: 14px; top: 13px; }
+  .row .btn { position: static; }
+  .input { position: absolute; height: 42px; padding: 3px; }
+  .input > div { height: 36px; border-radius: 8px; background: var(--input); border: 1px solid var(--border);
+    display: flex; align-items: center; padding-left: 11px; font-size: 14px; color: var(--ink); white-space: nowrap; overflow: hidden; }
+  .toggle { position: absolute; width: 54px; height: 34px; }
+  .toggle .track { position: absolute; left: 5px; top: 5px; width: 44px; height: 24px; border-radius: 12px; background: var(--raised); border: 1px solid var(--border); }
+  .toggle .knob { position: absolute; left: 3px; top: 3px; width: 18px; height: 18px; border-radius: 50%; background: var(--mute); }
+  .toggle.on .track { background: var(--sunset); border: 0; }
+  .toggle.on .knob { left: 23px; background: var(--ink); }
+  .badge { position: absolute; left: 24px; top: 24px; width: 40px; height: 40px; border-radius: 50%;
+    background: linear-gradient(135deg, var(--pink), var(--coral), var(--orange)); color: var(--on-accent);
+    font: 600 16px "Segoe UI"; display: flex; align-items: center; justify-content: center; }
+  .log div { height: 24px; display: flex; align-items: center; white-space: nowrap; }
+  .log .time { width: 78px; padding-left: 4px; font: 12.67px Consolas; color: var(--mute); }
+</style>
+</head>
+<body>
+
+<div id="side" class="abs">
+  <div class="mark" style="left:20px;top:24px;width:38px;height:38px;border-width:1.7px"><span style="font-size:16px">BN</span></div>
+  <div class="t grad" style="left:66px;top:21px;font:600 17.33px 'Segoe UI'">Bridge Night</div>
+  <div class="t small mute" style="left:66px;top:45px">Helper&nbsp;&nbsp;v0.4.0</div>
+  <div class="nav" data-p="status" style="top:92px"><div class="bg"></div><div class="bar"></div><div class="g glyph">&#xE9D9;</div><div class="l">Status</div></div>
+  <div class="nav" data-p="setup" style="top:138px"><div class="bg"></div><div class="bar"></div><div class="g glyph">&#xE9D5;</div><div class="l">Setup</div></div>
+  <div class="nav" data-p="settings" style="top:184px"><div class="bg"></div><div class="bar"></div><div class="g glyph">&#xE713;</div><div class="l">Settings</div></div>
+  <div class="nav" data-p="log" style="top:230px"><div class="bg"></div><div class="bar"></div><div class="g glyph">&#xE8A5;</div><div class="l">Log</div></div>
+  <div class="nav" data-p="about" style="top:276px"><div class="bg"></div><div class="bar"></div><div class="g glyph">&#xE946;</div><div class="l">About</div></div>
+  <!-- CPU / GPU gauges (UiControls.Gauge): ring 6px, track #2a1840, green < 60 %, amber < 85 %, red above; sample values -->
+  <div style="position:absolute;left:22px;top:422px;font:600 11px 'Segoe UI Semibold','Segoe UI';color:var(--mute)">THIS PC</div>
+  <svg style="position:absolute;left:22px;top:446px" width="80" height="80" viewBox="0 0 80 80">
+    <circle cx="40" cy="40" r="36" fill="none" stroke="#2a1840" stroke-width="6"/>
+    <circle cx="40" cy="40" r="36" fill="none" stroke="#3ddc84" stroke-width="6" stroke-linecap="round" stroke-dasharray="52.0 226.2" transform="rotate(-90 40 40)"/>
+    <text x="40" y="38" text-anchor="middle" font-family="Segoe UI Semibold" font-size="13.3" fill="#f6eefc">23%</text>
+    <text x="40" y="54" text-anchor="middle" font-family="Segoe UI Semibold" font-size="11" fill="#b7a6cc">CPU</text>
+  </svg>
+  <svg style="position:absolute;left:118px;top:446px" width="80" height="80" viewBox="0 0 80 80">
+    <circle cx="40" cy="40" r="36" fill="none" stroke="#2a1840" stroke-width="6"/>
+    <circle cx="40" cy="40" r="36" fill="none" stroke="#ffc06a" stroke-width="6" stroke-linecap="round" stroke-dasharray="160.6 226.2" transform="rotate(-90 40 40)"/>
+    <text x="40" y="38" text-anchor="middle" font-family="Segoe UI Semibold" font-size="13.3" fill="#f6eefc">71%</text>
+    <text x="40" y="54" text-anchor="middle" font-family="Segoe UI Semibold" font-size="11" fill="#b7a6cc">GPU</text>
+  </svg>
+  <div class="dot small mute" style="left:20px;top:572px;width:184px;height:24px;--c:var(--teal)">Connected to the League client</div>
+</div>
+
+<!-- STATUS (sample: League connected in a custom lobby, update banner shown, cards moved down by 64 + 16) -->
+<div class="page" id="status">
+  <div class="t h1" style="left:32px;top:26px">Status</div>
+  <div class="t body mute" style="left:32px;top:66px">What the helper sees right now. Updates by itself.</div>
+  <div class="card glow" style="left:32px;top:104px;width:676px;height:64px">
+    <div class="t strong" style="left:20px;top:11px">Update available: v0.5.0</div>
+    <div class="t small mute" style="left:20px;top:33px">A newer Bridge Night Helper is ready on GitHub.</div>
+    <div class="row" style="top:11px"><div class="btn primary"><div>Get the update</div></div></div>
+  </div>
+  <div class="card" style="left:32px;top:184px;width:330px;height:210px">
+    <div class="caps">LEAGUE CLIENT</div>
+    <div class="dot big" style="left:20px;top:42px;width:290px;height:32px;--c:var(--teal)">Connected</div>
+    <div class="divider" style="left:20px;top:86px;width:290px"></div>
+    <div class="t body mute mid" style="left:20px;top:100px;width:130px;height:24px">Phase</div>
+    <div class="t strong mid right" style="left:150px;top:100px;width:160px;height:24px">Lobby</div>
+    <div class="t body mute mid" style="left:20px;top:130px;width:130px;height:24px">Custom game</div>
+    <div class="t strong mid right amber" style="left:150px;top:130px;width:160px;height:24px">Yes</div>
+    <div class="t small mute" style="left:20px;top:170px">Only custom games are sent.</div>
+  </div>
+  <div class="card" style="left:378px;top:184px;width:330px;height:210px">
+    <div class="caps">SERVER</div>
+    <div class="dot big" style="left:20px;top:42px;width:290px;height:32px;--c:var(--teal)">OK</div>
+    <div class="divider" style="left:20px;top:86px;width:290px"></div>
+    <div class="t body mute mid" style="left:20px;top:100px;width:130px;height:24px">Last sent</div>
+    <div class="t strong mid right" style="left:150px;top:100px;width:160px;height:24px">21:14:08</div>
+    <div class="t small mute" style="left:20px;top:128px;width:290px">Game result 7700002: result saved</div>
+    <div class="t small mute wrap" style="left:20px;top:154px;width:290px;height:40px">No errors.</div>
+  </div>
+  <div class="card" style="left:32px;top:410px;width:330px;height:160px">
+    <div class="caps">QUEUE</div>
+    <div class="t huge" style="left:16px;top:36px;height:52px">0</div>
+    <div class="t body mute wrap" style="left:20px;top:92px;width:290px;height:48px">Nothing waiting. Results go out right away.</div>
+  </div>
+  <div class="card" style="left:378px;top:410px;width:330px;height:160px">
+    <div class="caps">SENDING</div>
+    <div class="t big" style="left:20px;top:38px">Sending is on</div>
+    <div class="t small mute" style="left:20px;top:68px">Your custom games go to Bridge Night.</div>
+    <div class="btn" style="left:17px;top:100px;width:296px;height:46px"><div style="height:40px">Pause sending</div></div>
+  </div>
+</div>
+
+<!-- SETUP -->
+<div class="page" id="setup">
+  <div class="t h1" style="left:32px;top:26px">Setup</div>
+  <div class="t body mute" style="left:32px;top:66px">Three steps, once. After that the helper works on its own.</div>
+  <div class="abs" style="left:75px;top:192px;width:2px;height:16px;background:rgba(255,192,106,.63)"></div>
+  <div class="abs" style="left:75px;top:296px;width:2px;height:16px;background:rgba(255,192,106,.63)"></div>
+  <div class="card" style="left:32px;top:104px;width:676px;height:88px">
+    <div class="badge">1</div>
+    <div class="t" style="left:84px;top:19px;font:600 16px 'Segoe UI'">Paste token</div>
+    <div class="t body mute" style="left:84px;top:46px;width:420px">Make it on the site's Helper page, then paste it in Settings.</div>
+    <div class="row" style="top:23px"><div class="btn"><div>Open Settings</div></div></div>
+  </div>
+  <div class="card" style="left:32px;top:208px;width:676px;height:88px">
+    <div class="badge">2</div>
+    <div class="t" style="left:84px;top:19px;font:600 16px 'Segoe UI'">Save and test</div>
+    <div class="t body mute" style="left:84px;top:46px;width:572px">Click "Save and test connection" on the Settings page.</div>
+  </div>
+  <div class="card" style="left:32px;top:312px;width:676px;height:88px">
+    <div class="badge">3</div>
+    <div class="t" style="left:84px;top:19px;font:600 16px 'Segoe UI'">Play</div>
+    <div class="t body mute" style="left:84px;top:46px;width:572px">Keep the BN icon by the clock running. Custom games only.</div>
+  </div>
+</div>
+
+<!-- SETTINGS -->
+<div class="page" id="settings">
+  <div class="t h1" style="left:32px;top:26px">Settings</div>
+  <div class="t body mute" style="left:32px;top:66px">Connection to the Bridge Night site and how the helper runs.</div>
+  <div class="card" style="left:32px;top:104px;width:676px;height:216px">
+    <div class="caps">CONNECTION</div>
+    <div class="t strong" style="left:20px;top:40px">Server URL</div>
+    <div class="input" style="left:17px;top:62px;width:642px"><div>https://kimgoxjydargqtbwolxz.supabase.co/functions/v1/helper</div></div>
+    <div class="t strong" style="left:20px;top:112px">Helper token</div>
+    <div class="input" style="left:17px;top:134px;width:642px"><div style="letter-spacing:2px">&#x25CF;&#x25CF;&#x25CF;&#x25CF;&#x25CF;&#x25CF;&#x25CF;&#x25CF;&#x25CF;&#x25CF;&#x25CF;&#x25CF;&#x25CF;&#x25CF;&#x25CF;&#x25CF;&#x25CF;&#x25CF;&#x25CF;&#x25CF;&#x25CF;&#x25CF;&#x25CF;&#x25CF;</div></div>
+    <div class="t small mute" style="left:20px;top:182px;width:636px">Make it on the site's Helper page ("Your helper token"). Stored encrypted for your Windows account.</div>
+  </div>
+  <div class="card" style="left:32px;top:336px;width:676px;height:160px">
+    <div class="caps">BEHAVIOUR</div>
+    <div class="t strong" style="left:20px;top:40px">Pause sending</div>
+    <div class="t small mute" style="left:20px;top:63px">Nothing is sent while paused. Same as Pause in the tray menu.</div>
+    <div class="toggle" style="left:607px;top:44px"><div class="track"><div class="knob"></div></div></div>
+    <div class="divider" style="left:20px;top:96px;width:636px"></div>
+    <div class="t strong" style="left:20px;top:106px">Start with Windows</div>
+    <div class="t small mute" style="left:20px;top:129px">Starts the helper when you sign in to Windows.</div>
+    <div class="toggle on" style="left:607px;top:110px"><div class="track"><div class="knob"></div></div></div>
+  </div>
+  <div class="card" style="left:32px;top:512px;width:676px;height:68px">
+    <div class="t small mute" style="left:20px;top:24px">Saving uses the new settings right away.</div>
+    <div class="row" style="right:14px"><div class="btn"><div>Save</div></div><div class="btn primary" style="margin-left:2px"><div>Save and test connection</div></div></div>
+  </div>
+</div>
+
+<!-- LOG -->
+<div class="page" id="log">
+  <div class="t h1" style="left:32px;top:26px">Log</div>
+  <div class="t body mute" style="left:32px;top:66px">The last 200 messages. The full log is helper-log.txt in the log folder.</div>
+  <div class="card" style="left:32px;top:104px;width:676px;height:392px">
+    <div class="caps">LAST MESSAGES</div>
+    <div class="abs log" style="left:20px;top:42px;width:640px;height:334px;overflow:hidden">
+      <div><span class="time">20:58:31</span>Bridge Night Helper 0.4.0 started</div>
+      <div><span class="time">20:58:33</span>Connected to the League client</div>
+      <div><span class="time">21:02:10</span>Custom lobby found (5 v 5)</div>
+      <div><span class="time">21:05:44</span>Champ select: nothing is sent until the loading screen</div>
+      <div><span class="time">21:06:52</span>Loading screen: picks sent</div>
+      <div><span class="time">21:31:17</span>Game over, sending the result</div>
+      <div><span class="time">21:31:18</span><span class="coral">Send failed: server not reachable, kept in the queue</span></div>
+      <div><span class="time">21:31:48</span>Resent from the queue: result saved</div>
+      <div><span class="time">21:40:02</span>Connection test: Works! hello ok</div>
+      <div style="background:var(--nav-active)"><span class="time">21:40:05</span>Settings saved</div>
+    </div>
+  </div>
+  <div class="card" style="left:32px;top:512px;width:676px;height:68px">
+    <div class="t small mute" style="left:20px;top:24px">Your helper token is never written to the log.</div>
+    <div class="row" style="right:14px"><div class="btn"><div>Copy log</div></div><div class="btn" style="margin-left:2px"><div>Open log folder</div></div></div>
+  </div>
+</div>
+
+<!-- ABOUT -->
+<div class="page" id="about">
+  <div class="t h1" style="left:32px;top:26px">About</div>
+  <div class="t body mute" style="left:32px;top:66px">What the helper does, and what it never does.</div>
+  <div class="card" style="left:32px;top:104px;width:676px;height:128px">
+    <div class="mark" style="left:24px;top:24px;width:80px;height:80px;border-width:3.6px"><span style="font-size:34px">BN</span></div>
+    <div class="t grad" style="left:122px;top:20px;font:600 26.67px 'Segoe UI';padding-left:0">Bridge Night Helper</div>
+    <div class="t body mute" style="left:124px;top:62px">Version 0.4.0</div>
+    <div class="t small mute wrap" style="left:124px;top:88px;width:380px">Closing this window keeps it running by the clock. To quit: right-click the BN icon, Exit.</div>
+    <div class="row" style="top:43px"><div class="btn"><div>Open on GitHub</div></div></div>
+  </div>
+  <div class="card" style="left:32px;top:248px;width:676px;height:252px">
+    <div class="caps">FAIR PLAY</div>
+    <div class="t glyph" style="left:20px;top:42px;color:var(--orange)">&#xE73E;</div>
+    <div class="t strong" style="left:52px;top:42px">Reads, never controls</div>
+    <div class="t body mute wrap" style="left:52px;top:65px;width:604px">It only reads the League client on this PC. It never clicks, picks or changes anything.</div>
+    <div class="t glyph" style="left:20px;top:110px;color:var(--orange)">&#xE73E;</div>
+    <div class="t strong" style="left:52px;top:110px">No champions during champ select</div>
+    <div class="t body mute wrap" style="left:52px;top:133px;width:604px">Picks are sent on the loading screen, once everyone can see them. Nothing the client hides is shown.</div>
+    <div class="t glyph" style="left:20px;top:178px;color:var(--orange)">&#xE73E;</div>
+    <div class="t strong" style="left:52px;top:178px">Custom games only</div>
+    <div class="t body mute wrap" style="left:52px;top:201px;width:604px">Normal, ranked and other queue games are ignored. Only custom games go to Bridge Night.</div>
+  </div>
+</div>
+
+<script>
+  var page = (location.hash || "#status").slice(1);
+  document.getElementById(page).classList.add("on");
+  document.querySelector('.nav[data-p="' + page + '"]').classList.add("sel");
+</script>
+</body>
+</html>

@@ -17,7 +17,8 @@ $exe = Join-Path $out $name
 $refs = "System.dll", "System.Core.dll", "System.Drawing.dll", "System.Windows.Forms.dll", "System.Management.dll",
         "System.Security.dll", "System.Web.Extensions.dll" | ForEach-Object { "/reference:" + (Join-Path $fw $_) }
 
-& $csc /nologo /target:winexe /optimize+ /platform:anycpu @define "/out:$exe" @refs (Join-Path $here "BridgeNightHelper.cs")
+& $csc /nologo /target:winexe /optimize+ /platform:anycpu @define "/out:$exe" @refs `
+    "/win32icon:$(Join-Path $here 'app.ico')" "/win32manifest:$(Join-Path $here 'app.manifest')" (Get-ChildItem $here -Filter *.cs | ForEach-Object { $_.FullName })
 if ($LASTEXITCODE -ne 0) { throw "Build failed" }
 
 $hash = (Get-FileHash $exe -Algorithm SHA256).Hash.ToLower()
