@@ -41,7 +41,7 @@ createRoot(document.getElementById("root")!).render(
                       <Route path="live" element={FEATURES.classicTeams ? <LiveClassic /> : <Live />} />
                       <Route path="history" element={<History />} />
                       <Route path="stats" element={<Stats />} />
-                      <Route path="stats/:id" element={<PlayerStats />} />
+                      {FEATURES.playerPages && <Route path="stats/:id" element={<PlayerStats />} />}
                       {FEATURES.rivals && <Route path="rivals" element={<Rivals />} />}
                       {FEATURES.builds && <Route path="builds" element={<Builds />} />}
                       <Route path="players" element={<Players />} />

@@ -3,6 +3,7 @@ import { Lock, Target, Undo2 } from "lucide-react";
 import { useAuth, useData } from "../../data/context";
 import { WinChance } from "../bits";
 import { Avatar } from "../ui";
+import { FEATURES, pointsLabel, shownPoints } from "../../lib/features";
 import { bountyTarget, rating, teamAvg } from "../../lib/stats";
 import { captainPick, captainUndo, draftOpen } from "../../lib/teams";
 import type { LiveGame, Side } from "../../lib/types";
@@ -15,10 +16,12 @@ export function Board({ L, onLock }: { L: LiveGame; onLock: () => void }) {
   const open = draftOpen(L);
   const cp = L.captains;
   const turn: Side | "" = open ? cp!.order[cp!.i] : "";
-  const rankList = Object.values(c.st)
-    .filter((x) => x.g)
-    .sort((a, b) => b.rating - a.rating)
-    .map((x) => x.id);
+  const rankList = FEATURES.ratings
+    ? Object.values(c.st)
+        .filter((x) => x.g)
+        .sort((a, b) => b.rating - a.rating)
+        .map((x) => x.id)
+    : [];
 
   const side = (ids: string[], k: Side) => (
     <div className={`side tm-side ${k === "blue" ? "b" : "r"}${turn === k ? " turn" : ""}${open ? "" : " reveal"}`}>
@@ -27,10 +30,12 @@ export function Board({ L, onLock }: { L: LiveGame; onLock: () => void }) {
         {turn === k ? (
           <span className="picking">Picking</span>
         ) : (
-          <span className="tm-telo" title="Average Elo of the players in this team">
-            <small>Team Elo</small>
-            <b className="num">{teamAvg(c, ids)}</b>
-          </span>
+          FEATURES.ratings && (
+            <span className="tm-telo" title="Average Elo of the players in this team">
+              <small>Team Elo</small>
+              <b className="num">{teamAvg(c, ids)}</b>
+            </span>
+          )
         )}
       </div>
       {ids.map((id, j) => {
@@ -48,8 +53,8 @@ export function Board({ L, onLock }: { L: LiveGame; onLock: () => void }) {
                 {plural(c.st[id]?.w ?? 0, "win")} · {plural(c.st[id]?.l ?? 0, "loss", "losses")}
               </div>
             </div>
-            <span className="tm-r num" title="Rating">
-              {rating(c, id)}
+            <span className="tm-r num" title={pointsLabel(rating(c, id))}>
+              {shownPoints(rating(c, id))}
             </span>
           </div>
         );
@@ -64,7 +69,7 @@ export function Board({ L, onLock }: { L: LiveGame; onLock: () => void }) {
     </div>
   );
 
-  const hunt = bountyTarget(c, [...L.blue, ...L.red]);
+  const hunt = FEATURES.bounties ? bountyTarget(c, [...L.blue, ...L.red]) : undefined;
   return (
     <div className="tm-result">
       <div className="board" data-testid="board">
@@ -94,7 +99,7 @@ export function Board({ L, onLock }: { L: LiveGame; onLock: () => void }) {
             </h3>
             <p className="sub">
               Pick {cp!.i + 1} of {cp!.order.length}
-              {cp!.i === 0 && " · lower rated captain goes first"}
+              {FEATURES.ratings && cp!.i === 0 && " · lower rated captain goes first"}
             </p>
           </div>
           <div className="chips">
@@ -109,7 +114,7 @@ export function Board({ L, onLock }: { L: LiveGame; onLock: () => void }) {
               >
                 <Avatar id={id} />
                 {pname(id)}
-                <small>{rating(c, id)}</small>
+                {FEATURES.ratings && <small>{rating(c, id)}</small>}
               </button>
             ))}
           </div>

@@ -7,6 +7,8 @@ describe("page titles", () => {
     expect(pageTitle("/")).toBe("Bridge Night · Custom games hub");
     expect(pageTitle("/stats")).toBe("Stats · Bridge Night");
     expect(pageTitle("/Stats/")).toBe("Stats · Bridge Night");
+    expect(pageTitle("/history")).toBe("Past games · Bridge Night");
+    expect(pageTitle("/stats/p0")).toBe("Player stats · Bridge Night");
     expect(pageTitle("/helper")).toBe("Helper app · Bridge Night");
     expect(pageTitle("/nope")).toBe("Page not found · Bridge Night");
   });

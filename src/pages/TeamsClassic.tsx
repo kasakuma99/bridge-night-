@@ -1,33 +1,41 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Plus, Target } from "lucide-react";
+import { Plus, Shuffle } from "lucide-react";
 import { useAuth, useData, usePrefs } from "../data/context";
-import { FeudBanner, HeroArt, RuleInfo, WinChance, useDodges } from "../components/bits";
+import { FeudBanner, HeroArt, RuleInfo, useDodges } from "../components/bits";
 import { Avatar, Empty, useConfirm, useToast } from "../components/ui";
-import { FEATURES, pointsLabel, usedRerollLimit, usedTeamStyle } from "../lib/features";
-import { bountyTarget, rating, rivalries, teamAvg } from "../lib/stats";
+import { FEATURES, usedRerollLimit, usedTeamStyle } from "../lib/features";
+import { Board } from "../components/teams/Board";
+import { SitOut } from "../components/teams/SitOut";
+import { rating, rivalries } from "../lib/stats";
 import {
   TEAM_SIZES,
   canDraft,
-  captainPick,
-  captainUndo,
   defaultSize,
-  draftOpen,
+  extraPlayers,
   makeTeams,
   maxSize,
+  planSitOut,
   rerollKey,
   rerollsLeft,
   sitPriority,
+  strSeed,
+  toggleSitPick,
+  validPicks,
+  type SitMode,
 } from "../lib/teams";
-import type { LiveGame, Side, TeamSize, TeamStyle } from "../lib/types";
-import { DAY, fmtDuration, plural } from "../lib/util";
+import type { TeamSize, TeamStyle } from "../lib/types";
+import { DAY, fmtDuration, plural, seeded } from "../lib/util";
 import { StoreError } from "../data/store";
+import "../styles/teams.css";
 
-const STYLES: [TeamStyle, string][] = [
-  ["random", "Random"],
-  ["balanced", "Balanced"],
-  ["captains", "Captains"],
+const STYLES: [TeamStyle, string, string][] = [
+  ["random", "Random", "Any split, fully random."],
+  ["balanced", "Balanced", "The closest Team Elo, picked at random among near-equal splits."],
+  ["captains", "Captains", "Two captains pick in turns (A-B-B-A). The lower rated captain picks first."],
 ];
+
+const freshSeed = () => strSeed(String(Math.random()));
 
 export function useTeamPicker() {
   const { data, active } = useData();
@@ -41,7 +49,7 @@ export function useTeamPicker() {
   return { selected, n, size, key, made, limit: usedRerollLimit(data.settings.rerollLimit) };
 }
 
-/** The first version of the Teams page (hero, captains, options, locking). Only used with FEATURES.classicTeams. */
+/** The Teams page from samu-dev (hero, captains, who sits out, options, locking). Only used with FEATURES.classicTeams. */
 export default function TeamsClassic() {
   const { data, c, store, now, pname, isActive, active } = useData();
   const { isMember, isAdmin } = useAuth();
@@ -53,18 +61,50 @@ export default function TeamsClassic() {
   const { selected, n, size, key, made, limit } = useTeamPicker();
   const [adding, setAdding] = useState(false);
   const [newName, setNewName] = useState("");
+  const [seed, setSeed] = useState(freshSeed);
 
   const L = data.live;
   const busy = !!L && L.phase !== "draft";
   const draft = L && L.phase === "draft" ? L : null;
   const left = rerollsLeft(limit, made);
   const ok = canDraft(limit, made);
-  const need = size * 2;
+  const extra = extraPlayers(n, size);
+
+  // Who sits out. Fair rotation uses a seed from the selection + game count, so every device shows the same preview.
+  const prio = sitPriority(data.matches, selected);
+  const picks = validPicks(prefs.sitPick, selected);
+  const planWith = (s: number) => {
+    try {
+      const rng = seeded(prefs.sitMode === "fair" ? strSeed(`${key}|${data.matches.length}`) : s ^ strSeed(key));
+      return planSitOut({ selected, size, mode: prefs.sitMode, sitPriority: prio, picked: picks, rng });
+    } catch {
+      return null; // "pick" mode, not enough picked yet
+    }
+  };
+  const plan = planWith(seed);
+  const outNow = draft ? draft.sitOut : (plan ?? []);
+  const [a1, a2] = prefs.apart;
+  const apartOn = !!(a1 && a2 && a1 !== a2);
+  const apartOut = apartOn ? outNow.filter((id) => id === a1 || id === a2) : [];
 
   const clearDraft = () => draft && store.setLive(null);
   const toggle = (id: string) => {
     const next = selected.includes(id) ? selected.filter((x) => x !== id) : [...selected, id];
     setPrefs({ selected: next });
+    clearDraft();
+  };
+  const setMode = (m: SitMode) => {
+    setPrefs({ sitMode: m });
+    clearDraft();
+  };
+  // Random pick; every press picks again.
+  const shuffleSit = () => {
+    setPrefs({ sitMode: "random" });
+    setSeed(freshSeed());
+    clearDraft();
+  };
+  const pickSit = (id: string) => {
+    setPrefs({ sitPick: toggleSitPick(picks, id, extra) });
     clearDraft();
   };
 
@@ -78,16 +118,27 @@ export default function TeamsClassic() {
       if (!yes) return;
       setPrefs({ rerolls: {} });
     } else if (!ok) return;
+    // A reroll in Random mode may pick someone else to sit out.
+    let sitOut = plan;
+    if (draft && prefs.sitMode === "random") {
+      const s = freshSeed();
+      setSeed(s);
+      sitOut = planWith(s);
+    }
+    if (!sitOut) {
+      toast(`Pick ${plural(extra, "player")} to sit out`, { err: true });
+      return;
+    }
     const last = data.matches.slice().sort((a, b) => b.playedAt - a.playedAt)[0];
-    const [a1, a2] = prefs.apart;
     try {
       const live = makeTeams({
         selected,
         size,
         style: usedTeamStyle(prefs.style),
         ratingOf: (id) => rating(c, id),
-        sitPriority: sitPriority(data.matches, selected),
-        apart: a1 && a2 ? [a1, a2] : null,
+        sitPriority: prio,
+        sitOut,
+        apart: apartOn ? [a1, a2] : null,
         avoid: prefs.avoidLast && last ? last : null,
         current: draft && !draft.captains ? draft : null,
       });
@@ -102,6 +153,7 @@ export default function TeamsClassic() {
     if (!draft) return;
     await store.setLive({ ...draft, phase: "select", captains: undefined, lockedAt: Date.now() });
     setPrefs({ rerolls: {} });
+    setSeed(freshSeed());
     nav("/live");
     toast(dodges.off ? "Champ select started" : `Champ select: ${plural(dodges.perTeam, "dodge")} per team tonight`);
   };
@@ -140,13 +192,24 @@ export default function TeamsClassic() {
         .sort((a, b) => b.rating - a.rating)[0]
     : undefined;
   const feud = FEATURES.rivals ? rivalries(c, isActive)[0] : undefined;
-  const apartOn = !!(prefs.apart[0] && prefs.apart[1] && prefs.apart[0] !== prefs.apart[1]);
   const optCount = (prefs.avoidLast ? 1 : 0) + (apartOn ? 1 : 0);
+  const pickMissing = !busy && !draft && plan === null;
 
-  const btnLabel = busy ? "Make teams" : !ok ? "No rerolls left" : draft ? (left === Infinity ? "Reroll" : `Reroll · ${left} left`) : "Make teams";
+  const btnLabel = busy
+    ? "Make teams"
+    : !ok
+      ? "No rerolls left"
+      : draft
+        ? left === Infinity
+          ? "Reroll"
+          : `Reroll · ${left} left`
+        : pickMissing
+          ? "Pick who sits out"
+          : "Make teams";
+  const styleInfo = STYLES.find(([s]) => s === usedTeamStyle(prefs.style))!;
 
   return (
-    <section aria-labelledby="t-h">
+    <section aria-labelledby="t-h" className="tm">
       <div className="hero">
         <HeroArt />
         <div className="in">
@@ -185,7 +248,7 @@ export default function TeamsClassic() {
             </span>
             {lead && (
               <span className="hchip">
-                Top rated <b>{pname(lead.id)}</b>
+                Top Elo <b>{pname(lead.id)}</b>
               </span>
             )}
           </div>
@@ -195,27 +258,37 @@ export default function TeamsClassic() {
       {feud && <FeudBanner f={feud} />}
       <RuleInfo />
 
-      <p className="hint" aria-live="polite">
-        {n < 2
-          ? "Pick at least 2 players."
-          : n > need
-            ? `${n} players in, ${n - need} ${n - need > 1 ? "sit" : "sits"} out this game. Sit-outs rotate.`
-            : `${n} players, ${size}v${size}.`}
-      </p>
+      <div className="panel tm-setup">
+        <div className="tm-top">
+          <h2>Players</h2>
+          <p className="hint" aria-live="polite">
+            {n < 2
+              ? "Pick at least 2 players."
+              : extra
+                ? `${n} players in, ${extra} ${extra > 1 ? "sit" : "sits"} out this game.`
+                : `${n} players, ${size}v${size}.`}
+          </p>
+        </div>
 
-      <div className="panel">
-        <div className="chips" role="group" aria-label="Who is playing">
+        <div className="chips tm-chips" role="group" aria-label="Who is playing">
           {active.map((p) => (
             <button
               key={p.id}
               type="button"
               className="chip"
               aria-pressed={selected.includes(p.id)}
+              aria-describedby={FEATURES.ratings ? `elo-${p.id}` : undefined}
               disabled={!isMember}
               onClick={() => toggle(p.id)}
             >
               <Avatar id={p.id} />
-              {p.name}
+              <span className="tm-nm">{p.name}</span>
+              {FEATURES.ratings && (
+                <small id={`elo-${p.id}`} className="num" aria-hidden title="Elo">
+                  {rating(c, p.id)}
+                  <span className="tm-sr"> Elo</span>
+                </small>
+              )}
             </button>
           ))}
           {isAdmin &&
@@ -244,37 +317,61 @@ export default function TeamsClassic() {
               </button>
             ))}
         </div>
-        <div className="controls">
-          <div className="seg" role="group" aria-label="Team size">
-            {TEAM_SIZES.map((k) => (
-              <button
-                key={k}
-                type="button"
-                aria-pressed={k === size}
-                disabled={n < 2 * k || !isMember}
-                onClick={() => {
-                  setPrefs({ size: k });
-                  clearDraft();
-                }}
-              >
-                {k}v{k}
-              </button>
-            ))}
-          </div>
-          {FEATURES.teamModes && (
-            <div className="seg" role="group" aria-label="Team style">
-              {STYLES.map(([s, label]) => (
-                <button key={s} type="button" aria-pressed={prefs.style === s} disabled={!isMember} onClick={() => setPrefs({ style: s })}>
-                  {label}
+
+        <div className="tm-fields">
+          <div className="tm-field">
+            <span className="tm-label" id="t-size">
+              Team size
+            </span>
+            <div className="seg" role="group" aria-labelledby="t-size">
+              {TEAM_SIZES.map((k) => (
+                <button
+                  key={k}
+                  type="button"
+                  aria-pressed={k === size}
+                  disabled={n < 2 * k || !isMember}
+                  onClick={() => {
+                    setPrefs({ size: k });
+                    clearDraft();
+                  }}
+                >
+                  {k}v{k}
                 </button>
               ))}
             </div>
+          </div>
+          {FEATURES.teamModes && (
+            <div className="tm-field">
+              <span className="tm-label" id="t-style">
+                Team style
+              </span>
+              <div className="seg" role="group" aria-labelledby="t-style">
+                {STYLES.map(([s, label]) => (
+                  <button key={s} type="button" aria-pressed={prefs.style === s} disabled={!isMember} onClick={() => setPrefs({ style: s })}>
+                    {label}
+                  </button>
+                ))}
+              </div>
+              <p className="tm-desc">{styleInfo[2]}</p>
+            </div>
           )}
-          <span className="grow" />
-          <button className="btn pri" type="button" disabled={!isMember || n < 2 || (!busy && !ok)} onClick={generate}>
-            {btnLabel}
-          </button>
         </div>
+
+        {extra > 0 && (
+          <SitOut
+            mode={prefs.sitMode}
+            onMode={setMode}
+            onShuffle={shuffleSit}
+            extra={extra}
+            selected={selected}
+            out={outNow}
+            picks={picks}
+            onPick={pickSit}
+            apartOut={apartOut}
+            disabled={!isMember}
+          />
+        )}
+
         {isMember && (
           <details className="opts">
             <summary>
@@ -320,6 +417,26 @@ export default function TeamsClassic() {
             </div>
           </details>
         )}
+
+        <div className="controls tm-go">
+          <p className="tm-sum">
+            {n >= 2 ? (
+              <>
+                <b>
+                  {size}v{size}
+                </b>{" "}
+                · {styleInfo[1]}
+                {extra > 0 && ` · ${extra} out`}
+              </>
+            ) : (
+              "Nobody picked yet"
+            )}
+          </p>
+          <button className="btn pri" type="button" disabled={!isMember || n < 2 || (!busy && (!ok || pickMissing))} onClick={generate}>
+            {draft && ok && !busy && <Shuffle aria-hidden />}
+            {btnLabel}
+          </button>
+        </div>
         {!isMember && <p className="note">Log in as a member to make teams.</p>}
       </div>
 
@@ -337,118 +454,8 @@ export default function TeamsClassic() {
       ) : !draft ? (
         <Empty title="No teams yet" text="Pick who's playing and hit Make teams." />
       ) : (
-        <Draft L={draft} onLock={lock} />
+        <Board key={draft.id} L={draft} onLock={lock} />
       )}
     </section>
-  );
-}
-
-function Draft({ L, onLock }: { L: LiveGame; onLock: () => void }) {
-  const { c, store, pname } = useData();
-  const { isMember } = useAuth();
-  const open = draftOpen(L);
-  const turn: Side | "" = open ? L.captains!.order[L.captains!.i] : "";
-  const rankList = FEATURES.ratings
-    ? Object.values(c.st)
-        .filter((x) => x.g)
-        .sort((a, b) => b.rating - a.rating)
-        .map((x) => x.id)
-    : [];
-
-  const side = (ids: string[], k: Side) => (
-    <div className={`side ${k === "blue" ? "b" : "r"}${turn === k ? " turn" : ""}${open ? "" : " reveal"}`}>
-      <h3>
-        {k === "blue" ? "Blue side" : "Red side"}
-        {turn === k ? (
-          <span className="picking">Picking</span>
-        ) : (
-          FEATURES.ratings && <small title="Average Elo of the players in this team">Team Elo {teamAvg(c, ids)}</small>
-        )}
-      </h3>
-      {ids.map((id, j) => {
-        const r = rankList.indexOf(id) + 1;
-        return (
-          <div className="pl" key={id}>
-            <Avatar id={id} />
-            <div>
-              <b>
-                {pname(id)}
-                {L.captains && j === 0 && <span className="tag2">Captain</span>}
-                {r > 0 && r <= 3 && <span className="rank">#{r}</span>}
-              </b>
-              <div className="rt">
-                {pointsLabel(rating(c, id))} · {c.st[id]?.w ?? 0}–{c.st[id]?.l ?? 0}
-              </div>
-            </div>
-          </div>
-        );
-      })}
-    </div>
-  );
-
-  const hunt = FEATURES.bounties ? bountyTarget(c, [...L.blue, ...L.red]) : undefined;
-  return (
-    <div key={L.id}>
-      <div className="board" data-testid="board">
-        {side(L.blue, "blue")}
-        <div className={`vs${open ? "" : " reveal"}`}>VS</div>
-        {side(L.red, "red")}
-      </div>
-      {L.sitOut.length > 0 && <p className="sit">Sitting out: {L.sitOut.map(pname).join(", ")}</p>}
-      {open ? (
-        <div className="panel" style={{ marginTop: 16 }} data-testid="captain-pick">
-          <div className="ph">
-            <h3>
-              {pname(turn === "blue" ? L.blue[0] : L.red[0])} picks for {turn === "blue" ? "Blue" : "Red"}
-            </h3>
-            <p className="sub">
-              Pick {L.captains!.i + 1} of {L.captains!.order.length}
-              {FEATURES.ratings && L.captains!.i === 0 && " · lower rated captain goes first"}
-            </p>
-          </div>
-          <div className="chips">
-            {L.captains!.pool.map((id) => (
-              <button
-                key={id}
-                type="button"
-                className="chip"
-                aria-pressed="false"
-                disabled={!isMember}
-                onClick={() => store.setLive(captainPick(L, id))}
-              >
-                <Avatar id={id} />
-                {pname(id)}
-                {FEATURES.ratings && <small>{rating(c, id)}</small>}
-              </button>
-            ))}
-          </div>
-          <div className="win">
-            <button className="btn ghost" type="button" disabled={!isMember || !L.captains!.i} onClick={() => store.setLive(captainUndo(L))}>
-              Undo last pick
-            </button>
-          </div>
-        </div>
-      ) : (
-        <>
-          {hunt && (
-            <div className="info bounty">
-              <Target aria-hidden />
-              <div>
-                <b>Bounty on {pname(hunt)}.</b> {c.st[hunt].streak} wins in a row. {L.blue.includes(hunt) ? "Red" : "Blue"} side can
-                end it tonight.
-              </div>
-            </div>
-          )}
-          <WinChance blue={L.blue} red={L.red} />
-          {isMember && (
-            <div className="win">
-              <button className="btn pri" type="button" onClick={onLock}>
-                Lock teams and go to champ select
-              </button>
-            </div>
-          )}
-        </>
-      )}
-    </div>
   );
 }
