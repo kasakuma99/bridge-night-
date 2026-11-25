@@ -84,7 +84,7 @@ export function WinChance({ blue, red }: { blue: string[]; red: string[] }) {
         <i style={{ width: `${pb}%` }} />
       </div>
       <span className="rl">{100 - pb}% Red</span>
-      <small>Win chance from ratings</small>
+      <small>Win chance from Elo</small>
     </div>
   );
 }

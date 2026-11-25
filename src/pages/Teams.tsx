@@ -237,7 +237,7 @@ export default function Teams() {
             </span>
             {lead && (
               <span className="hchip">
-                Top rated <b>{pname(lead.id)}</b>
+                Top Elo <b>{pname(lead.id)}</b>
               </span>
             )}
           </div>
