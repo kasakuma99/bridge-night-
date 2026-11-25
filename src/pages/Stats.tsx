@@ -2,22 +2,33 @@ import { useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Award, Crown, Flame, Shield, Sparkles, Swords, Target } from "lucide-react";
 import { useData, usePrefs } from "../data/context";
-import { Avatar, ChampAvatar, Form, ItemIcon } from "../components/ui";
+import { Avatar, ChampAvatar, Empty, Form, ItemIcon } from "../components/ui";
+import { EloChart, EloDelta, reasons } from "../components/stats/Elo";
+import { FEATURES, POINTS_NAME, byWins, shownPoints, visibleBadges } from "../lib/features";
+import { sizeLabel } from "../lib/live";
 import {
   badges,
+  eloLog,
+  eloTrend,
   kdaRatio,
   periodStats,
+  PLACEMENT_GAMES,
   profile,
   rating,
   records,
+  START_RATING,
   topEntries,
   weeklyAwards,
   type Badge,
+  type Computed,
 } from "../lib/stats";
-import { DAY, fmtMonth, plural } from "../lib/util";
+import { DAY, fmtMonth, plural, TZ } from "../lib/util";
+import "../styles/stats.css";
 
 const pct = (w: number, g: number) => (g ? Math.round((w / g) * 100) : 0);
 const f1 = (v: number) => v.toFixed(1);
+const streakText = (s: number) => (s > 0 ? `W${s}` : s < 0 ? `L${-s}` : "–");
+const shortDay = (t: number) => new Date(t).toLocaleDateString("en-GB", { timeZone: TZ, day: "numeric", month: "short" });
 
 const BADGE_ICON: Record<string, typeof Award> = {
   "Monthly champion": Crown,
@@ -36,19 +47,16 @@ export default function Stats() {
   const per = period ? `the last ${period} days` : "all time";
 
   const { rows, count } = useMemo(() => periodStats(data.matches, since, isActive), [data.matches, since, isActive]);
-  const sorted = rows
-    .slice()
-    .sort(
-      period
-        ? (a, b) => b.w - a.w || b.w / b.g - a.w / a.g || rating(c, b.id) - rating(c, a.id)
-        : (a, b) => rating(c, b.id) - rating(c, a.id),
-    );
-  const all = Object.values(c.st).filter((x) => isActive(x.id) && x.g);
-  const topW = rows.slice().sort((a, b) => b.w - a.w)[0];
-  const topR = all.slice().sort((a, b) => b.rating - a.rating)[0];
-  const hot = all.filter((x) => x.streak > 0).sort((a, b) => b.streak - a.streak)[0];
+  const inPeriod = new Map(rows.map((r) => [r.id, r]));
+  // The list has everyone who has played; W–L and win rate follow the switch.
+  // Elo is always all-time. Without Elo, the order is wins in the chosen period.
+  const ranked = rankedPlayers(c, isActive, pname, inPeriod);
+  const topW = rows.slice().sort((a, b) => b.w - a.w || a.g - b.g)[0];
+  const topR = ranked[0];
+  const topS = ranked.filter((x) => x.bestStreak > 0).sort((a, b) => b.bestStreak - a.bestStreak)[0];
+  const hot = ranked.filter((x) => x.streak > 0).sort((a, b) => b.streak - a.streak)[0];
   const asked = params.get("player");
-  const focus = asked && c.st[asked] && isActive(asked) ? asked : sorted[0]?.id;
+  const focus = asked && c.st[asked]?.g && isActive(asked) ? asked : ranked[0]?.id;
 
   const rec = useMemo(() => records(data.matches, since, isActive), [data.matches, since, isActive]);
   const aw = useMemo(() => weeklyAwards(data.matches, now, isActive), [data.matches, now, isActive]);
@@ -118,86 +126,98 @@ export default function Stats() {
 
       <div className="kpis">
         {kpi("Games played", count, period ? `in the last ${period} days` : "since the start")}
-        {kpi("Most wins", topW ? who(topW.id) : "–", topW ? `${topW.w} wins in ${per}` : "No games yet")}
-        {kpi("Highest rating", topR ? who(topR.id) : "–", topR ? `${rating(c, topR.id)} rating` : "No games yet")}
+        {kpi("Most wins", topW ? who(topW.id) : "–", topW ? `${plural(topW.w, "win")} in ${per}` : "No games yet")}
+        {FEATURES.ratings
+          ? kpi("Top Elo", topR ? who(topR.id) : "–", topR ? `${rating(c, topR.id)} Elo` : "Everyone starts at 1000")
+          : kpi("Best win streak", topS ? who(topS.id) : "–", topS ? `${plural(topS.bestStreak, "win")} in a row, all time` : "No games yet")}
         {kpi("Hottest streak", hot ? who(hot.id) : "–", hot ? `${hot.streak} wins in a row` : "Nobody is on a streak")}
       </div>
 
       <div className="statgrid">
         <section className="panel" aria-labelledby="lb-h">
           <div className="ph">
-            <h2 id="lb-h">Leaderboard</h2>
-            <p className="sub">{period ? "Sorted by wins" : "Sorted by rating"}</p>
+            <h2 id="lb-h">{FEATURES.ratings ? "Elo ranking" : "Leaderboard"}</h2>
+            <p className="sub">{!FEATURES.ratings ? "Sorted by wins" : period ? `W–L and win rate: last ${period} days` : "All games"}</p>
           </div>
-          <div className="lbhead" aria-hidden>
-            <span />
-            <span>Player</span>
-            <span>Last 5</span>
-            <span className="xs">Avg K/D/A</span>
-            <span>Rating</span>
-            <span className="xs">Streak</span>
-            <span>{period ? "Wins" : "Win rate"}</span>
-          </div>
-          <ol className="lb">
-            {sorted.length ? (
-              sorted.map((x, i) => {
-                const s = c.st[x.id];
-                return (
-                  <li key={x.id}>
-                    <button
-                      type="button"
-                      className="lbrow"
-                      aria-pressed={x.id === focus}
-                      onClick={() => {
-                        setParams({ player: x.id }, { replace: true });
-                        if (window.innerWidth <= 1000) document.getElementById("pcard")?.scrollIntoView({ behavior: "smooth", block: "start" });
-                      }}
-                    >
-                      <span className="pos">{i + 1}</span>
-                      <span className="who">
-                        <Avatar id={x.id} />
-                        <span>
-                          <b>{pname(x.id)}</b>
-                          <small>
-                            {x.w}–{x.g - x.w} · {pct(x.w, x.g)}%
-                          </small>
+          {ranked.length ? (
+            <>
+              <div className={`lbhead rk-head${FEATURES.ratings ? "" : " noelo"}`} aria-hidden>
+                <span>#</span>
+                <span>Player</span>
+                <span>{FEATURES.ratings ? "Elo" : POINTS_NAME}</span>
+                {FEATURES.ratings && <span>Last 5</span>}
+                <span className="md">W–L</span>
+                <span className="md">Win rate</span>
+                <span className="md">Streak</span>
+              </div>
+              <ol className="rk">
+                {ranked.map((x, i) => {
+                  const p = inPeriod.get(x.id);
+                  const trend = eloTrend(eloLog(c, x.id));
+                  const wl = p ? `${p.w}–${p.g - p.w}` : "–";
+                  const wr = p ? `${pct(p.w, p.g)}%` : "–";
+                  return (
+                    <li key={x.id}>
+                      <button
+                        type="button"
+                        className={`lbrow rk-row${FEATURES.ratings ? "" : " noelo"}`}
+                        aria-pressed={x.id === focus}
+                        onClick={() => {
+                          setParams({ player: x.id }, { replace: true });
+                          if (window.innerWidth <= 1000) document.getElementById("pcard")?.scrollIntoView({ behavior: "smooth", block: "start" });
+                        }}
+                      >
+                        <span className="pos">{i + 1}</span>
+                        <span className="who">
+                          <Avatar id={x.id} />
+                          <span>
+                            <b>{pname(x.id)}</b>
+                            <small>
+                              <Form id={x.id} n={5} />
+                              {FEATURES.ratings && x.g < PLACEMENT_GAMES && <span className="plc">Placement {x.g}/{PLACEMENT_GAMES}</span>}
+                            </small>
+                            <small className="rk-meta">
+                              {wl} · {wr} · {streakText(x.streak)}
+                            </small>
+                          </span>
                         </span>
-                      </span>
-                      <span className="c fm">
-                        <Form id={x.id} n={5} />
-                      </span>
-                      <span className="c s xs">
-                        <b>{x.kn ? `${f1(x.k / x.kn)}/${f1(x.d / x.kn)}/${f1(x.a / x.kn)}` : "–"}</b>
-                      </span>
-                      <span className="c r">
-                        <b>{rating(c, x.id)}</b>
-                      </span>
-                      <span className="c s xs">
-                        <b>{s.streak > 0 ? `W${s.streak}` : s.streak < 0 ? `L${-s.streak}` : "–"}</b>
-                      </span>
-                      <span className="c w">
-                        <b>{period ? x.w : `${pct(x.w, x.g)}%`}</b>
-                        <small>{period ? "wins" : "win rate"}</small>
-                      </span>
-                    </button>
-                  </li>
-                );
-              })
-            ) : (
-              <li className="empty" style={{ margin: 0 }}>
-                No games in this period yet.
-              </li>
-            )}
-          </ol>
-          <p className="note">
-            Tap a player to see their profile. Everyone starts at 1000. After each game you're compared with every opponent: beating
-            stronger players gives more, beating weaker players less, and losing to stronger players costs less. The first 10 games
-            count a bit more. Losers who surrender lose 5 extra; 3+ wins in a row and ending a bounty give a small bonus. Every game
-            counts at least 3. Kills and deaths don't change the rating. It always counts all games.
-          </p>
+                        <span className="elo">{shownPoints(rating(c, x.id))}</span>
+                        {FEATURES.ratings && (
+                          <span className="tr">
+                            <EloDelta d={trend} arrow />
+                          </span>
+                        )}
+                        <span className="md">{wl}</span>
+                        <span className="md">{wr}</span>
+                        <span className={`md stk${x.streak > 0 ? " hot" : ""}`}>{streakText(x.streak)}</span>
+                      </button>
+                    </li>
+                  );
+                })}
+              </ol>
+            </>
+          ) : (
+            <Empty title="No ranked players yet" text={FEATURES.ratings ? "Everyone starts at 1000 Elo. Finish a game and the ranking shows up here." : "Finish a game and the leaderboard shows up here."} />
+          )}
+          {FEATURES.ratings && (
+            <details className="elo-how">
+              <summary>How Elo works</summary>
+              <p>
+                Everyone starts at {START_RATING}. After each game you're compared with every opponent: beating stronger players gives more,
+                beating weaker players less, and losing to stronger players costs less. A 100 point gap means about 13 for the favourite and 17
+                for the underdog. The first {PLACEMENT_GAMES} games (placement) count a bit more. Losers who surrender lose 5 extra; 3+ wins in
+                a row and ending someone's streak (bounty) give a small bonus. Every game counts at least 3. Kills and deaths don't change Elo,
+                and Elo always counts all games.
+              </p>
+            </details>
+          )}
         </section>
         <aside className="panel pcard" id="pcard" aria-label="Player profile">
-          {focus ? <Profile id={focus} /> : <p className="sub">Play a game to see player profiles.</p>}
+          {focus ? (
+            <Profile id={focus} />
+          ) : (
+            <Empty compact title="Player profiles" text="Click a player in the list to see their profile. Profiles appear after the first game." />
+          )}
         </aside>
       </div>
 
@@ -300,6 +320,18 @@ export default function Stats() {
   );
 }
 
+/** Everyone who has played: by Elo, or by wins (in the period, then all time) when Elo is hidden. */
+function rankedPlayers(c: Computed, isActive: (id: string) => boolean, name: (id: string) => string, inPeriod?: Map<string, { g: number; w: number }>) {
+  const all = Object.values(c.st).filter((x) => isActive(x.id) && x.g);
+  if (FEATURES.ratings) return all.sort((a, b) => b.rating - a.rating || b.w - a.w);
+  const wins = byWins(name);
+  const row = (x: (typeof all)[number]) => {
+    const p = inPeriod ? inPeriod.get(x.id) : x;
+    return { id: x.id, g: p?.g ?? 0, w: p?.w ?? 0 };
+  };
+  return all.sort((a, b) => wins(row(a), row(b)));
+}
+
 function BadgeChip({ b }: { b: Badge }) {
   const Icon = BADGE_ICON[b.title] ?? Shield;
   return (
@@ -315,31 +347,40 @@ function Profile({ id }: { id: string }) {
   const { c, pname, player, isActive } = useData();
   const x = c.st[id];
   const p = player(id);
-  const rankList = Object.values(c.st)
-    .filter((s) => isActive(s.id) && s.g)
-    .sort((a, b) => b.rating - a.rating);
+  const rankList = rankedPlayers(c, isActive, pname);
   const rank = rankList.findIndex((s) => s.id === id) + 1;
   const pr = profile(c, id, isActive);
   const champs = topEntries(x.champs, 3);
   const items = topEntries(x.items, 6);
-  const h = x.hist.slice(-31);
-  const change = Math.round(h[h.length - 1] - h[Math.max(0, h.length - 6)]);
-  const mn = Math.min(...h) - 8;
-  const mx = Math.max(...h) + 8;
-  const line = h.map((v, i) => `${((i / Math.max(1, h.length - 1)) * 300).toFixed(1)},${(100 - ((v - mn) / (mx - mn)) * 66 - 8).toFixed(1)}`).join(" ");
-  const up = change >= 0;
-  const bs = badges(x);
+  const log = eloLog(c, id);
+  const trend = eloTrend(log);
+  const shown = Math.min(30, log.length);
+  const peak = Math.round(Math.max(...x.hist));
+  const bs = visibleBadges(badges(x));
 
   return (
     <>
       <div className="pc-top">
         <Avatar id={id} lg />
         <div>
-          <h2>{p?.name}</h2>
+          <h2>{p?.name ?? pname(id)}</h2>
           <p className="sub">
-            <span>#{rank} by rating</span> · <Form id={id} n={10} />
+            <span>#{rank} {FEATURES.ratings ? "in Elo" : "in wins"}</span> · <Form id={id} n={10} />
           </p>
         </div>
+      </div>
+      <div className="pc-elo">
+        <div>
+          <small>{FEATURES.ratings ? "Elo" : POINTS_NAME}</small>
+          <b>{shownPoints(rating(c, id))}</b>
+        </div>
+        {FEATURES.ratings && (
+          <div className="pc-elo-tr">
+            <EloDelta d={trend} arrow />
+            <small>last {Math.min(5, log.length)} games</small>
+          </div>
+        )}
+        {FEATURES.ratings && x.g < PLACEMENT_GAMES && <span className="plc">Placement {x.g}/{PLACEMENT_GAMES}</span>}
       </div>
       {bs.length > 0 && (
         <div className="badges" aria-label="Badges">
@@ -350,8 +391,8 @@ function Profile({ id }: { id: string }) {
       )}
       <div className="pc-stats">
         <div>
-          <small>Rating</small>
-          <b>{rating(c, id)}</b>
+          <small>{FEATURES.ratings ? "Peak Elo" : "Best streak"}</small>
+          <b>{FEATURES.ratings ? peak : x.bestStreak}</b>
         </div>
         <div>
           <small>Win rate</small>
@@ -366,24 +407,37 @@ function Profile({ id }: { id: string }) {
           <b>{x.kdaGames ? kdaRatio(x.k, x.d, x.a).toFixed(2) : "–"}</b>
         </div>
       </div>
-      <div className="chart">
-        <span className="cl">Rating, last {h.length - 1} games</span>
-        <span className="cr" style={{ color: up ? "var(--color-ice)" : "var(--color-red)" }}>
-          {up ? "+" : ""}
-          {change} last 5
-        </span>
-        <svg viewBox="0 0 300 100" preserveAspectRatio="none" role="img" aria-label={`Rating chart, now ${rating(c, id)}`}>
-          <polygon points={`0,100 ${line} 300,100`} fill={up ? "rgba(191,230,255,.10)" : "rgba(255,90,110,.10)"} />
-          <polyline
-            points={line}
-            fill="none"
-            stroke={up ? "var(--color-ice)" : "var(--color-red)"}
-            strokeWidth="2.2"
-            vectorEffect="non-scaling-stroke"
-            strokeLinejoin="round"
-          />
-        </svg>
-      </div>
+      {FEATURES.ratings && (
+        <>
+          <div className="chart elo-chart" role="img" aria-label={`Elo over the last ${plural(shown, "game")}: from ${Math.round(x.hist[x.hist.length - 1 - shown])} to ${rating(c, id)}`}>
+            <span className="cl">Elo, last {plural(shown, "game")}</span>
+            <EloChart hist={x.hist} start={START_RATING} />
+          </div>
+          <div>
+            <h3 className="pc-h">Recent Elo changes</h3>
+            <ol className="elo-log">
+              {log
+                .slice(-5)
+                .reverse()
+                .map((e) => (
+                  <li key={e.match.id}>
+                    <span className={`res${e.won ? " w" : ""}`}>{e.won ? "W" : "L"}</span>
+                    <span className="what">
+                      <b>
+                        {e.won ? "Won" : "Lost"} · {shortDay(e.match.playedAt)} · {sizeLabel(e.match)}
+                      </b>
+                      <small>{reasons(e.change).join(" · ")}</small>
+                    </span>
+                    <span className="aft">
+                      <EloDelta d={e.change.delta} />
+                      <small>{e.after} Elo</small>
+                    </span>
+                  </li>
+                ))}
+            </ol>
+          </div>
+        </>
+      )}
       <div>
         <div className="fact">
           <span>Record</span>

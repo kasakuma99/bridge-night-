@@ -1,38 +1,24 @@
-import { useEffect, useRef } from "react";
+import { Suspense, lazy, useEffect, useRef } from "react";
 import { Link, NavLink, Outlet, useLocation } from "react-router-dom";
-import { LogIn, LogOut, MessageCircle } from "lucide-react";
+import { MessageCircle } from "lucide-react";
 import { SAMPLE_MODE, useAuth, useData, type Role } from "../data/context";
+import { FEATURES } from "../lib/features";
+import { showFeed } from "../lib/live";
 import { isDiscordInvite } from "../lib/util";
-import { Logo, Skeleton, useToast } from "./ui";
+import { Logo, Skeleton } from "./ui";
 import { PendingResults } from "./HelperAdmin";
+import { AccountMenu } from "./qol/AccountMenu";
+import { Gate } from "./qol/Gate";
+import { LoginPrompt } from "./qol/LoginPrompt";
+import { OfflineBanner, UpdateNotice } from "./qol/Notices";
+import { pageTitle } from "./qol/logic";
+import "../styles/qol.css";
 
-function Account() {
-  const { canLogin, ready, user, pending, signIn, signOut, isAdmin } = useAuth();
-  const toast = useToast();
-  if (!canLogin || !ready) return null;
-  if (!user)
-    return (
-      <button
-        className="btn sm"
-        type="button"
-        onClick={() => signIn().catch(() => toast("Could not start the Discord login. Try again."))}
-      >
-        <LogIn aria-hidden />
-        <span>Log in</span>
-      </button>
-    );
-  return (
-    <button
-      className="btn sm ghost"
-      type="button"
-      title={`Logged in as ${user.name}${isAdmin ? " (admin)" : pending ? " (waiting for approval)" : ""}. Click to log out.`}
-      onClick={() => void signOut().then(() => toast("Logged out"))}
-    >
-      {user.avatar ? <img src={user.avatar} alt="" width={20} height={20} style={{ borderRadius: 999 }} /> : <LogOut aria-hidden />}
-      <span>Log out</span>
-    </button>
-  );
-}
+// npm run dev:live only: not in the production build.
+const LiveBridge =
+  import.meta.env.DEV && SAMPLE_MODE && import.meta.env.VITE_LIVE
+    ? lazy(() => import("../dev/LiveTools").then((m) => ({ default: m.LiveBridge })))
+    : null;
 
 function PendingNote() {
   const { pending, user } = useAuth();
@@ -47,15 +33,15 @@ function PendingNote() {
 
 export const SITE_NAME = "Bridge Night";
 
-const NAV = [
+const NAV: [to: string, label: string][] = [
   ["/", "Teams"],
   ["/live", "Live"],
-  ["/history", "History"],
+  ["/history", "Past games"],
   ["/stats", "Stats"],
-  ["/rivals", "Rivals"],
-  ["/builds", "Builds"],
+  ...(FEATURES.rivals ? [["/rivals", "Rivals"] as [string, string]] : []),
+  ...(FEATURES.builds ? [["/builds", "Builds"] as [string, string]] : []),
   ["/players", "Players"],
-] as const;
+];
 
 function DiscordLink({ className, children, label }: { className?: string; children: React.ReactNode; label?: string }) {
   const { data } = useData();
@@ -69,22 +55,29 @@ function DiscordLink({ className, children, label }: { className?: string; child
 }
 
 export function Layout() {
-  const { data, status, error } = useData();
-  const { role, setRole } = useAuth();
+  const { data, status, error, now } = useData();
+  const { role, setRole, isMember } = useAuth();
+  const closed = FEATURES.privateSite && !isMember;
   const loc = useLocation();
   const nav = useRef<HTMLElement>(null);
-  const live = data.live && data.live.phase !== "draft";
+  const live = FEATURES.classicTeams ? data.live && data.live.phase !== "draft" : showFeed(data.feed, now) && data.feed.status !== "ended";
 
   useEffect(() => {
+    document.title = closed ? SITE_NAME : pageTitle(loc.pathname);
     window.scrollTo(0, 0);
     // Keep the active tab visible on phones.
     const n = nav.current;
     const t = n?.querySelector<HTMLElement>('[aria-current="page"]');
     if (n && t && n.scrollWidth > n.clientWidth) n.scrollTo({ left: t.offsetLeft - n.clientWidth / 2 + t.offsetWidth / 2 });
-  }, [loc.pathname]);
+  }, [loc.pathname, closed]);
 
   return (
     <>
+      {LiveBridge && !closed && (
+        <Suspense fallback={null}>
+          <LiveBridge />
+        </Suspense>
+      )}
       <a className="btn pri skip" href="#main">
         Skip to content
       </a>
@@ -95,25 +88,27 @@ export function Layout() {
             {SITE_NAME}
           </Link>
           <nav className="tabs" aria-label="Sections" ref={nav}>
-            {NAV.map(([to, label]) => (
+            {(closed ? [] : NAV).map(([to, label]) => (
               <NavLink key={to} className="tab" to={to} end={to === "/"}>
                 {to === "/live" && live && <span className="live-dot" role="img" aria-label="Game running" />}
                 {label}
               </NavLink>
             ))}
           </nav>
-          <DiscordLink className="btn sm dis" label="Join our Discord (opens in a new tab)">
-            <MessageCircle aria-hidden />
-            <span>Join our Discord</span>
-          </DiscordLink>
-          <Account />
+          {!closed && (
+            <DiscordLink className="btn sm dis" label="Join our Discord (opens in a new tab)">
+              <MessageCircle aria-hidden />
+              <span>Join our Discord</span>
+            </DiscordLink>
+          )}
+          <AccountMenu />
         </div>
       </header>
       <main className="wrap" id="main" tabIndex={-1}>
         {SAMPLE_MODE && !loc.search.includes("shot") && (
           <p className="preview">
             <i />
-            Local preview with sample players and games. Changes are saved in this browser only.
+            Local preview with sample players. Changes are saved in this browser only.
             <label>
               <span className="sr-only">View as</span>
               <select value={role} onChange={(e) => setRole(e.target.value as Role)} aria-label="Preview the site as">
@@ -124,9 +119,12 @@ export function Layout() {
             </label>
           </p>
         )}
-        <PendingNote />
-        {status === "loading" ? (
-          <div aria-busy="true" aria-label="Loading">
+        <OfflineBanner />
+        {!closed && <PendingNote />}
+        {closed ? (
+          <Gate />
+        ) : status === "loading" ? (
+          <div role="status" aria-busy="true" aria-label="Loading">
             <Skeleton h={48} />
             <div style={{ height: 16 }} />
             <Skeleton h={260} />
@@ -153,11 +151,15 @@ export function Layout() {
               <Logo size={24} />
               {SITE_NAME}
             </span>
-            <DiscordLink>Join our Discord</DiscordLink>
-            <Link to="/stats">Stats</Link>
-            <Link to="/rivals">Rivals</Link>
-            <Link to="/builds">Builds</Link>
-            <Link to="/helper">Helper app</Link>
+            {!closed && (
+              <>
+                <DiscordLink>Join our Discord</DiscordLink>
+                <Link to="/stats">Stats</Link>
+                {FEATURES.rivals && <Link to="/rivals">Rivals</Link>}
+                {FEATURES.builds && <Link to="/builds">Builds</Link>}
+                <Link to="/helper">Helper app</Link>
+              </>
+            )}
             <span>Fan project, made by friends for friends.</span>
           </div>
           <p>
@@ -166,6 +168,8 @@ export function Layout() {
           </p>
         </div>
       </footer>
+      {!FEATURES.privateSite && <LoginPrompt />}
+      <UpdateNotice />
     </>
   );
 }

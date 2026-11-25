@@ -165,3 +165,7 @@ supabase/.temp/
 helper/dist/
 !.env.production
 .wrangler/
+
+# Planning docs for the tosh branch: local only, they change all the time
+/tosh_docs/TODO.MD
+/tosh_docs/CURRENT_TASK.MD

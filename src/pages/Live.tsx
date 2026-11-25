@@ -1,373 +1,204 @@
-import { useEffect, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
-import { Check, Dices } from "lucide-react";
-import { useAuth, useData, useDDragon, usePrefs } from "../data/context";
-import { RuleInfo, rivalryText, useDodges } from "../components/bits";
-import { Avatar, ChampAvatar, Empty, useConfirm, useToast } from "../components/ui";
-import { CHALLENGES } from "../lib/champions";
-import { compute, rating, rivalries, teamAvg } from "../lib/stats";
-import type { LiveGame, LivePhase, ParticipantStats, Side } from "../lib/types";
-import { mmss, rndInt } from "../lib/util";
+import { Fragment, lazy, Suspense, useState } from "react";
+import { Link } from "react-router-dom";
+import { Check, Crown, Hourglass, WifiOff } from "lucide-react";
+import { SAMPLE_MODE, useAuth, useData, useNow } from "../data/context";
+import { GameBoard, usePlayerName } from "../components/GameBoard";
+import { Empty, useConfirm, useToast } from "../components/ui";
+import { RECENT_MS, clockOf, endText, eventText, hasAugments, isStale, needsWinner, showFeed, waitingForResult } from "../lib/live";
+import type { FeedStatus, LiveFeed, Side } from "../lib/types";
+import { fmtTime, mmss } from "../lib/util";
 
-const PHASES: [LivePhase, string][] = [
-  ["select", "Champ select"],
-  ["playing", "In game"],
-  ["result", "Result"],
+// Only on localhost with sample data: the fake game isn't in the production build.
+const SimPanel =
+  import.meta.env.DEV && SAMPLE_MODE && !import.meta.env.VITE_LIVE
+    ? lazy(() => import("../dev/LiveTools").then((m) => ({ default: m.SimPanel })))
+    : null;
+
+const STEPS: [FeedStatus[], string][] = [
+  [["select"], "Champ Select"],
+  [["loading", "playing"], "In Game"],
+  [["ended"], "Recently Ended"],
 ];
-
-function Timer({ from }: { from: number }) {
-  const [now, setNow] = useState(Date.now());
-  useEffect(() => {
-    const t = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(t);
-  }, []);
-  return (
-    <div className="timer" role="timer" aria-label="Game time">
-      {mmss(now - from)}
-    </div>
-  );
-}
+const TITLE: Record<FeedStatus, string> = { select: "Champ Select", loading: "In Game", playing: "In Game", ended: "Recently Ended" };
 
 export default function Live() {
-  const { data, c, store, pname, isActive } = useData();
-  const { isMember } = useAuth();
-  const { setPrefs } = usePrefs();
-  const { dd } = useDDragon();
-  const toast = useToast();
-  const confirm = useConfirm();
-  const nav = useNavigate();
-  const dodges = useDodges();
-  const [saving, setSaving] = useState(false);
-  const L = data.live && data.live.phase !== "draft" ? data.live : null;
-
-  const steps = (
-    <ol className="steps" aria-label="Game steps">
-      {PHASES.map(([p, label], k) => {
-        const i = L ? PHASES.findIndex(([x]) => x === L.phase) : -1;
-        return (
-          <li key={p} className={k === i ? "on" : k < i ? "done" : ""} aria-current={k === i ? "step" : undefined}>
-            <em>{k < i ? <Check aria-label="done" /> : k + 1}</em>
-            {label}
-          </li>
-        );
-      })}
-    </ol>
-  );
-
-  if (!L)
-    return (
-      <section>
-        <div className="head">
-          <div>
-            <h1>Live game</h1>
-            {steps}
-          </div>
-        </div>
-        <RuleInfo />
-        <Empty title="No game running" text="Make teams first, then lock them to start champ select.">
-          <Link className="btn pri" to="/">
-            Make teams
-          </Link>
-        </Empty>
-      </section>
-    );
-
-  const set = (patch: Partial<LiveGame>) => store.setLive({ ...L, ...patch });
-  const setStat = (id: string, patch: Partial<ParticipantStats>) =>
-    set({ stats: { ...L.stats, [id]: { ...L.stats[id], ...patch } } });
-  const sideOf = (id: string): Side => (L.blue.includes(id) ? "blue" : "red");
-
-  const dodge = (id: string) => {
-    const s = sideOf(id);
-    // The champion may be unknown here: the helper only fills champions in once the game loads (fair play).
-    const champ = L.stats[id]?.champion ?? "";
-    if (dodges.left[s] <= 0) return;
-    // A dodge restarts champ select: everyone gets new random champions, so all picks are cleared.
-    // It still costs one dodge of the dodger's team.
-    const stats = Object.fromEntries(
-      Object.entries(L.stats).map(([pid, st]) => {
-        const { champion: _drop, ...rest } = st;
-        void _drop;
-        return [pid, rest];
-      }),
-    );
-    set({
-      stats,
-      dodgeLog: [...L.dodgeLog, { playerId: id, champion: champ, side: s, at: Date.now() }],
-    });
-    toast(`${pname(id)} dodged${champ ? ` ${champ}` : ""}. New champions for everyone. ${s === "blue" ? "Blue" : "Red"} has ${dodges.left[s] - 1} left tonight`);
-  };
-
-  const spin = () => {
-    const opts = CHALLENGES.filter((x) => x !== L.challenge);
-    const ch = opts[rndInt(opts.length)];
-    set({ challenge: ch });
-    toast(`Challenge: ${ch}`);
-  };
-
-  const cancel = async () => {
-    const yes = await confirm({
-      title: "Cancel this game?",
-      text: "Teams, picks and dodges are thrown away. Nothing is saved to the history.",
-      yes: "Cancel game",
-    });
-    if (!yes) return;
-    await store.setLive(null);
-    setPrefs({ rerolls: {} });
-    nav("/");
-    toast("Game cancelled");
-  };
-
-  const finish = async (winner: Side) => {
-    if (saving) return;
-    setSaving(true);
-    try {
-      const losers = winner === "blue" ? L.red : L.blue;
-      const hunted = losers.filter((id) => (c.st[id]?.streak ?? 0) >= 3).sort((a, b) => c.st[b].streak - c.st[a].streak)[0];
-      const huntedStreak = hunted ? c.st[hunted].streak : 0;
-      const m = await store.saveResult(L.id, winner);
-      if (!m) {
-        toast("This game was already saved");
-        nav("/history");
-        return;
-      }
-      // Did a rivalry between two opponents of this game grow?
-      const after = compute([...data.matches, m], data.players);
-      const winners = winner === "blue" ? m.blue : m.red;
-      const grew = rivalries(after, isActive).find(
-        (f) => winners.includes(f.leader) && (m.blue.includes(f.a) ? m.red : m.blue).includes(f.a === f.leader ? f.b : f.a),
-      );
-      nav("/history");
-      toast(
-        hunted
-          ? `Bounty claimed! ${pname(hunted)}'s ${huntedStreak}-win streak is over`
-          : grew
-            ? `${rivalryText(grew, pname).title}!`
-            : `${winner === "blue" ? "Blue" : "Red"} side win saved`,
-      );
-    } catch (e) {
-      toast(e instanceof Error ? e.message : "Could not save the result", { err: true });
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const pips = (s: Side) =>
-    dodges.off ? (
-      <small>no dodges</small>
-    ) : (
-      <span className="pips" aria-label={`${dodges.left[s]} dodges left tonight`}>
-        {Array.from({ length: dodges.perTeam }, (_, k) => (
-          <i key={k} className={k < dodges.left[s] ? "full" : ""} />
-        ))}{" "}
-        {dodges.left[s]} left
-      </span>
-    );
-
-  const row = (id: string) => {
-    const s = L.stats[id] ?? {};
-    const champ = s.champion;
-    if (L.phase === "select")
-      return (
-        <div className="pl" key={id}>
-          {champ ? <ChampAvatar name={champ} /> : <Avatar id={id} />}
-          <div>
-            <b>{pname(id)}</b>
-            <div className="rt">{champ ? `Locked in · ${champ}` : "Picking…"}</div>
-          </div>
-          {isMember ? (
-            <button
-              className="dodge"
-              type="button"
-              disabled={dodges.left[sideOf(id)] <= 0}
-              onClick={() => dodge(id)}
-              aria-label={`Dodge for ${pname(id)}`}
-            >
-              Dodge
-            </button>
-          ) : (
-            <span />
-          )}
-          {isMember && (
-            <select
-              className="full"
-              aria-label={`Champion for ${pname(id)}`}
-              value={champ ?? ""}
-              onChange={(e) => setStat(id, { champion: e.target.value || undefined })}
-            >
-              <option value="">Pick champion</option>
-              {dd.champions.map((ch) => (
-                <option key={ch.name}>{ch.name}</option>
-              ))}
-            </select>
-          )}
-        </div>
-      );
-    if (L.phase === "playing")
-      return (
-        <div className="pl" key={id}>
-          <Avatar id={id} />
-          <div>
-            <b>{pname(id)}</b>
-            <div className="rt">Rating {rating(c, id)}</div>
-          </div>
-          <span className="champ">
-            {champ && <ChampAvatar name={champ} size={24} sq />}
-            {champ ?? "–"}
-          </span>
-        </div>
-      );
-    return (
-      <div className="pl" key={id}>
-        {champ ? <ChampAvatar name={champ} /> : <Avatar id={id} />}
-        <div>
-          <b>{pname(id)}</b>
-          <div className="rt">{champ ?? "No champion"}</div>
-        </div>
-        <span />
-        {isMember && (
-          <div className="kda">
-            {(["kills", "deaths", "assists"] as const).map((k) => (
-              <label key={k}>
-                {k[0].toUpperCase() + k.slice(1)}
-                <input
-                  type="number"
-                  min={0}
-                  max={99}
-                  inputMode="numeric"
-                  value={s[k] ?? ""}
-                  onChange={(e) => {
-                    const v = e.target.value === "" ? undefined : Math.max(0, Math.min(99, Math.floor(+e.target.value) || 0));
-                    setStat(id, { [k]: v });
-                  }}
-                />
-              </label>
-            ))}
-          </div>
-        )}
-      </div>
-    );
-  };
-
-  const side = (ids: string[], k: Side) => (
-    <div className={`side ${k === "blue" ? "b" : "r"}`}>
-      <h3>
-        {k === "blue" ? "Blue side" : "Red side"}
-        {L.phase === "select" ? pips(k) : <small title="Average Elo of the players in this team">Team Elo {teamAvg(c, ids)}</small>}
-      </h3>
-      {ids.map(row)}
-    </div>
-  );
-
-  const all = [...L.blue, ...L.red];
-  const picked = all.filter((id) => L.stats[id]?.champion).length;
-  const showChallenge = data.settings.challengesEnabled || !!L.challenge;
+  const { data } = useData();
+  const now = useNow(1000);
+  const f = showFeed(data.feed, now) ? data.feed : null;
+  const at = f ? STEPS.findIndex(([s]) => s.includes(f.status)) : -1;
 
   return (
     <section>
       <div className="head">
         <div>
-          <h1>{L.phase === "select" ? "Champ select" : L.phase === "playing" ? "Game in progress" : "Enter the result"}</h1>
-          {steps}
+          <h1>{f ? TITLE[f.status] : "Live game"}</h1>
+          <ol className="steps" aria-label="Game status">
+            {STEPS.map(([, label], k) => (
+              <li key={label} className={k === at ? "on" : k < at ? "done" : ""} aria-current={k === at ? "step" : undefined}>
+                <em>{k < at ? <Check aria-label="done" /> : k + 1}</em>
+                {label}
+              </li>
+            ))}
+          </ol>
         </div>
-        {L.phase === "playing" && L.startedAt && <Timer from={L.startedAt} />}
+        {f && <Clock f={f} now={now} />}
       </div>
-      <RuleInfo inGame />
-      {showChallenge &&
-        (L.challenge ? (
-          <div className="info">
-            <Dices aria-hidden />
-            <div>
-              Challenge this game: <b>{L.challenge}</b>
-            </div>
-            {L.phase === "select" && isMember && (
-              <div className="acts2">
-                <button className="btn sm ghost" type="button" onClick={spin}>
-                  Spin again
-                </button>
-                <button className="btn sm ghost" type="button" onClick={() => set({ challenge: undefined })}>
-                  Remove
-                </button>
-              </div>
-            )}
-          </div>
-        ) : (
-          L.phase === "select" &&
-          isMember && (
-            <button className="linkbtn" type="button" onClick={spin}>
-              <Dices aria-hidden />
-              Spin a random challenge (optional)
-            </button>
-          )
-        ))}
-      <div className="board">
-        {side(L.blue, "blue")}
-        <div className="vs">VS</div>
-        {side(L.red, "red")}
-      </div>
-      {L.sitOut.length > 0 && <p className="sit">Sitting out: {L.sitOut.map(pname).join(", ")}</p>}
-      {L.dodgeLog.length > 0 && (
-        <p className="sit" data-testid="dodgelog">
-          {L.dodgeLog.map((d) => `${pname(d.playerId)} dodged${d.champion ? ` ${d.champion}` : ""}`).join(" · ")}
-        </p>
-      )}
-      {isMember ? (
-        <div className="win">
-          {L.phase === "select" && (
-            <>
-              <button className="btn pri" type="button" onClick={() => set({ phase: "playing", startedAt: Date.now() })}>
-                {picked < all.length ? `Start game (${picked}/${all.length} picked)` : "All locked in, start game"}
-              </button>
-              <button className="btn ghost" type="button" onClick={cancel}>
-                Cancel game
-              </button>
-            </>
-          )}
-          {L.phase === "playing" && (
-            <>
-              <button
-                className="btn pri"
-                type="button"
-                onClick={() =>
-                  set({ phase: "result", durationMin: Math.max(1, Math.round((Date.now() - (L.startedAt ?? Date.now())) / 6e4)) })
-                }
-              >
-                Game over, enter result
-              </button>
-              <button className="btn ghost" type="button" onClick={() => set({ phase: "select" })}>
-                Back to champ select
-              </button>
-            </>
-          )}
-          {L.phase === "result" && (
-            <>
-              <button className="btn blue" type="button" disabled={saving} onClick={() => finish("blue")}>
-                Blue won
-              </button>
-              <button className="btn red" type="button" disabled={saving} onClick={() => finish("red")}>
-                Red won
-              </button>
-            </>
-          )}
-        </div>
+      {f ? (
+        <Game f={f} now={now} />
       ) : (
-        <p className="note">You're watching live. Members fill in picks and results.</p>
+        <Empty title="No game running" text="Start a custom game in League. It shows up here on its own, as long as one player runs the helper app.">
+          <Link className="btn pri" to="/">
+            Make teams
+          </Link>
+          <Link className="btn ghost" to="/history">
+            Past games
+          </Link>
+        </Empty>
       )}
-      {L.phase === "result" && isMember && (
-        <label style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 12 }}>
-          <input
-            type="checkbox"
-            checked={!!L.surrender}
-            onChange={(e) => set({ surrender: e.target.checked ? "ff" : undefined })}
-          />
-          <span>The losing team surrendered (FF)</span>
-        </label>
-      )}
-      {L.phase === "result" && isMember && (
-        <p className="note">
-          K/D/A is optional. Leave it empty if you didn't check the scoreboard. <button className="linkbtn" style={{ margin: 0, minHeight: 0 }} type="button" onClick={() => set({ phase: "playing" })}>Back to the game</button>
-        </p>
+      {SimPanel && (
+        <Suspense fallback={null}>
+          <SimPanel />
+        </Suspense>
       )}
     </section>
+  );
+}
+
+function Clock({ f, now }: { f: LiveFeed; now: number }) {
+  const where = [f.mode, f.map].filter(Boolean).join(" · ");
+  const sec = f.status === "playing" ? clockOf(f, now) : f.status === "ended" ? f.end?.durationSec : undefined;
+  return (
+    <div className="gameclock">
+      {sec != null && (
+        <div className="timer" role="timer" aria-label={f.status === "ended" ? "Game length" : "Game time"}>
+          {mmss(sec * 1000)}
+        </div>
+      )}
+      {f.status === "loading" && <span className="sub">Loading screen</span>}
+      {where && <span className="sub">{where}</span>}
+    </div>
+  );
+}
+
+function Game({ f, now }: { f: LiveFeed; now: number }) {
+  const ended = f.status === "ended";
+  const winner = f.choice === "blue" || f.choice === "red" ? f.choice : f.end?.winner;
+  const augments = hasAugments(f.mode, f.players);
+  const pending = augments && !f.players.some((p) => p.augments?.length) && !f.end?.aborted && now - (f.end?.at ?? now) < RECENT_MS;
+  return (
+    <>
+      {isStale(f, now) && (
+        <div className="info warn" role="status">
+          <WifiOff aria-hidden />
+          <div>
+            No updates since <b>{fmtTime(f.updatedAt)}</b>. The player running the helper may have left or closed League.
+          </div>
+        </div>
+      )}
+      {ended && <Outcome f={f} now={now} winner={winner} />}
+      <GameBoard players={f.players} finished={ended} winner={ended ? winner : undefined} augments={augments} augmentsPending={ended && pending} />
+      {f.status === "select" && <p className="note">Champions show up on the loading screen, when both teams can see them.</p>}
+      {ended && f.savedAs && (
+        <p className="sit">
+          Saved in <Link to={`/history?game=${encodeURIComponent(f.savedAs)}`}>Past games</Link>.
+        </p>
+      )}
+      {f.status === "playing" && <Log f={f} />}
+    </>
+  );
+}
+
+function Outcome({ f, now, winner }: { f: LiveFeed; now: number; winner?: Side }) {
+  const { store } = useData();
+  const { isMember } = useAuth();
+  const toast = useToast();
+  const confirm = useConfirm();
+  const [busy, setBusy] = useState(false);
+
+  const decide = async (choice: Side | "skip") => {
+    if (choice === "skip" && !(await confirm({ title: "Don't count this game?", text: "It won't be in Past games or Stats.", yes: "Don't count it" }))) return;
+    setBusy(true);
+    try {
+      await store.decideFeed(f.id, choice);
+      toast(choice === "skip" ? "Game not counted" : `${choice === "blue" ? "Blue" : "Red"} side win saved`);
+    } catch (e) {
+      toast(e instanceof Error ? e.message : "Could not save the result", { err: true });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  if (winner) {
+    const why = f.choice ? "" : endText(winner, f.end?.reason);
+    return (
+      <div className={`outcome ${winner === "blue" ? "b" : "r"}`} role="status">
+        <Crown aria-hidden />
+        <div>
+          <b>{winner === "blue" ? "Blue" : "Red"} side won</b>
+          <span>{why || (f.choice ? "Result entered by a member" : "How it ended is not known yet")}</span>
+        </div>
+      </div>
+    );
+  }
+  if (waitingForResult(f, now))
+    return (
+      <div className="info" role="status">
+        <Hourglass aria-hidden />
+        <div>The game is over. Waiting for the result from League.</div>
+      </div>
+    );
+  return (
+    <div className="info warn" role="status">
+      <Hourglass aria-hidden />
+      <div>
+        <b>Ended, no result.</b> League didn't name a winner.{isMember ? " Who won?" : " A member can enter it."}
+      </div>
+      {isMember && needsWinner(f, now) && (
+        <div className="acts2">
+          <button className="btn sm blue" type="button" disabled={busy} onClick={() => void decide("blue")}>
+            Blue won
+          </button>
+          <button className="btn sm red" type="button" disabled={busy} onClick={() => void decide("red")}>
+            Red won
+          </button>
+          <button className="btn sm ghost" type="button" disabled={busy} onClick={() => void decide("skip")}>
+            Don't count
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function Log({ f }: { f: LiveFeed }) {
+  const name = usePlayerName();
+  const by = new Map(f.players.map((p) => [p.key, p]));
+  const label = (key?: string) => {
+    const p = key ? by.get(key) : undefined;
+    return name(p);
+  };
+  const sideOf = (key?: string) => (key ? by.get(key)?.side : undefined);
+  const list = f.events.slice(-30).reverse();
+  return (
+    <div className="panel gamelog">
+      <h2>Log</h2>
+      {list.length ? (
+        <ol>
+          {list.map((e) => {
+            const s = e.type === "ace" ? e.side : sideOf(e.by);
+            return (
+              <Fragment key={e.id}>
+                <li className={s === "blue" ? "b" : s === "red" ? "r" : ""}>
+                  <time>{mmss(e.time * 1000)}</time>
+                  <span>{eventText(e, label)}</span>
+                </li>
+              </Fragment>
+            );
+          })}
+        </ol>
+      ) : (
+        <p className="sub">Nothing has happened yet.</p>
+      )}
+    </div>
   );
 }

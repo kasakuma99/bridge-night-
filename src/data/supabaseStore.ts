@@ -1,5 +1,5 @@
 import type { PostgrestError, RealtimeChannel, SupabaseClient } from "@supabase/supabase-js";
-import type { AppData, DodgeEntry, LiveGame, Match, ParticipantStats, Player, Settings, Side, TeamSize } from "../lib/types";
+import type { AppData, DodgeEntry, EndReason, FeedPlayer, LiveFeed, LiveGame, Match, ParticipantStats, Player, Settings, Side, TeamSize } from "../lib/types";
 import { DEFAULT_SETTINGS } from "../lib/types";
 import { type DataStore, type StoreState, StoreError, validName } from "./store";
 
@@ -9,14 +9,17 @@ interface RiotRow { player_id: string; riot_id: string }
 interface MatchRow {
   id: string; played_at: string; mode: number; winner: Side; sit_out: string[]; challenge: string | null;
   duration_min: number | null; game_id: string | null; live_id: string | null; surrender: "ff" | "early" | null;
+  end_reason: EndReason | null; duration_sec: number | null; guests: FeedPlayer[] | null; game_mode: string | null; map: string | null;
 }
 interface PartRow {
   match_id: string; player_id: string; team: Side; slot: number; champion: string | null; kills: number | null;
   deaths: number | null; assists: number | null; items: number[] | null; damage: number | null;
+  level: number | null; spells: number[] | null; augments: number[] | null;
 }
 interface DodgeRow { match_id: string; player_id: string | null; side: Side; champion: string; at: string }
 interface SettingsRow {
   dodge_hours: number | string; dodges_per_team: number; reroll_limit: number; challenges_enabled: boolean; discord_url: string;
+  save_live_games: boolean;
 }
 
 const ms = (t: string) => new Date(t).getTime();
@@ -50,22 +53,47 @@ export class SupabaseStore implements DataStore {
   /** live game writes are queued so they reach the database in order */
   private liveQueue: Promise<unknown> = Promise.resolve();
   private pendingLive = 0;
+  private allowed = false;
 
   constructor(private sb: SupabaseClient) {
-    void this.refresh();
-    this.channel = sb
-      .channel("bn-data")
-      .on("postgres_changes", { event: "*", schema: "public" }, () => this.soon())
-      .subscribe((s) => {
-        // After a reconnect, catch up on anything we missed.
-        if (s === "SUBSCRIBED" && this.state.status === "ready") this.soon();
-      });
     if (typeof document !== "undefined")
       document.addEventListener("visibilitychange", () => document.visibilityState === "visible" && this.soon());
     // Riot IDs become visible / hidden when someone logs in or out.
     sb.auth.onAuthStateChange((ev) => {
       if (ev === "SIGNED_IN" || ev === "SIGNED_OUT" || ev === "USER_UPDATED") this.soon(0);
     });
+  }
+
+  setAccess(allowed: boolean) {
+    if (allowed === this.allowed) return;
+    this.allowed = allowed;
+    if (this.channel) void this.sb.removeChannel(this.channel);
+    this.channel = null;
+    if (!allowed) {
+      clearTimeout(this.timer);
+      this.set({ status: "loading", data: { players: [], matches: [], live: null, settings: { ...DEFAULT_SETTINGS } } });
+      return;
+    }
+    void this.refresh();
+    this.channel = this.sb
+      .channel("bn-data")
+      .on("postgres_changes", { event: "*", schema: "public" }, (p) => {
+        // The live game changes every few seconds: take it as it comes instead of loading everything again.
+        if (p.table === "live_feed") this.showFeed(p.eventType === "DELETE" ? null : ((p.new as { data?: LiveFeed }).data ?? null));
+        else this.soon();
+      })
+      .subscribe((s) => {
+        // After a reconnect, catch up on anything we missed.
+        if (s === "SUBSCRIBED" && this.state.status === "ready") this.soon();
+      });
+  }
+
+  private showFeed(feed: LiveFeed | null) {
+    if (!this.allowed || this.state.status !== "ready") return;
+    const was = this.state.data.feed;
+    this.set({ ...this.state, data: { ...this.state.data, feed } });
+    // A game was just saved: Past games and Stats need it.
+    if (feed?.savedAs && feed.savedAs !== was?.savedAs) this.soon();
   }
 
   private set(s: StoreState) {
@@ -79,6 +107,7 @@ export class SupabaseStore implements DataStore {
   getState = () => this.state;
 
   private soon(delay = 150) {
+    if (!this.allowed) return;
     clearTimeout(this.timer);
     this.timer = setTimeout(() => void this.refresh(), delay);
   }
@@ -95,31 +124,44 @@ export class SupabaseStore implements DataStore {
 
   /** Loads everything. Ratings, streaks etc. are calculated from this by the site. */
   refresh(): Promise<void> {
+    if (!this.allowed) return Promise.resolve();
     if (this.loading) {
       this.again = true;
       return this.loading;
     }
     this.loading = (async () => {
       try {
-        const [players, riot, matches, parts, dodges, live, settings] = await Promise.all([
+        const [players, riot, matches, parts, dodges, live, settings, feed] = await Promise.all([
           this.all<PlayerRow>("players", "id,name,active,created_at", "created_at"),
           // Riot IDs are members-only: visitors are refused (on purpose), so treat that as "no Riot IDs".
           this.all<RiotRow>("player_riot_ids", "player_id,riot_id", "player_id").catch(() => [] as RiotRow[]),
-          this.all<MatchRow>("matches", "id,played_at,mode,winner,sit_out,challenge,duration_min,game_id,live_id,surrender", "played_at"),
-          this.all<PartRow>("match_participants", "match_id,player_id,team,slot,champion,kills,deaths,assists,items,damage", "match_id"),
+          this.all<MatchRow>("matches", "id,played_at,mode,winner,sit_out,challenge,duration_min,game_id,live_id,surrender,end_reason,duration_sec,guests,game_mode,map", "played_at"),
+          this.all<PartRow>("match_participants", "match_id,player_id,team,slot,champion,kills,deaths,assists,items,damage,level,spells,augments", "match_id"),
           this.all<DodgeRow>("dodge_log", "match_id,player_id,side,champion,at", "at"),
           this.sb.from("live_game").select("data").maybeSingle(),
           this.sb.from("settings").select("*").eq("id", 1).maybeSingle(),
+          this.sb.from("live_feed").select("data").maybeSingle(),
         ]);
         if (live.error) throw live.error;
         if (settings.error) throw settings.error;
-        const data = this.build(players, riot, matches, parts, dodges, live.data?.data ?? null, settings.data as SettingsRow | null);
+        if (feed.error) throw feed.error;
+        const conf = settings.data as SettingsRow | null;
+        // Until the release, games from League only count as a test.
+        const tests = conf?.save_live_games === false ? await this.all<{ data: Match }>("test_games", "data", "created_at") : [];
+        if (!this.allowed) return;
+        const data = this.build(players, riot, matches, parts, dodges, live.data?.data ?? null, conf);
+        const known = new Set(data.matches.map((m) => m.gameId));
+        for (const t of tests) if (!known.has(t.data.gameId)) data.matches.push(t.data);
+        // A newer look at the live game may have arrived while this was loading.
+        const now = this.state.data.feed;
+        const got = (feed.data?.data ?? null) as LiveFeed | null;
+        data.feed = now && got && now.id === got.id && now.updatedAt > got.updatedAt ? now : got;
         // Don't let a refresh overwrite a live-game change that is still on its way to the database.
         if (this.pendingLive) data.live = this.state.data.live;
         this.set({ status: "ready", data });
       } catch (e) {
         console.error("[bridge-night] loading data failed", e);
-        if (this.state.status !== "ready")
+        if (this.allowed && this.state.status !== "ready")
           this.set({ ...this.state, status: "error", error: "Could not load the data. Check your connection and reload." });
       } finally {
         this.loading = null;
@@ -160,6 +202,9 @@ export class SupabaseStore implements DataStore {
           if (p.assists != null) st.assists = p.assists;
           if (p.items) st.items = p.items;
           if (p.damage != null) st.damage = p.damage;
+          if (p.level != null) st.level = p.level;
+          if (p.spells) st.spells = p.spells;
+          if (p.augments) st.augments = p.augments;
           stats[p.player_id] = st;
         }
         return {
@@ -177,6 +222,11 @@ export class SupabaseStore implements DataStore {
           ...(m.game_id ? { gameId: m.game_id } : {}),
           ...(m.live_id ? { liveId: m.live_id } : {}),
           ...(m.surrender ? { surrender: m.surrender } : {}),
+          ...(m.end_reason ? { end: m.end_reason } : {}),
+          ...(m.duration_sec ? { durationSec: m.duration_sec } : {}),
+          ...(m.guests?.length ? { guests: m.guests } : {}),
+          ...(m.game_mode ? { gameMode: m.game_mode } : {}),
+          ...(m.map ? { map: m.map } : {}),
         };
       }),
       live,
@@ -281,6 +331,26 @@ export class SupabaseStore implements DataStore {
     return job;
   }
 
+  // Only the helper app sends the live game, through the "live" function.
+  async setFeed() {
+    throw new StoreError("The live game comes from the helper app");
+  }
+
+  async decideFeed(feedId: string, choice: Side | "skip") {
+    const { error } = await this.sb.functions.invoke("live", { body: { type: "decide", feedId, choice } });
+    if (error) {
+      const res = (error as { context?: unknown }).context;
+      const body = res instanceof Response ? ((await res.json().catch(() => null)) as { note?: string } | null) : null;
+      throw res instanceof Response && body?.note && res.status < 500 ? new StoreError(body.note) : friendly(error as Error, "Could not save the result");
+    }
+    await this.refresh();
+  }
+
+  /** Games from before the release are only tests: they can't be changed, and go away then. */
+  private real(matchId: string) {
+    if (/^g/.test(matchId)) throw new StoreError("This is a test game. Test games disappear at the release.");
+  }
+
   async saveResult(liveId: string, winner: Side) {
     await this.liveQueue; // make sure the last picks / K/D/A reached the database first
     const id = (await this.run(this.sb.rpc("save_live_result", { p_live_id: liveId, p_winner: winner }), "Could not save the result")) as
@@ -292,6 +362,7 @@ export class SupabaseStore implements DataStore {
   }
 
   async flipWinner(matchId: string) {
+    this.real(matchId);
     const m = this.state.data.matches.find((x) => x.id === matchId);
     if (!m) return;
     await this.run(
@@ -302,6 +373,7 @@ export class SupabaseStore implements DataStore {
   }
 
   async deleteMatch(matchId: string) {
+    this.real(matchId);
     await this.run(this.sb.from("matches").delete().eq("id", matchId), "Could not delete the game");
     await this.refresh();
   }
