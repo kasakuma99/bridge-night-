@@ -35,34 +35,47 @@ export const useToast = () => useContext(ToastCtx);
 
 /* ---------- confirm dialog ---------- */
 
+interface Choice {
+  value: string;
+  label: string;
+  kind?: "pri" | "red";
+}
 interface Ask {
+  title: string;
+  text: string;
+  choices: Choice[];
+  resolve: (value: string | null) => void;
+}
+interface Confirm {
   title: string;
   text: string;
   yes: string;
   danger?: boolean;
-  resolve: (ok: boolean) => void;
 }
-const ConfirmCtx = createContext<(o: Omit<Ask, "resolve">) => Promise<boolean>>(async () => false);
+type Choose = (o: Omit<Ask, "resolve">) => Promise<string | null>;
+const ChooseCtx = createContext<Choose>(async () => null);
 
 export function ConfirmProvider({ children }: { children: ReactNode }) {
   const [ask, setAsk] = useState<Ask | null>(null);
   const ref = useRef<HTMLDialogElement>(null);
-  const confirm = useCallback(
-    (o: Omit<Ask, "resolve">) => new Promise<boolean>((resolve) => setAsk({ ...o, resolve })),
-    [],
-  );
+  const choose = useCallback<Choose>((o) => new Promise((resolve) => setAsk({ ...o, resolve })), []);
   useEffect(() => {
     const d = ref.current;
     if (!d) return;
     if (ask && !d.open) d.showModal();
     if (!ask && d.open) d.close();
   }, [ask]);
-  const done = (ok: boolean) => {
-    ask?.resolve(ok);
+  const done = (value: string | null) => {
+    ask?.resolve(value);
     setAsk(null);
   };
+  const cancel = (
+    <button className="btn ghost" type="button" autoFocus onClick={() => done(null)}>
+      Cancel
+    </button>
+  );
   return (
-    <ConfirmCtx.Provider value={confirm}>
+    <ChooseCtx.Provider value={choose}>
       {children}
       <dialog
         ref={ref}
@@ -71,10 +84,10 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
         aria-describedby="dlg-d"
         onCancel={(e) => {
           e.preventDefault();
-          done(false);
+          done(null);
         }}
         onClick={(e) => {
-          if (e.target === e.currentTarget) done(false);
+          if (e.target === e.currentTarget) done(null);
         }}
       >
         {ask && (
@@ -84,20 +97,33 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
               {ask.text}
             </p>
             <div className="win">
-              <button className="btn ghost" type="button" autoFocus onClick={() => done(false)}>
-                Cancel
-              </button>
-              <button className={`btn ${ask.danger === false ? "pri" : "red"}`} type="button" onClick={() => done(true)}>
-                {ask.yes}
-              </button>
+              {ask.choices.length < 2 && cancel}
+              {ask.choices.map((c) => (
+                <button key={c.value} className={`btn ${c.kind ?? ""}`} type="button" onClick={() => done(c.value)}>
+                  {c.label}
+                </button>
+              ))}
+              {ask.choices.length >= 2 && cancel}
             </div>
           </div>
         )}
       </dialog>
-    </ConfirmCtx.Provider>
+    </ChooseCtx.Provider>
   );
 }
-export const useConfirm = () => useContext(ConfirmCtx);
+/** Several options. Resolves to the chosen value, or null when cancelled. */
+export const useChoose = () => useContext(ChooseCtx);
+
+/** Yes or cancel. */
+export function useConfirm() {
+  const choose = useChoose();
+  return useCallback(
+    async (o: Confirm) =>
+      (await choose({ title: o.title, text: o.text, choices: [{ value: "yes", label: o.yes, kind: o.danger === false ? "pri" : "red" }] })) ===
+      "yes",
+    [choose],
+  );
+}
 
 /* ---------- avatars & icons ---------- */
 

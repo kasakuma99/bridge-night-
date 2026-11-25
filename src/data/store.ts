@@ -33,7 +33,7 @@ export interface DataStore {
 
 export class StoreError extends Error {}
 
-const KEY = "bn-data-v1";
+const KEY = "bn-data-v2";
 const NAME_MAX = 20;
 
 export function validName(name: string, players: Player[], selfId?: string) {

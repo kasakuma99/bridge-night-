@@ -5,6 +5,7 @@ import {
   byWins,
   fmtPoints,
   pointsLabel,
+  pointsOf,
   shownPoints,
   usedRerollLimit,
   usedTeamStyle,
@@ -21,7 +22,7 @@ describe("feature flags", () => {
   it("everything extra is off", () => {
     expect(Object.values(FEATURES).every((v) => v === false)).toBe(true);
     expect(Object.keys(FEATURES).sort()).toEqual(
-      ["bounties", "builds", "challenges", "dodges", "ratings", "rerollLimit", "rivals", "teamModes"],
+      ["bounties", "builds", "challenges", "classicTeams", "dodges", "ratings", "rerollLimit", "rivals", "teamModes"],
     );
   });
 
@@ -57,8 +58,10 @@ describe("Papi Points", () => {
     for (const r of [0, 987, 1000, 1432]) {
       expect(shownPoints(r, OFF)).toBe("1,000");
       expect(pointsLabel(r, OFF)).toBe("1,000 Papi Points");
+      expect(pointsOf(r, OFF)).toBe(1000);
     }
     expect(shownPoints(987, ON)).toBe("987");
+    expect(pointsOf(987, ON)).toBe(987);
     expect(pointsLabel(987, ON)).toBe("Rating 987");
   });
 

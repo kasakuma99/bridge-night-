@@ -1,5 +1,5 @@
 export type Side = "blue" | "red";
-export type TeamSize = 1 | 2 | 3 | 4;
+export type TeamSize = 1 | 2 | 3 | 4 | 5;
 export type TeamStyle = "random" | "balanced" | "captains";
 
 export interface Player {
@@ -69,6 +69,8 @@ export interface LiveGame {
   red: string[];
   sitOut: string[];
   captains?: CaptainDraft;
+  /** How the teams were made (for rerolls). */
+  style?: TeamStyle;
   stats: Record<string, ParticipantStats>;
   dodgeLog: DodgeEntry[];
   challenge?: string;

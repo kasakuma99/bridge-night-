@@ -4,6 +4,7 @@ import { useAuth, useData } from "../data/context";
 import { Empty, ItemIcon, useConfirm, useToast } from "../components/ui";
 import { FEATURES } from "../lib/features";
 import { hasKda } from "../lib/stats";
+import { TEAM_SIZES } from "../lib/teams";
 import type { Match, Side } from "../lib/types";
 import { DAY, dayKey, fmtDayLong, fmtTime, plural } from "../lib/util";
 
@@ -118,7 +119,7 @@ export default function History() {
           </select>
           <select className="f" aria-label="Filter by mode" value={fm} onChange={(e) => (setFm(e.target.value), setShown(20))}>
             <option value="">All modes</option>
-            {[1, 2, 3, 4].map((k) => (
+            {TEAM_SIZES.map((k) => (
               <option key={k} value={k}>
                 {k}v{k}
               </option>
@@ -151,10 +152,10 @@ export default function History() {
             return (
               <div key={m.id}>
                 {head}
-                <article className="match" aria-label={`${m.mode}v${m.mode} at ${fmtTime(m.playedAt)}, ${m.winner} won`}>
+                <article className="match" aria-label={`${m.blue.length}v${m.red.length} at ${fmtTime(m.playedAt)}, ${m.winner} won`}>
                   <div className="when">
                     <b>{fmtTime(m.playedAt)}</b>
-                    {m.mode}v{m.mode}
+                    {m.blue.length}v{m.red.length}
                     {m.durationMin ? ` · ${m.durationMin} min` : ""}
                   </div>
                   {team(m, "blue")}

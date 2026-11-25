@@ -14,6 +14,7 @@ import { ConfirmProvider, ToastProvider } from "./components/ui";
 import { Layout } from "./components/Layout";
 import { FEATURES } from "./lib/features";
 import Teams from "./pages/Teams";
+import TeamsClassic from "./pages/TeamsClassic";
 import Live from "./pages/Live";
 import History from "./pages/History";
 import Stats from "./pages/Stats";
@@ -34,7 +35,7 @@ createRoot(document.getElementById("root")!).render(
                 <ConfirmProvider>
                   <Routes>
                     <Route element={<Layout />}>
-                      <Route index element={<Teams />} />
+                      <Route index element={FEATURES.classicTeams ? <TeamsClassic /> : <Teams />} />
                       <Route path="live" element={<Live />} />
                       <Route path="history" element={<History />} />
                       <Route path="stats" element={<Stats />} />
