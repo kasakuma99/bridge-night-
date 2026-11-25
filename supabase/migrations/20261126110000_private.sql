@@ -1,7 +1,5 @@
--- RELEASE DAY ONLY. Run this together with the merge to main, after a backup.
--- It makes the data private, so the site that was live before stops working for visitors.
--- It is not in supabase/migrations/ on purpose: nothing may apply it earlier by accident.
--- On release day it moves to supabase/migrations/ with a new timestamp.
+-- The release: the data is private, only admins edit games, and games from the helper are saved.
+-- Applied after the new site is live (docs/release.md). supabase/release/undo.sql is the way back.
 
 /* ------------------------------------- only approved members read anything */
 

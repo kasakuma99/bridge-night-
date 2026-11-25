@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "dev:sample": "vite --mode sample",
+    "check:private": "node scripts/check-private.mjs",
     "dev:db": "vite --mode production --port 5173 --strictPort",
     "dev:live": "node scripts/dev-live.mjs",
     "build": "tsc -b && vite build",
@@ -31,6 +32,7 @@
     "@types/react": "^19.3.2",
     "@types/react-dom": "^19.3.0",
     "@vitejs/plugin-react": "^6.3.0",
+    "playwright-core": "1.65.0",
     "supabase": "^3.4.0",
     "tailwindcss": "^4.3.5",
     "typescript": "^7.0.2",

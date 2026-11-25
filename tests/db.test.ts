@@ -26,6 +26,8 @@ const P = (n: number) => `10000000-0000-4000-8000-00000000000${n}`;
 const [ADMIN, MEMBER, PENDING, ADMIN2, GHOST] = [1, 2, 3, 4, 5].map(U);
 const NAMES = ["Tosh", "Samu", "Lenny", "Artur", "Philip", "Nick"];
 
+const PRIVATE = "20261126110000_private.sql";
+
 let db: PGlite;
 const one = async <T = Record<string, unknown>>(sql: string, args: unknown[] = []) => (await db.query<T>(sql, args)).rows[0];
 
@@ -62,7 +64,8 @@ beforeAll(async () => {
   }
   await db.query("insert into public.matches (id, mode, winner) values ($1, 1, 'blue')", [U(9)]);
   await db.query("insert into public.match_participants (match_id, player_id, team) values ($1, $2, 'blue'), ($1, $3, 'red')", [U(9), P(0), P(1)]);
-  for (const f of files.filter((x) => x >= "20261126")) await db.exec(readFileSync(`supabase/migrations/${f}`, "utf8"));
+  // The private part follows below.
+  for (const f of files.filter((x) => x >= "20261126" && x !== PRIVATE)) await db.exec(readFileSync(`supabase/migrations/${f}`, "utf8"));
 }, 60_000);
 
 /* The database part of the live Edge Function. */
@@ -222,7 +225,7 @@ describe("after the release: private", () => {
   beforeAll(async () => {
     await db.query("insert into public.test_games (game_id, data) values ('1', '{}')");
     await db.query("insert into public.helper_tokens (name, token_hash, created_by) values ('old', 'x', null), ('mine', 'y', $1)", [MEMBER]);
-    await db.exec(readFileSync("supabase/release/private.sql", "utf8"));
+    await db.exec(readFileSync(`supabase/migrations/${PRIVATE}`, "utf8"));
   }, 60_000);
 
   const TABLES = ["players", "player_riot_ids", "matches", "match_participants", "dodge_log", "live_game", "live_feed", "settings", "test_games", "pending_results", "members", "helper_tokens"];
@@ -289,6 +292,21 @@ describe("after the release: private", () => {
     expect((await db.query("select name from public.helper_tokens")).rows).toEqual([{ name: "mine" }]);
     await db.query("delete from auth.users where id = $1", [MEMBER]);
     expect((await db.query("select name from public.helper_tokens")).rows).toEqual([]);
+  });
+
+  it("undo.sql brings back what the old site needs, and can run twice", async () => {
+    const undo = readFileSync("supabase/release/undo.sql", "utf8");
+    await db.exec(undo);
+    await db.exec(undo);
+    for (const t of ["players", "matches", "match_participants", "settings"]) expect((await as("anon", `select * from public.${t}`)).length).toBeGreaterThan(0);
+    for (const t of ["live_feed", "live_state", "test_games", "members", "helper_tokens", "player_riot_ids"]) await refused(as("anon", `select ${COLS[t] ?? "*"} from public.${t}`));
+    await as(ADMIN2, "update public.matches set winner = 'red' where id = $1", [U(9)]);
+    expect((await one<{ winner: string }>("select winner from public.matches where id = $1", [U(9)]))!.winner).toBe("red");
+    await as(PENDING, "delete from public.matches");
+    await as(PENDING, "update public.matches set winner = 'blue'");
+    expect((await one<{ winner: string }>("select winner from public.matches where id = $1", [U(9)]))!.winner).toBe("red");
+    await as(ADMIN, "delete from public.members where user_id = $1", [PENDING]);
+    expect((await db.query("select 1 from public.members where user_id = $1", [PENDING])).rows).toEqual([]);
   });
 
   it("a backup brings everything back, with links, guests and 5v5", async () => {
