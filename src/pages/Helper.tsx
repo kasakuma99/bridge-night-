@@ -126,7 +126,7 @@ export default function Helper() {
           <li>
             <Swords aria-hidden />
             <span>
-              <b>Champ select:</b> both teams' picks appear on the <Link to="/live">Live</Link> page automatically.
+              <b>Fair play:</b> during champ select the <Link to="/live">Live</Link> page only shows who plays on which side. Champions appear when the game loads, like on the loading screen.
             </span>
           </li>
           <li>
@@ -229,8 +229,8 @@ export default function Helper() {
             title="Play"
             text={
               <>
-                Leave it running (BN icon next to the clock). It only does something in custom games: picks show on the{" "}
-                <Link to="/live">Live</Link> page, the result is sent after the game.
+                Leave it running (BN icon next to the clock). It only does something in custom games: champions show on the{" "}
+                <Link to="/live">Live</Link> page when the game loads, the result is sent after the game.
               </>
             }
             path={["BN tray icon", "Custom game"]}
