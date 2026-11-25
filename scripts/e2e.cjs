@@ -208,7 +208,7 @@ const step = (s) => console.log(`\n${s}`);
   step("Stats");
   await p.goto(BASE + "/stats");
   ok(/has the most wins in the last 30 days/.test(await p.locator("h1").textContent()), "30-day title");
-  ok((await p.locator(".lbhead").textContent()).includes("Wins"), "sorted by wins");
+  ok((await p.locator(".lbhead").textContent()).includes("Elo"), "ranked by Elo");
   await btn("All time").click();
   ok((await p.locator("h1").textContent()) === "Stats" && (await p.locator(".lbhead").textContent()).includes("Win rate"), "all-time view");
   const second = p.locator(".lbrow").nth(1);
