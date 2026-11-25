@@ -1,0 +1,39 @@
+# Builds the Windows helper from source and publishes it as a GitHub Release.
+# Runs when a tag like helper-v0.1.0 is pushed. Anyone can read this file and the source it builds.
+name: Helper release
+
+on:
+  push:
+    tags: ["helper-v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build with the C# compiler that ships with Windows
+        shell: pwsh
+        run: powershell -NoProfile -ExecutionPolicy Bypass -File helper/build.ps1
+
+      - name: Publish release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $hash = (Get-FileHash helper/dist/bridge-night-helper.exe -Algorithm SHA256).Hash.ToLower()
+          $notes = @"
+          Bridge Night Helper $($env:GITHUB_REF_NAME -replace '^helper-v','')
+
+          Built by GitHub Actions from the source in this repository (helper/BridgeNightHelper.cs).
+
+          **SHA-256:** ``$hash``
+
+          Check it in PowerShell:  ``Get-FileHash .\bridge-night-helper.exe``
+
+          The app is not code-signed, so Windows SmartScreen may say "unknown publisher". Click **More info** → **Run anyway** if the hash matches.
+          "@
+          gh release create $env:GITHUB_REF_NAME helper/dist/bridge-night-helper.exe helper/dist/bridge-night-helper.exe.sha256 --title "Helper $($env:GITHUB_REF_NAME -replace '^helper-v','v')" --notes $notes

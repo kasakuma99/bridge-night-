@@ -1,7 +1,49 @@
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { Download, ShieldCheck } from "lucide-react";
 
+export const REPO = "kasakuma99/bridge-night-";
+
+interface Release {
+  version: string;
+  url: string;
+  sha256: string | null;
+  date: string;
+  page: string;
+}
+
+/** Newest helper release from GitHub (public API, no key). */
+function useHelperRelease() {
+  const [state, setState] = useState<{ loading: boolean; release: Release | null }>({ loading: true, release: null });
+  useEffect(() => {
+    const ac = new AbortController();
+    fetch(`https://api.github.com/repos/${REPO}/releases?per_page=20`, { signal: ac.signal, headers: { Accept: "application/vnd.github+json" } })
+      .then((r) => (r.ok ? r.json() : []))
+      .then((list: { tag_name: string; html_url: string; published_at: string; body?: string; draft: boolean; assets: { name: string; browser_download_url: string; digest?: string }[] }[]) => {
+        const rel = list.find((r) => !r.draft && r.tag_name.startsWith("helper-v") && r.assets.some((a) => a.name === "bridge-night-helper.exe"));
+        if (!rel) return setState({ loading: false, release: null });
+        const exe = rel.assets.find((a) => a.name === "bridge-night-helper.exe")!;
+        const fromDigest = exe.digest?.startsWith("sha256:") ? exe.digest.slice(7) : null;
+        const fromNotes = rel.body?.match(/SHA-256:\*\*\s*`([0-9a-f]{64})`/i)?.[1] ?? null;
+        setState({
+          loading: false,
+          release: {
+            version: rel.tag_name.replace(/^helper-v/, ""),
+            url: exe.browser_download_url,
+            sha256: (fromDigest ?? fromNotes)?.toLowerCase() ?? null,
+            date: new Date(rel.published_at).toLocaleDateString("de-DE", { timeZone: "Europe/Berlin" }),
+            page: rel.html_url,
+          },
+        });
+      })
+      .catch(() => !ac.signal.aborted && setState({ loading: false, release: null }));
+    return () => ac.abort();
+  }, []);
+  return state;
+}
+
 export default function Helper() {
+  const { loading, release } = useHelperRelease();
   return (
     <section>
       <div className="head">
@@ -36,12 +78,44 @@ export default function Helper() {
           <h2>Who needs it</h2>
           <p className="sub">Just one player per game. If two people run it, the game is still only saved once.</p>
           <h2>Download</h2>
-          <p className="sub">The helper is coming soon. When it's ready, the download and its fingerprint (SHA-256) appear here.</p>
-          <div>
-            <button className="btn pri" type="button" disabled>
-              <Download aria-hidden /> Download (coming soon)
-            </button>
-          </div>
+          {release ? (
+            <>
+              <p className="sub">
+                Version {release.version}, published {release.date}.{" "}
+                <a href={release.page} target="_blank" rel="noopener noreferrer">
+                  Release notes on GitHub
+                </a>
+              </p>
+              <div>
+                <a className="btn pri" href={release.url}>
+                  <Download aria-hidden /> Download bridge-night-helper.exe
+                </a>
+              </div>
+              {release.sha256 && (
+                <p className="sub">
+                  SHA-256: <span style={{ wordBreak: "break-all" }}>{release.sha256}</span>
+                </p>
+              )}
+              <h2>Set it up</h2>
+              <ol>
+                <li>Download it and double-click it. If Windows says "unknown publisher", click More info, then Run anyway (see the right).</li>
+                <li>Ask an admin for a helper token (Players page, "Helper tokens").</li>
+                <li>Paste the token in the helper's window and click "Save and test connection".</li>
+                <li>Leave it running (icon next to the clock). It does its thing in custom games only.</li>
+              </ol>
+            </>
+          ) : (
+            <>
+              <p className="sub">
+                {loading ? "Looking for the latest version…" : "No release found right now. Try again later, or see the releases on GitHub."}
+              </p>
+              <div>
+                <a className="btn" href={`https://github.com/${REPO}/releases`} target="_blank" rel="noopener noreferrer">
+                  <Download aria-hidden /> Releases on GitHub
+                </a>
+              </div>
+            </>
+          )}
         </div>
         <div className="panel prose">
           <h2 style={{ display: "flex", gap: 10, alignItems: "center" }}>
