@@ -38,14 +38,14 @@ using System.Windows.Forms;
 [assembly: AssemblyTitle("Bridge Night Helper")]
 [assembly: AssemblyProduct("Bridge Night Helper")]
 [assembly: AssemblyDescription("Shows custom games on the Bridge Night site. Read-only towards League.")]
-[assembly: AssemblyVersion("0.6.0.0")]
-[assembly: AssemblyFileVersion("0.6.0.0")]
+[assembly: AssemblyVersion("0.7.0.0")]
+[assembly: AssemblyFileVersion("0.7.0.0")]
 
 namespace BridgeNight
 {
     static class Program
     {
-        public const string Version = "0.6.0";
+        public const string Version = "0.7.0";
         public const string DefaultServer = "https://kimgoxjydargqtbwolxz.supabase.co/functions/v1/live";
         /// Versions before 0.5 sent to this one. Settings that still have it move to the new one.
         public const string OldServer = "https://kimgoxjydargqtbwolxz.supabase.co/functions/v1/helper";
@@ -58,12 +58,21 @@ namespace BridgeNight
         public const string Title = "Bridge Night Helper";
 #endif
 
+        /// Set when this process was started by Updater after replacing the exe: the version it replaced.
+        public static string UpdatedFrom = "";
+
         [STAThread]
-        static void Main()
+        static void Main(string[] args)
         {
             bool created;
+            for (int i = 0; i + 1 < args.Length; i++) if (args[i] == "--updated-from") UpdatedFrom = args[i + 1];
             using (var mutex = new Mutex(true, Id + "-single-instance", out created))
             {
+                // After an update the old process may still be closing: wait for it instead of complaining.
+                if (!created && UpdatedFrom != "")
+                {
+                    try { created = mutex.WaitOne(15000); } catch (AbandonedMutexException) { created = true; }
+                }
                 if (!created)
                 {
                     MessageBox.Show(Title + " is already running. Look for its icon next to the clock.", Title);
@@ -85,6 +94,20 @@ namespace BridgeNight
         public string Server = Program.DefaultServer;
         public string Token = "";
         public bool Paused;
+        // 0.7 options (Settings page). Defaults keep the PC light: only what the user switches on runs.
+        public bool AutoUpdate = true;      // install new versions by itself (never during a game)
+        public bool LiveMeasure = true;     // Performance page measures while it is open
+        public int MeasureEvery = 5;        // seconds: 1, 5 or 10
+        public bool RecordLastGame = true;  // keep a light performance record of each custom game
+        public bool ResultAlerts = true;    // pop-up when a result is saved
+        public bool GameModeAuto = true;    // apply game mode when a game starts
+        public bool PowerPlanInGame = true; // high-performance power plan during games
+        public bool MusicQuieter = false;   // turn music apps down during games
+        public bool BreakReminder = false;  // remind after long sessions
+        public bool Hotkeys = true;         // Ctrl+Alt+M (mic) and Ctrl+Alt+H (output)
+        public bool MuteSound = true;       // short sound when muting/unmuting
+        public bool MutedBadge = true;      // small "Muted" badge on screen
+        public bool TourDone = false;       // first-start tour finished or skipped
 
         public static string Dir
         {
@@ -110,6 +133,20 @@ namespace BridgeNight
                 s.Server = Json.Str(d, "server") ?? Program.DefaultServer;
                 if (s.Server == Program.OldServer) s.Server = Program.DefaultServer;
                 s.Paused = Json.Bool(d, "paused") ?? false;
+                s.AutoUpdate = Json.Bool(d, "autoUpdate") ?? true;
+                s.LiveMeasure = Json.Bool(d, "liveMeasure") ?? true;
+                var every = Json.Long(d, "measureEvery") ?? 5;
+                s.MeasureEvery = every == 1 || every == 10 ? (int)every : 5;
+                s.RecordLastGame = Json.Bool(d, "recordLastGame") ?? true;
+                s.ResultAlerts = Json.Bool(d, "resultAlerts") ?? true;
+                s.GameModeAuto = Json.Bool(d, "gameModeAuto") ?? true;
+                s.PowerPlanInGame = Json.Bool(d, "powerPlanInGame") ?? true;
+                s.MusicQuieter = Json.Bool(d, "musicQuieter") ?? false;
+                s.BreakReminder = Json.Bool(d, "breakReminder") ?? false;
+                s.Hotkeys = Json.Bool(d, "hotkeys") ?? true;
+                s.MuteSound = Json.Bool(d, "muteSound") ?? true;
+                s.MutedBadge = Json.Bool(d, "mutedBadge") ?? true;
+                s.TourDone = Json.Bool(d, "tourDone") ?? false;
                 var enc = Json.Str(d, "token");
                 if (!string.IsNullOrEmpty(enc))
                 {
@@ -133,6 +170,19 @@ namespace BridgeNight
             d["server"] = Server;
             d["token"] = enc;
             d["paused"] = Paused;
+            d["autoUpdate"] = AutoUpdate;
+            d["liveMeasure"] = LiveMeasure;
+            d["measureEvery"] = MeasureEvery;
+            d["recordLastGame"] = RecordLastGame;
+            d["resultAlerts"] = ResultAlerts;
+            d["gameModeAuto"] = GameModeAuto;
+            d["powerPlanInGame"] = PowerPlanInGame;
+            d["musicQuieter"] = MusicQuieter;
+            d["breakReminder"] = BreakReminder;
+            d["hotkeys"] = Hotkeys;
+            d["muteSound"] = MuteSound;
+            d["mutedBadge"] = MutedBadge;
+            d["tourDone"] = TourDone;
             File.WriteAllText(FilePath, Json.Write(d), Encoding.UTF8);
         }
 
