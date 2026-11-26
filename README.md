@@ -22,9 +22,9 @@
 
 <br/><br/>
 
-<a href="https://github.com/kasakuma99/bridge-night-/releases"><img src="docs/images/release-0.6.0.png" alt="New version 0.6.0 of the helper: a brand-new window, sunset look and app icon, CPU and GPU gauges" width="100%" /></a>
+<img src="docs/images/release-0.7.0.png" alt="New version 0.7.0 of the helper, coming soon: a brand-new look, performance and network, instant replay and audio" width="100%" />
 
-<p><a href="https://github.com/kasakuma99/bridge-night-/releases"><b>Download helper 0.6.0 →</b></a></p>
+<p><b>Coming soon.</b> Until then, <a href="https://github.com/kasakuma99/bridge-night-/releases">helper 0.6.0</a> is the current download.</p>
 
 <br/>
 
@@ -67,7 +67,7 @@
 
 <img src="docs/images/helper-07.png" alt="Helper 0.7 concept" width="100%" />
 
-<p><sub>A design concept for the next helper. Not built yet.</sub></p>
+<p><sub>Coming in 0.7.0.</sub></p>
 
 <br/>
 
