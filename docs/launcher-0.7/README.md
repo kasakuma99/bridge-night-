@@ -44,7 +44,7 @@ Open `mockup.html` in a browser: it is clickable, with a screen picker at the bo
 | Help | Explanations per page, hotkeys, "launcher or site", log (moved here from Settings), "still stuck? ask in Discord". |
 | Mini window | Slim always-on-top strip: status or game timer, mic, headset, ping, GPU, back to the full window. Updates every 5 s. Button in the title bar. |
 | Tray panel, pop-ups | Flyout by the clock (status, quick buttons). Pop-ups: teams locked, loading screen with builds, win saved with rating change, game night reminder. |
-| Update | One-click update that checks the SHA-256 against the GitHub release. |
+| Update | In-app update check: on start and once a day, the helper asks GitHub for the newest release. If there is one, a banner shows the new version and what it changes. "Update and restart" downloads it, checks the SHA-256 against the release, replaces the old file and restarts. Nothing installs without a click; "Later" hides the banner until the next version. |
 | Share card, Discord status | A picture of your own game to paste into Discord; Rich Presence "Bridge Night · 3v3 · Blue side" (needs a free Discord app ID). |
 
 **Removed on purpose:** lobby password, "quiet Windows pop-ups", lock the Windows key, shut down after the game, pin window on
