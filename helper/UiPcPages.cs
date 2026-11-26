@@ -100,7 +100,7 @@ namespace BridgeNight
 
     class NetworkPage : Page
     {
-        Label verdictIcon, verdict, verdictSub, ping, jitter, loss, spike, spikeAt, traceState;
+        Label server, verdictIcon, verdict, verdictSub, ping, jitter, loss, spike, spikeAt, traceState;
         Chart chart;
         HopsView hopsView;
         FlatButton trace;
@@ -108,7 +108,7 @@ namespace BridgeNight
         public NetworkPage(MainWindow w) : base(w, "Network")
         {
             Heading("Network", "Network");
-            var server = L(this, "EUW game server", Theme.Small, Theme.Ink2, X0 + W0 - 220, 30, 220, 22);
+            server = L(this, "EUW game server", Theme.Small, Theme.Ink2, X0 + W0 - 320, 30, 320, 22);
             server.TextAlign = ContentAlignment.MiddleRight;
 
             var v = Ui.Card(this, null, X0, Y0, W0, 76);
@@ -146,12 +146,16 @@ namespace BridgeNight
             return l;
         }
 
-        public override void Shown() { NetCheck.Start("network"); }
-        public override void Hidden() { NetCheck.Stop("network"); }
+        public override void Shown() { NetCheck.Start(NetCheck.FastCaller); }
+        public override void Hidden() { NetCheck.Stop(NetCheck.FastCaller); }
 
         public override void Tick()
         {
             var n = NetCheck.Current ?? new NetReport();
+            // Riot drops pings, so NetCheck may measure to a data centre next to EUW: say which one honestly.
+            var near = (NetCheck.TargetName ?? "").StartsWith("Amsterdam");
+            Ui.Set(server, near ? "Amsterdam, next to the EUW servers" : "EUW game server");
+            Ui.Set(verdictSub, near ? "Riot does not answer pings, so this measures to a server next to EUW." : "Ping to the EUW game server, measured once a second while this page is open.");
             var measuring = !n.PingMs.HasValue;
             Ui.Set(verdict, measuring ? "Measuring…" : n.Verdict == "" ? (n.Ok ? "All good" : "Unstable connection") : n.Verdict);
             Ui.Set(verdictIcon, measuring ? "\uE916" : n.Ok ? "\uE73E" : "\uE7BA", measuring ? Theme.Mute : n.Ok ? Theme.Good : Theme.Warn);

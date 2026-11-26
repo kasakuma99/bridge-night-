@@ -1,5 +1,5 @@
 # Renders every screen of the 0.7 window to PNG files, offscreen (nothing opens on screen, nothing is sent).
-# Default: builds a preview library with sample data (FakePcServices.cs instead of PcServices.cs) into helper\dist.
+# Default: builds a preview library with sample data (FakePcServices.cs instead of PcServices.cs and the Pc*.cs features) into helper\dist.
 # -Empty: uses the real test build (helper\build.ps1 -Test) instead, to check the empty / "Measuring…" states.
 # Usage (PowerShell, from the repo folder):  .\helper\tools\preview\render-0.7.ps1 [-Out folder] [-Empty]
 param([string]$Out = "", [switch]$Empty)
@@ -21,7 +21,7 @@ if ($Empty) {
     $refs = "System.dll", "System.Core.dll", "System.Drawing.dll", "System.Windows.Forms.dll", "System.Management.dll",
             "System.Security.dll", "System.Web.Extensions.dll" | ForEach-Object { "/reference:" + (Join-Path $fw $_) }
     [string[]]$res = @(Get-ChildItem (Join-Path $helper "res") -File | ForEach-Object { "/resource:$($_.FullName),$($_.Name)" }) + "/resource:$(Join-Path $helper 'app.ico'),app.ico"
-    $src = @(Get-ChildItem $helper -Filter *.cs | Where-Object { $_.Name -ne "PcServices.cs" } | ForEach-Object { $_.FullName }) + (Join-Path $preview "FakePcServices.cs")
+    $src = @(Get-ChildItem $helper -Filter *.cs | Where-Object { $_.Name -notlike "Pc*.cs" } | ForEach-Object { $_.FullName }) + (Join-Path $preview "FakePcServices.cs")
     & (Join-Path $fw "csc.exe") /nologo /nowarn:649,169,67 /target:library /define:TEST "/out:$dll" @refs @res $src
     if ($LASTEXITCODE -ne 0) { throw "Preview build failed" }
 }

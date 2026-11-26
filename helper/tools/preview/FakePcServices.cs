@@ -111,6 +111,8 @@ namespace BridgeNight
     static class NetCheck
     {
         public const string ServerName = "EUW";
+        public const string FastCaller = "network";
+        public static string TargetName { get { return "Riot EUW"; } }
         public static void Start(string who) { }
         public static void Stop(string who) { }
         public static NetReport Current { get { return new NetReport { PingMs = 23, JitterMs = 3, LossPercent = 0, Verdict = "All good: your connection and EUW look fine", Ok = true }; } }
