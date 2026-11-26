@@ -235,7 +235,6 @@ namespace BridgeNight
 
         /// Newest first, at most 5, kept in Settings.Dir\games.json.
         public static List<GameReport> LastGames() { return LastGamesImpl(); }
-        public static int? OpenApps { get { return null; } } // stub: Agent D provides the real one
     }
 
     /* ------------------------------------------------------------------ Network */

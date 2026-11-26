@@ -221,7 +221,7 @@ namespace BridgeNight
             }
             catch (Exception e)
             {
-                note = "That did not work: " + e.Message;
+                note = "That did not work: " + PcServices.Scrub(e.Message);
                 PcServices.Log("Fix " + id + " failed: " + e.Message);
                 return false;
             }

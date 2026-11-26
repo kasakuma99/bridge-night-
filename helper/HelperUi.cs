@@ -110,7 +110,7 @@ namespace BridgeNight
 
         void Log(string line)
         {
-            line = Scrub(line, settings.Token);
+            line = PcServices.Scrub(Scrub(line, settings.Token)); // token, user folder, PC name, then IPs and emails
             var text = DateTime.Now.ToString("HH:mm:ss") + "  " + line;
             WriteLogFile(text);
             var saved = ReportSent(line);
