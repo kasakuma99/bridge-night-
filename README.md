@@ -1,131 +1,86 @@
 <div align="center">
 
-<img src="public/og.png" alt="Bridge Night" width="720" />
+<img src="docs/images/banner.png" alt="Bridge Night" width="800" />
 
-# Bridge Night
+<h3>Who plays tonight?</h3>
 
-**Who plays tonight?** Team generator, live games, past games, stats and rivalries for our custom game nights.
+<p>Teams, live games, stats and rivalries<br/>for our League of Legends custom game nights.</p>
 
-[![Live site](https://img.shields.io/badge/live-bridge--night.workers.dev-bfe6ff?style=for-the-badge&labelColor=0b0f14)](https://bridge-night.bridge-night.workers.dev)
-[![Helper app](https://img.shields.io/github/v/release/kasakuma99/bridge-night-?filter=helper-v*&label=helper%20app&style=for-the-badge&color=4f8cff&labelColor=0b0f14)](https://github.com/kasakuma99/bridge-night-/releases)
-[![Free to run](https://img.shields.io/badge/cost-0%E2%82%AC-f2c46d?style=for-the-badge&labelColor=0b0f14)](#how-it-runs-for-free)
+<br/>
 
-**[Open the site](https://bridge-night.bridge-night.workers.dev)** · **[Get the helper app](https://github.com/kasakuma99/bridge-night-/releases)** · **[Join our Discord](https://discord.gg/mEAF2C9Qq)**
+<a href="https://bridge-night.bridge-night.workers.dev"><img src="https://img.shields.io/badge/Open_the_site-ff4f8e?style=for-the-badge&logo=googlechrome&logoColor=white" alt="Open the site" height="36"/></a>&nbsp;
+<a href="https://github.com/kasakuma99/bridge-night-/releases"><img src="https://img.shields.io/badge/Get_the_helper-ff7466?style=for-the-badge&logo=windows&logoColor=white" alt="Get the helper" height="36"/></a>&nbsp;
+<a href="https://discord.gg/mEAF2C9Qq"><img src="https://img.shields.io/badge/Join_our_Discord-ff9c4a?style=for-the-badge&logo=discord&logoColor=white" alt="Join our Discord" height="36"/></a>
 
-</div>
+<p><a href="https://bridge-night.bridge-night.workers.dev"><b>bridge-night.bridge-night.workers.dev</b></a></p>
 
----
+<sub>Private for our group · free to run · fan project</sub>
 
-## What it does
+<br/><br/>
 
-Bridge Night is the home of our ARAM Mayhem custom games: 1v1 up to 5v5, a few nights a week, always with the same group of friends. The site is private: you log in with Discord, and an admin lets you in. It started as a clickable prototype and grew into a small app we actually use on game night.
+<img src="docs/images/features.png" alt="Teams, live game, history, stats, rivals and the helper app" width="100%" />
 
-|  |  |
-|---|---|
-| **Team generator** | Pick a mode from 1v1 to 5v5 and who's playing. Random or weighted teams, uneven teams if you like, fair sit-out rotation, unlimited rerolls. |
-| **Live game** | Follows the custom game in League by itself: both sides, champions, levels, K/D/A, items, summoner spells, clock and log. After the game who won, why, and the augments. |
-| **Past games** | Every game with teams and champions, and a details table with level, K/D/A, items and augments. |
-| **Stats** | Leaderboard, streaks, records, best duos and trios, weekly awards, monthly champions and player profiles with badges. |
-| **Rivals** | Head-to-head records and "Samu is dominating Nick" banners when someone keeps winning. |
-| **Helper app** | Small Windows tray app for one player per game. It reads League and shows the game on the site. |
-| **Phone friendly** | Add it to your home screen and it opens like an app. |
+<br/><br/>
 
-## Screenshots
+<img src="docs/images/release-0.7.0.png" alt="New version 0.7.0 of the helper, coming soon: a brand-new look, performance and network, instant replay and audio" width="100%" />
 
-<p align="center"><img src="docs/screenshots/teams.png" alt="Team generator" width="860" /></p>
+<p><b>Coming soon.</b> Until then, <a href="https://github.com/kasakuma99/bridge-night-/releases">helper 0.6.0</a> is the current download.</p>
+
+<br/>
+
+<img src="docs/images/how-it-works.png" alt="How a night works: make teams, play, see who's on fire" width="100%" />
+
+<br/><br/>
+
+<h2>On the site</h2>
+
+<img src="docs/images/site-live.png" alt="The live game on the site" width="100%" />
+
+<p><b>Live game</b> · champions, levels, K/D/A, items and a log while you play</p>
 
 <table>
   <tr>
-    <td><img src="docs/screenshots/stats.png" alt="Stats and player profile" /></td>
-    <td><img src="docs/screenshots/history.png" alt="Match history" /></td>
+    <td width="50%" align="center"><img src="docs/images/site-teams.png" alt="Teams" /><br/><b>Teams</b> · fair teams in one click</td>
+    <td width="50%" align="center"><img src="docs/images/site-stats.png" alt="Stats" /><br/><b>Stats</b> · leaderboard, streaks and profiles</td>
   </tr>
   <tr>
-    <td><img src="docs/screenshots/rivals.png" alt="Rivals" /></td>
-    <td><img src="docs/screenshots/builds.png" alt="Builds" /></td>
+    <td width="50%" align="center"><img src="docs/images/site-history.png" alt="Past games" /><br/><b>Past games</b> · every game, every item</td>
+    <td width="50%" align="center"><img src="docs/images/site-rivals.png" alt="Rivals" /><br/><b>Rivals</b> · who's dominating whom</td>
   </tr>
 </table>
 
-<sub>Screenshots use sample data and show an earlier version: some of it is switched off in [features.ts](src/lib/features.ts).</sub>
+<sub>Screenshots with sample data.</sub>
 
-## How a game night works
+<br/><br/>
 
-```mermaid
-flowchart LR
-  A[Pick players<br/>on the site] --> B[Make teams]
-  B --> C[Custom game in League<br/>Champ select]
-  C --> D[In game]
-  D --> E[Result saved]
-  E --> F[Stats, rivals<br/>and awards update]
-  H[Helper app<br/>on one player's PC] -. live data<br/>and result .-> C & D & E
-```
+<h2>The helper app</h2>
 
-Only approved members see the site: you log in with Discord, then an admin lets you in and links you to your player. One player per game runs the helper app; if several do, the game is still saved once. If League names no winner, a member chooses. Only admins can swap a winner or delete a game.
+<p>A tiny Windows tray app. <b>One player per game</b> runs it,<br/>and the game shows up on the site by itself.</p>
 
-## The helper app
+<p>
+<b>Reads, never controls</b> &nbsp;·&nbsp; <b>Custom games only</b> &nbsp;·&nbsp; <b>No admin rights</b> &nbsp;·&nbsp; <b>Open source</b>
+</p>
 
-A tiny Windows tray app (about 50 KB), built from [`helper/BridgeNightHelper.cs`](helper/BridgeNightHelper.cs) by GitHub Actions and published under [Releases](https://github.com/kasakuma99/bridge-night-/releases).
+<p><sub>Set up: log in with Discord → get approved → Helper tab → download → make a token → paste it into the helper.</sub></p>
 
-- **Read-only.** It only reads what the League client and the game offer to programs on your own PC (the Live Client Data API), and never sends commands to them.
-- **Fair play.** During champ select it sends only names and sides. Champions follow on the loading screen, when everyone sees them.
-- **Custom games only.** From other games nothing is read or sent.
-- **One server.** It only talks to our site, with your personal helper token.
-- **No admin rights, no service, no autostart** unless you tick it. No ads, no tracking.
+<br/>
 
-**Set it up:** log in on the site with Discord → get approved → Helper tab → download → **Make a token** → paste it into the helper → **Save and test connection**.
+<img src="docs/images/helper-07.png" alt="Helper 0.7 concept" width="100%" />
 
-**Check it's safe:** the release notes and the Helper page show the file's SHA-256. In PowerShell, `Get-FileHash .\bridge-night-helper.exe` must show the same value. The app isn't code-signed, so Windows may say "unknown publisher" (More info → Run anyway).
+<p><sub>Coming in 0.7.0.</sub></p>
 
-## How it runs for free
+<br/>
 
-| Part | Runs on |
-|---|---|
-| Website | Cloudflare Workers (static assets), deployed automatically from `main` |
-| Database, login, live updates | Supabase (Postgres, Discord login, Realtime) |
-| Live games | Supabase Edge Function `live` (and `helper` for helpers before 0.5) |
-| Backups and keep-alive | A Cloudflare Worker on a timer: daily keep-alive, weekly JSON backup to Workers KV (last 8 kept) |
-| Helper builds | GitHub Actions |
+<a href="https://discord.gg/mEAF2C9Qq"><img src="docs/images/discord.png" alt="Join us on Discord" width="100%" /></a>
 
-### Security
+<br/><br/>
 
-- The site is private. Row Level Security on every table: without approval you can read nothing.
-- Riot IDs of people who aren't on the site are never stored or shown, and the live data has no Riot IDs at all.
-- Helper tokens are stored only as a SHA-256 hash and can be revoked at any time.
-- Only the public Supabase key is in this repo (it's designed for browsers). Secret keys live only in Supabase and Cloudflare.
-- Strict Content Security Policy on the site.
+<img src="docs/images/logo.png" alt="Bridge Night logo" width="88" />
 
-## Built with
+<p><b>Bridge Night</b><br/><sub>Made by friends for friends. Thanks to <b>Lenny</b> and <b>Tosh</b>, and to everyone who shows up on game night.</sub></p>
 
-Vite · React · TypeScript · Tailwind CSS · Supabase · Cloudflare Workers · lucide icons · Outfit and Plus Jakarta Sans · C# (.NET Framework, ships with Windows) for the helper.
+<p><sub><a href="docs/DEVELOPMENT.md">How it's built and how to run it</a> &nbsp;·&nbsp; <a href="https://github.com/kasakuma99/bridge-night-/releases">Releases</a> &nbsp;·&nbsp; <a href="https://discord.gg/mEAF2C9Qq">Discord</a></sub></p>
 
-<details>
-<summary><b>Run it locally</b></summary>
+<sub>Bridge Night was created under Riot Games' "Legal Jibber Jabber" policy using assets owned by Riot Games.<br/>Riot Games does not endorse or sponsor this project.</sub>
 
-```bash
-npm install
-npm run dev:sample   # http://localhost:5173 with sample players and games, no account needed
-npm run dev:live     # sample data plus the game League is playing on this PC, nothing leaves it
-npm run dev:db       # the real database, with login: changes are real!
-npm test             # unit tests, also the database changes in a small Postgres and the live server
-npm run e2e          # clicks through the site (first: npm run dev:sample -- --port 5174)
-node scripts/build-live.mjs   # after changing src/lib/live*.ts: bundles it for the live function
-npm run typecheck
-.\helper\build.ps1   # builds the helper with the C# compiler that ships with Windows (-Test: a separate test program)
-```
-
-- `src/lib/` holds the rules as plain functions: per-player Elo (start 1000; after 10 placement games a 100 point gap gives the favourite 13 and the underdog 17; FF costs 5 extra; small streak and bounty bonuses), streaks, bounties, badges, awards, monthly champions, rivalries, team generator and the dodge rule. Times use Europe/Berlin.
-- `src/data/` is the only place that changes data: a local store for the sample preview and a Supabase store for the live site, behind the same interface. Ratings and awards are always recalculated from the full match list.
-- `supabase/migrations/` has the database schema, security rules and functions. `supabase/functions/live/` takes the live games: the logic is `src/lib/live.ts` and `liveServer.ts`, bundled into `core.js`. [docs/release.md](docs/release.md) has the release steps.
-- `backup-worker/` is the backup and keep-alive worker.
-
-</details>
-
-## Thanks
-
-Big thanks to **Lenny** and **Tosh** for their help with Bridge Night. 💙
-
-And to everyone who shows up on game night.
-
----
-
-<sub>Bridge Night is a fan project, made by friends for friends.<br/>
-Bridge Night was created under Riot Games' "Legal Jibber Jabber" policy using assets owned by Riot Games. Riot Games does not endorse or sponsor this project.</sub>
+</div>
