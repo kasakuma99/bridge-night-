@@ -183,7 +183,7 @@ namespace BridgeNight
     class GameModePage : Page
     {
         const int Slots = 4;
-        ToggleSwitch auto, power, music, breaks;
+        ToggleSwitch auto, music, breaks;
         Card before, fixes, now;
         readonly Label[][] beforeRows = new Label[Slots][], fixRows = new Label[Slots][];
         readonly FlatButton[] beforeFix = new FlatButton[Slots], fixFix = new FlatButton[Slots];
@@ -212,17 +212,14 @@ namespace BridgeNight
             }
             note = L(this, "", Theme.Small, Theme.Ink2, X0, Y0 + 480, 382, 40);
 
-            var when = Ui.Card(this, "When a game starts", X0 + 394, Y0, 382, 236);
-            power = Ui.SwitchRow(when, "\uE945", "Power plan: High performance", "Back to normal after the game", 46, 382);
+            var when = Ui.Card(this, "When a game starts", X0 + 394, Y0, 382, 168);
+            music = Ui.SwitchRow(when, "\uEC4F", "Music quieter in game", "Turns music apps down while you play", 46, 382);
             Ui.Divider(when, 16, 104, 350);
-            music = Ui.SwitchRow(when, "\uEC4F", "Music quieter in game", "Turns music apps down while you play", 114, 382);
-            Ui.Divider(when, 16, 172, 350);
-            breaks = Ui.SwitchRow(when, "\uEC32", "Break reminder", "A short nudge after a long session", 182, 382);
-            power.CheckedChanged += delegate { if (!syncing) { S.PowerPlanInGame = power.Checked; Save(); } };
+            breaks = Ui.SwitchRow(when, "", "Break reminder", "A short nudge after a long session", 114, 382);
             music.CheckedChanged += delegate { if (!syncing) { S.MusicQuieter = music.Checked; Save(); } };
             breaks.CheckedChanged += delegate { if (!syncing) { S.BreakReminder = breaks.Checked; Save(); } };
 
-            now = Ui.Card(this, "Right now", X0 + 394, Y0 + 250, 382, 120);
+            now = Ui.Card(this, "Right now", X0 + 394, Y0 + 182, 382, 120);
             nowTitle = L(now, "", Theme.Strong, Theme.Ink, 16, 46, 350, 24);
             nowText = L(now, "", Theme.Small, Theme.Mute, 16, 72, 350, 40);
         }
@@ -302,7 +299,6 @@ namespace BridgeNight
         {
             syncing = true;
             auto.Checked = S.GameModeAuto;
-            power.Checked = S.PowerPlanInGame;
             music.Checked = S.MusicQuieter;
             breaks.Checked = S.BreakReminder;
             syncing = false;
@@ -315,7 +311,7 @@ namespace BridgeNight
             Ui.Set(nowTitle, active ? "Game mode is on" : "Game mode is off", active ? Theme.Ink : Theme.Ink2);
             Ui.Set(nowText, active ? (GameMode.ActiveText == "" ? "Everything goes back to normal when the game ends." : GameMode.ActiveText)
                 : S.GameModeAuto ? "It switches on when a game starts and back off when it ends." : "Automatic is off: nothing changes when a game starts.");
-            foreach (Control c in new Control[] { power, music, breaks }) c.Enabled = S.GameModeAuto;
+            foreach (Control c in new Control[] { music, breaks }) c.Enabled = S.GameModeAuto;
         }
     }
 
