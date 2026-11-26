@@ -31,7 +31,7 @@ that one player runs during the game, so nobody ever has to type in a result.</p
 
 <br/><br/>
 
-<img src="docs/images/release-0.7.0.png" alt="New version 0.7.0 of the helper: a brand-new look, performance and network, audio and game mode" width="100%" />
+<img src="docs/images/release-0.7.0.png" alt="New version 0.7.0 of the helper: a brand-new look, live game and performance, audio and game mode" width="100%" />
 
 <p><b>Out now.</b> <a href="https://github.com/kasakuma99/bridge-night-/releases/latest">Download helper 0.7.0</a>: from now on it keeps itself up to date.</p>
 
@@ -78,7 +78,7 @@ that one player runs during the game, so nobody ever has to type in a result.</p
 
 <br/>
 
-<img src="docs/images/helper-07.png" alt="Helper 0.7: Home, Performance, Game mode and the mini window" width="100%" />
+<img src="docs/images/helper-07.png" alt="Helper 0.7: Home, Live, Game mode and the mini window" width="100%" />
 
 <h3>What's new in 0.7.0</h3>
 
@@ -93,6 +93,7 @@ built to stay light: nothing runs in the background that you didn't switch on.</
   <tr><td><b>Network</b></td><td>Ping, jitter and packet loss towards EUW (Riot does not answer pings, so it measures to a server right next to it), and whether lag comes from your Wi-Fi, your provider or Riot. Only while the window is open.</td></tr>
   <tr><td><b>Game mode</b></td><td>A check before game night (pending Windows restart, League patch), a reminder to take a break after long sessions, optional quieter music while you play, and one-click fixes for a monitor below its best refresh rate, mouse acceleration and the Sticky Keys pop-up.</td></tr>
   <tr><td><b>Audio</b></td><td>Mute your microphone everywhere at once, in Discord, League and the browser, and switch between headset, speakers and monitor with one key.</td></tr>
+  <tr><td><b>Settings</b></td><td>Every switch in one tidy pop-up over the window: connection, startup and alerts, performance, game mode, audio and updates.</td></tr>
   <tr><td><b>Mini window</b></td><td>A slim strip that stays on top while you play: status, mic, ping, GPU load and the game timer.</td></tr>
   <tr><td><b>Notifications</b></td><td>A short heads-up when a result is saved, when game mode switches on, and after an update, with a "Muted" badge while your mic is off.</td></tr>
   <tr><td><b>Automatic updates</b></td><td>New versions come from this page's releases, are checked with their SHA-256 fingerprint and install by themselves, never during a game. Can be turned off.</td></tr>
