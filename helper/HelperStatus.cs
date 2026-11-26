@@ -58,6 +58,14 @@ namespace BridgeNight
             lock (gate) { serverOk = ok; lastError = ok ? "" : note ?? ""; }
         }
 
+        // The game's own live data (Live Client Data, custom games only, from the loading screen on), for the Live page.
+        // The Watcher replaces the whole object each time, it never changes one in place, so readers can use it freely.
+        static object game;
+        static DateTime gameAt;
+
+        public static void SetGame(object data) { lock (gate) { game = data; gameAt = DateTime.UtcNow; } }
+        public static object Game(out DateTime readAt) { lock (gate) { readAt = gameAt; return game; } }
+
         public static void SetQueued(int n) { lock (gate) { queued = n; } }
         public static void SetUpdate(string version) { lock (gate) { updateVersion = version ?? ""; } }
     }

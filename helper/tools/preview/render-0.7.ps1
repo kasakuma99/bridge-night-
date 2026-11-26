@@ -100,6 +100,20 @@ foreach ($tab in 0, 1, 2) {
     $perf.GetType().GetProperty("Tab").SetValue($perf, $tab)
     Page $w "Performance" ("02-performance-" + @("live", "last-game", "apps")[$tab])
 }
+# A sample game for the Live page (fake names), set the way the Watcher sets it.
+$sample = '{"gameData":{"gameTime":1265.4},"allPlayers":[' +
+  '{"championName":"Ahri","riotIdGameName":"Player One","team":"ORDER","level":14,"isDead":false,"scores":{"kills":7,"deaths":2,"assists":9,"creepScore":182},"items":[{"displayName":"Luden' + "'" + 's Companion"},{"displayName":"Sorcerer' + "'" + 's Shoes"},{"displayName":"Shadowflame"},{"displayName":"Dark Seal"}]},' +
+  '{"championName":"Garen","riotIdGameName":"Player Two","team":"ORDER","level":13,"isDead":true,"scores":{"kills":3,"deaths":4,"assists":5,"creepScore":160},"items":[{"displayName":"Stridebreaker"},{"displayName":"Plated Steelcaps"},{"displayName":"Sterak' + "'" + 's Gage"}]},' +
+  '{"championName":"Jinx","riotIdGameName":"Player Three","team":"ORDER","level":12,"isDead":false,"scores":{"kills":5,"deaths":3,"assists":6,"creepScore":201},"items":[{"displayName":"Kraken Slayer"},{"displayName":"Berserker' + "'" + 's Greaves"},{"displayName":"Infinity Edge"}]},' +
+  '{"championName":"Lux","riotIdGameName":"Player Four","team":"CHAOS","level":13,"isDead":false,"scores":{"kills":4,"deaths":5,"assists":8,"creepScore":150},"items":[{"displayName":"Malignance"},{"displayName":"Sorcerer' + "'" + 's Shoes"},{"displayName":"Horizon Focus"}]},' +
+  '{"championName":"Darius","riotIdGameName":"Player Five","team":"CHAOS","level":14,"isDead":false,"scores":{"kills":6,"deaths":6,"assists":2,"creepScore":175},"items":[{"displayName":"Trinity Force"},{"displayName":"Plated Steelcaps"},{"displayName":"Dead Man' + "'" + 's Plate"}]},' +
+  '{"championName":"Thresh","riotIdGameName":"Player Six","team":"CHAOS","level":11,"isDead":false,"scores":{"kills":1,"deaths":4,"assists":12,"creepScore":38},"items":[{"displayName":"Celestial Opposition"},{"displayName":"Mobility Boots"}]}],' +
+  '"events":{"Events":[{"EventName":"GameStart","EventTime":0.5},{"EventName":"FirstBlood","EventTime":212.3,"Recipient":"Player One"},{"EventName":"ChampionKill","EventTime":212.3,"KillerName":"Player One","VictimName":"Player Four"},{"EventName":"DragonKill","EventTime":540.1,"KillerName":"Player Three","DragonType":"Fire"},{"EventName":"TurretKilled","EventTime":810.9,"KillerName":"Player Five"},{"EventName":"Multikill","EventTime":1102.2,"KillerName":"Player One","KillStreak":2},{"EventName":"ChampionKill","EventTime":1240.7,"KillerName":"Player Five","VictimName":"Player Two"}]}}'
+$game = (T "Json").GetMethod("Parse").Invoke($null, @($sample))
+Static "HelperStatus" "SetGame" @($game)
+Page $w "Live" "02a-live"
+Static "HelperStatus" "SetGame" @($null)
+Page $w "Live" "02b-live-empty"
 Page $w "Network" "03-network"
 Page $w "GameModeP" "04-game-mode"
 Page $w "Audio" "05-audio"

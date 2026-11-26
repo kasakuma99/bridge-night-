@@ -75,6 +75,7 @@ namespace BridgeNight
         TourOverlay tour;
 
         public HomePage Home;
+        public LivePage Live;
         public PerformancePage Performance;
         public NetworkPage Network;
         public GameModePage GameModeP;
@@ -106,6 +107,7 @@ namespace BridgeNight
 
             BuildTitleBar();
             Home = Add(new HomePage(this));
+            Live = Add(new LivePage(this));
             Performance = Add(new PerformancePage(this));
             Network = Add(new NetworkPage(this));
             GameModeP = Add(new GameModePage(this));
@@ -189,10 +191,11 @@ namespace BridgeNight
                     g.DrawLine(p, Theme.Px(24), Theme.Px(112), Theme.Px(SidebarW - 24), Theme.Px(112));
             };
             AddNav(side, "Home", "\uE80F", Home, 64);
-            AddNav(side, "Performance", "\uE9D9", Performance, 124);
-            AddNav(side, "Network", "\uE839", Network, 164);
-            AddNav(side, "Game mode", "\uE7FC", GameModeP, 204);
-            AddNav(side, "Audio", "\uE7F6", Audio, 244);
+            AddNav(side, "Live", "\uE93E", Live, 124);
+            AddNav(side, "Performance", "\uE9D9", Performance, 164);
+            AddNav(side, "Network", "\uE839", Network, 204);
+            AddNav(side, "Game mode", "\uE7FC", GameModeP, 244);
+            AddNav(side, "Audio", "\uE7F6", Audio, 284);
             AddNav(side, "Help", "\uE897", Help, 482);
             var settingsItem = new NavItem("Settings", "\uE713") { Location = new Point(Theme.Px(8), Theme.Px(522)), AccessibleDescription = "Opens on top of this page" };
             settingsItem.Click += delegate { OpenSettings(null); };

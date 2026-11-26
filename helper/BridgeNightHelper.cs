@@ -392,6 +392,7 @@ namespace BridgeNight
                 creds = null;
                 status("Waiting for the League client");
                 if (lastPhase != "") { lastPhase = ""; lastCustom = null; log("League client closed"); }
+                HelperStatus.SetGame(null);
                 return;
             }
             var phase = answer.ToString();
@@ -399,6 +400,7 @@ namespace BridgeNight
             var changed = phase != lastPhase;
             if (changed) log("Client phase: " + phase);
             lastPhase = phase;
+            if (!InGame.Contains(phase)) HelperStatus.SetGame(null); // the Live page only shows a running game
 
             if (phase == "Lobby")
             {
@@ -424,6 +426,7 @@ namespace BridgeNight
                 status(settings.Paused ? "Paused" : custom ? "Custom game: " + phase : "Not a custom game");
                 if (!custom)
                 {
+                    HelperStatus.SetGame(null);
                     // Only the result of our earlier custom game, if we are still waiting for it.
                     var h = History(c, false);
                     if (h != null) Send(Reading("None", c, null, null, null, null, null, h));
@@ -451,7 +454,7 @@ namespace BridgeNight
                     lob = Lcu.Get(c, "/lol-lobby/v2/lobby");
                     if (Json.List(Json.Dict(lob, "gameConfig"), "customTeam100") == null) lob = lobby;
                 }
-                if (InGame.Contains(phase)) game = Lcu.GetGame("/liveclientdata/allgamedata");
+                if (InGame.Contains(phase)) { game = Lcu.GetGame("/liveclientdata/allgamedata"); HelperStatus.SetGame(game); }
                 if (Over.Contains(phase))
                 {
                     eog = Lcu.Get(c, "/lol-end-of-game/v1/eog-stats-block");
