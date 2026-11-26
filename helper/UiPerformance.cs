@@ -400,8 +400,27 @@ namespace BridgeNight
             }
 
             upValue = StatCard(p, "PC on for", 0);
-            procValue = StatCard(p, "Apps running", 1);
+            procValue = StatCard(p, "Apps open", 1);
             restartValue = StatCard(p, "Windows restart", 2);
+        }
+
+        DateTime appsCountedAt = DateTime.MinValue;
+        static readonly HashSet<string> WindowsParts = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+            { "ApplicationFrameHost", "TextInputHost", "ShellExperienceHost", "StartMenuExperienceHost", "SearchHost", "explorer" };
+
+        /// Apps with a window, like the taskbar shows; not the 300+ background processes Windows always runs.
+        static string OpenApps()
+        {
+            try
+            {
+                var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                foreach (var pr in Process.GetProcesses())
+                    using (pr)
+                        try { if (pr.MainWindowHandle != IntPtr.Zero && pr.MainWindowTitle != "" && !WindowsParts.Contains(pr.ProcessName)) names.Add(pr.ProcessName); }
+                        catch { } // the process just ended
+                return names.Count.ToString();
+            }
+            catch { return "–"; }
         }
 
         Label StatCard(Control p, string caption, int i)
@@ -450,7 +469,7 @@ namespace BridgeNight
             if (apps.Count == 0) Ui.Set(appsNote, "Measuring…", Theme.Mute);
             else if (appsNote.Text == "Measuring…") Ui.Set(appsNote, "Close asks the app politely. League and Windows are never closed.");
 
-            try { Ui.Set(procValue, Process.GetProcesses().Length.ToString()); } catch { }
+            if (DateTime.UtcNow >= appsCountedAt) { appsCountedAt = DateTime.UtcNow.AddSeconds(5); Ui.Set(procValue, OpenApps()); }
             var up = PerfMon.Uptime;
             Ui.Set(upValue, up > TimeSpan.Zero ? Ui.Span(up) : "–");
             Ui.Set(restartValue, PerfMon.RestartPending ? "Pending" : "Not needed", PerfMon.RestartPending ? Theme.Warn : Theme.Ink);
