@@ -13,6 +13,11 @@ npm run typecheck
 .\helper\build.ps1   # builds the helper with the C# compiler that ships with Windows
 ```
 
+## Where we are
+
+[status.md](status.md) lists what's on the site, what's built but switched off in `src/lib/features.ts`, and what's
+still to do. [security-review.md](security-review.md) lists every security finding and whether it's fixed.
+
 ## Where things are
 
 - `src/lib/` holds the rules as plain functions: Elo, streaks, badges, awards, rivalries, team generator. Times use Europe/Berlin.

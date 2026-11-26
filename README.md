@@ -107,7 +107,7 @@ built to stay light: nothing runs in the background that you didn't switch on.</
 
 <p><b>Bridge Night</b><br/><sub>Made by friends for friends. Thanks to <b>Lenny</b> and <b>Tosh</b>, and to everyone who shows up on game night.</sub></p>
 
-<p><sub><a href="docs/DEVELOPMENT.md">How it's built and how to run it</a> &nbsp;·&nbsp; <a href="https://github.com/kasakuma99/bridge-night-/releases">Releases</a></sub></p>
+<p><sub><a href="docs/DEVELOPMENT.md">How it's built and how to run it</a> &nbsp;·&nbsp; <a href="docs/status.md">Where we are</a> &nbsp;·&nbsp; <a href="docs/security-review.md">Security</a> &nbsp;·&nbsp; <a href="https://github.com/kasakuma99/bridge-night-/releases">Releases</a></sub></p>
 
 <sub>Bridge Night was created under Riot Games' "Legal Jibber Jabber" policy using assets owned by Riot Games.<br/>Riot Games does not endorse or sponsor this project.</sub>
 

@@ -169,3 +169,7 @@ helper/dist/
 # Planning docs for the tosh branch: local only, they change all the time
 /tosh_docs/TODO.MD
 /tosh_docs/CURRENT_TASK.MD
+
+# Claude Code: personal settings and session handover notes stay local
+.claude/settings.local.json
+.claude/handover.md
