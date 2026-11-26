@@ -8,6 +8,7 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Text.RegularExpressions;
 using System.Threading;
 
 namespace BridgeNight
@@ -21,6 +22,7 @@ namespace BridgeNight
         static SynchronizationContext ui;
         static DateTime? gameStartedAt;
         static DateTime nextGameCheck = DateTime.MinValue;
+        static readonly Cached<bool> leagueRunning = new Cached<bool>("game check", 1, GameProcessRunning); // asked every 2 s
         static volatile bool gameRunning;
         // Break reminder: play time adds up over a session; a session ends after an hour without a game.
         static TimeSpan sessionPlay = TimeSpan.Zero;
@@ -37,6 +39,7 @@ namespace BridgeNight
             if (ui == null && Thread.CurrentThread.GetApartmentState() == ApartmentState.STA) ui = new System.Windows.Forms.WindowsFormsSynchronizationContext();
             Safe("updater start", Updater.OnStart);
             Safe("hotkeys", AudioCtl.SyncHotkeys);
+            Safe("perf preload", PerfMon.Preload);
         }
 
         /// Called by TrayApp every second on the UI thread. Notices game start/end (the "League of Legends" game
@@ -50,7 +53,7 @@ namespace BridgeNight
             var now = DateTime.Now;
             if (now < nextGameCheck) return;
             nextGameCheck = now.AddSeconds(2);
-            bool running = GameProcessRunning();
+            bool running = leagueRunning.Get(); // the process list is read on a background thread, at most 2 s old
             if (running && !gameRunning) Safe("game start", OnGameStart);
             else if (!running && gameRunning) Safe("game end", delegate { OnGameEnd(true); });
             if (gameRunning && settings.BreakReminder && !breakReminded && gameStartedAt.HasValue
@@ -86,7 +89,28 @@ namespace BridgeNight
         {
             var l = logger;
             if (l == null) return;
-            try { l(line); } catch { }
+            try { l(Scrub(line)); } catch { }
+        }
+
+        static readonly Regex Ipv4 = new Regex(@"(?<![\d.])\d{1,3}(\.\d{1,3}){3}(?![\d.])");
+        static readonly Regex Email = new Regex(@"[\w.+-]+@[\w-]+(\.[\w-]+)+");
+
+        /// Log lines and error texts may be shared for help: nothing in them may point to this PC or person
+        /// (user folder, Windows user and PC name, IP or email addresses; error messages often name file paths).
+        internal static string Scrub(string text)
+        {
+            if (string.IsNullOrEmpty(text)) return text;
+            try
+            {
+                var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+                if (home.Length > 3) text = Regex.Replace(text, Regex.Escape(home), "%USERPROFILE%", RegexOptions.IgnoreCase);
+                foreach (var name in new[] { Environment.UserName, Environment.MachineName })
+                    if (!string.IsNullOrEmpty(name) && name.Length >= 3)
+                        text = Regex.Replace(text, @"(?<![\w])" + Regex.Escape(name) + @"(?![\w])", "<private>", RegexOptions.IgnoreCase);
+                text = Email.Replace(text, "<email>");
+                return Ipv4.Replace(text, "<ip>");
+            }
+            catch { return text; }
         }
 
         /// Runs on the UI thread (the one that called Start); directly when there is none (tests).
@@ -196,7 +220,12 @@ namespace BridgeNight
         /// One plain-words hint about the latest sample, or null (e.g. "Chrome holds 2.1 GB").
         public static string Tip() { return TipImpl(); }
 
+        /// The getters below return at once with the last result from a background thread (refreshed while they are
+        /// called: apps every 3 s, open apps 5 s, startup apps and drives 30 s). Empty / null until the first is ready.
+        /// Biggest apps by memory, at most 12, with CPU % since the previous refresh.
         public static List<AppUse> TopApps(int count) { return TopAppsImpl(count); }
+        /// NEW in 0.7: apps with a window, like the taskbar (one per program, Windows' own parts left out); null until known.
+        public static int? OpenApps { get { return OpenAppsImpl(); } }
         /// Asks the app to close (CloseMainWindow), never kills League or system processes. False if refused.
         public static bool CloseApp(string name) { return CloseAppImpl(name); }
         public static List<StartupApp> StartupApps() { return StartupAppsImpl(); }
@@ -255,7 +284,7 @@ namespace BridgeNight
         /// Applies one fix for this Windows user only. Never needs admin. note = what happened, in plain words.
         public static bool Fix(string id, out string note) { return FixImpl(id, out note); }
         public static bool Active { get { return ActiveImpl(); } }       // game mode currently applied
-        public static string ActiveText { get { return ActiveTextImpl(); } }    // "High performance plan, music at 30 %"
+        public static string ActiveText { get { return ActiveTextImpl(); } }    // "Music at 30 %"
     }
 
     /* ------------------------------------------------------------------ Audio */
