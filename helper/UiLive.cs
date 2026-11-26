@@ -327,6 +327,18 @@ namespace BridgeNight
         const int LineH = 28, FreshSeconds = 30;
         readonly Timer slide = new Timer { Interval = 15 };
         float offset; // pixels the list is still shifted up while a new event slides in
+        bool prevFresh; // the old top line was highlighted when the new one came in: it shrinks during the slide
+        static readonly Dictionary<int, Font> fonts = new Dictionary<int, Font>();
+
+        /// Text font at a size between Small and Body, cached per tenth of a point (the slide asks for ~20 sizes).
+        static Font Sized(bool bold, float size)
+        {
+            var k = (int)Math.Round(size * 10) * 2 + (bold ? 1 : 0);
+            Font font;
+            if (!fonts.TryGetValue(k, out font))
+                fonts[k] = font = new Font((bold ? Theme.SmallStrong : Theme.Small).FontFamily, (float)Math.Round(size, 1));
+            return font;
+        }
 
         public Timeline()
         {
@@ -335,7 +347,7 @@ namespace BridgeNight
             AccessibleRole = AccessibleRole.List;
             slide.Tick += delegate
             {
-                offset = Math.Max(0, offset - Theme.Px(3));
+                offset = Math.Max(0, offset - Math.Max(Theme.Px(1) * .7f, offset * .12f)); // eases out, about 0.4 s
                 if (offset <= 0) slide.Stop();
                 Invalidate();
             };
@@ -357,7 +369,7 @@ namespace BridgeNight
             if (k == key && freshNow == wasFresh) return;
             // A new event on top: slide it in (only when the page is on screen; the timer stops by itself).
             var newFirst = list.Count > 0 ? list[0].Key : "";
-            if (firstKey != "" && newFirst != firstKey && Visible) { offset = Theme.Px(LineH); slide.Start(); }
+            if (firstKey != "" && newFirst != firstKey && Visible) { prevFresh = wasFresh; offset = Theme.Px(LineH); slide.Start(); }
             firstKey = newFirst;
             key = k;
             lines = list;
@@ -446,39 +458,45 @@ namespace BridgeNight
             {
                 var l = lines[i];
                 var y = i * lh - offset;
-                var fresh = i == 0 && now - l.At < FreshSeconds;
+                // How highlighted this line is (0..1): while a new event slides in, the new top grows into the
+                // highlight and the old top shrinks out of it, so the highlight seems to move down a line.
+                var progress = 1f - offset / Theme.Px(LineH);
+                var em = i == 0 ? (now - l.At < FreshSeconds ? progress : 0f) : i == 1 && offset > 0 && prevFresh ? 1f - progress : 0f;
+                var fresh = em > .5f;
                 var fade = i == 0 ? 255 : Math.Max(110, 255 - i * 14); // older lines get a little quieter
-                TextRenderer.DrawText(g, Ui.Clock(TimeSpan.FromSeconds(l.At)), fresh ? Theme.SmallStrong : Theme.Small, new Rectangle(0, (int)y, timeW, lh), fresh ? Theme.Ink : Theme.Mute, f | TextFormatFlags.Right);
+                var alpha = (int)(fade + (255 - fade) * em);
+                TextRenderer.DrawText(g, Ui.Clock(TimeSpan.FromSeconds(l.At)), Sized(fresh, 9.5f), new Rectangle(0, (int)y, timeW, lh), fresh ? Theme.Ink : Theme.Mute, f | TextFormatFlags.Right);
 
-                // Dot; the newest one glows.
-                var d = Theme.Px(fresh ? 12 : 9);
+                // Dot; the highlighted one is bigger and glows.
+                var d = Theme.Px(9 + 3 * em);
                 var cy = y + lh / 2f;
-                if (fresh)
-                    using (var glow = new SolidBrush(Color.FromArgb(60, l.Dot))) g.FillEllipse(glow, axis - d, cy - d, d * 2, d * 2);
+                if (em > .02f)
+                    using (var glow = new SolidBrush(Color.FromArgb((int)(60 * em), l.Dot))) g.FillEllipse(glow, axis - d, cy - d, d * 2, d * 2);
                 using (var ring = new SolidBrush(Theme.Base)) g.FillEllipse(ring, axis - d / 2f - Theme.Px(2), cy - d / 2f - Theme.Px(2), d + Theme.Px(4), d + Theme.Px(4));
                 using (var b = new SolidBrush(l.Dot)) g.FillEllipse(b, axis - d / 2f, cy - d / 2f, d, d);
 
                 var x = axis + Theme.Px(22);
+                var size = 9.5f + 1f * em; // Small (9.5) up to Body (10.5)
                 foreach (var part in l.Parts)
                 {
-                    var font = fresh ? (part.Value ? Theme.Strong : Theme.Body) : part.Value ? Theme.SmallStrong : Theme.Small;
-                    var color = fresh ? (part.Value ? Theme.Ink : Theme.Ink2) : Color.FromArgb(fade, part.Value ? Theme.Ink : Theme.Ink2);
+                    var font = Sized(part.Value, size);
+                    var color = Color.FromArgb(alpha, part.Value ? Theme.Ink : Theme.Ink2);
                     var w = TextRenderer.MeasureText(g, part.Key, font, Size.Empty, TextFormatFlags.NoPrefix | TextFormatFlags.NoPadding).Width;
                     var room = Width - Theme.Px(80) - x;
                     if (room <= 0) break;
                     TextRenderer.DrawText(g, part.Key, font, new Rectangle(x, (int)y, Math.Min(w + 1, room), lh), color, f | TextFormatFlags.EndEllipsis);
                     x += w;
                 }
-                if (fresh)
+                if (em > .05f)
                 {
-                    // Small "NOW" tag after the newest line.
+                    // Small "NOW" tag after the highlighted line; it fades with the highlight.
                     var tag = new RectangleF(x + Theme.Px(10), cy - Theme.Px(9), Theme.Px(40), Theme.Px(18));
                     using (var path = Theme.Round(tag, tag.Height / 2))
                     {
-                        using (var b = new SolidBrush(Color.FromArgb(40, l.Dot))) g.FillPath(b, path);
-                        using (var p = new Pen(Color.FromArgb(120, l.Dot))) g.DrawPath(p, path);
+                        using (var b = new SolidBrush(Color.FromArgb((int)(40 * em), l.Dot))) g.FillPath(b, path);
+                        using (var p = new Pen(Color.FromArgb((int)(120 * em), l.Dot))) g.DrawPath(p, path);
                     }
-                    TextRenderer.DrawText(g, "NOW", Theme.Tiny, Rectangle.Round(tag), Theme.Ink, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding);
+                    TextRenderer.DrawText(g, "NOW", Theme.Tiny, Rectangle.Round(tag), Color.FromArgb((int)(255 * em), Theme.Ink), TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding);
                 }
             }
         }
