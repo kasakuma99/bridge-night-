@@ -1,592 +1,333 @@
-// Bridge Night Helper: the main window (sidebar + Status, Setup, Settings, Log and About pages).
-// Layout is in 96-dpi pixels; AutoScaleMode.Dpi scales it, painting code scales with Theme.Px.
+// Bridge Night Helper: the main window. Own title bar (with the mini-window button), sidebar, and the pages
+// (UiHome.cs, UiPerformance.cs, UiPcPages.cs, UiSettingsHelp.cs). Pop-ups and the tour: UiPopups.cs.
+// Layout numbers are 96-dpi units, turned into device pixels with Theme.Px / Theme.R.
 
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Drawing;
 using System.Drawing.Drawing2D;
-using System.IO;
 using System.Runtime.InteropServices;
-using System.Text.RegularExpressions;
-using System.Threading;
 using System.Windows.Forms;
 
 namespace BridgeNight
 {
-    class SettingsForm : Form
+    /// One page of the window. Enter/Leave run when it becomes visible on screen or stops being visible;
+    /// Tick runs once a second while it is visible. Measuring only happens between Enter and Leave.
+    class Page : Backdrop
     {
-        const string ReleasesUrl = "https://github.com/kasakuma99/bridge-night-/releases";
-        const string RepoUrl = "https://github.com/kasakuma99/bridge-night-";
-        const int SidebarWidth = 220, PageWidth = 740, PageHeight = 620, Inner = 676, Left0 = 32, Top0 = 104;
-        static readonly Font StepTitle = new Font("Segoe UI Semibold", 12f);
+        public const int X0 = 24, W0 = 776, Y0 = 76, PageW = 824, PageH = 640;
+        protected readonly MainWindow Win;
+        protected readonly Settings S;
 
-        static readonly string[][] SetupSteps =
+        public Page(MainWindow win, string name)
         {
-            new[] { "Paste token", "Make it on the site's Helper page, then paste it in Settings." },
-            new[] { "Save and test", "Click \"Save and test connection\" on the Settings page." },
-            new[] { "Play", "Keep the BN icon by the clock running. Custom games only." },
-        };
+            Win = win;
+            S = win.Settings;
+            Bounds = Theme.R(MainWindow.SidebarW, MainWindow.TitleH, PageW, PageH);
+            Visible = false;
+            AccessibleName = name;
+            AccessibleRole = AccessibleRole.PropertyPage;
+        }
 
-        static readonly string[][] FairPlay =
+        public virtual void Shown() { }
+        public virtual void Hidden() { }
+        public virtual void Tick() { }
+
+        /// Page title with the small "?" that opens Help at `help`.
+        protected void Heading(string text, string help)
         {
-            new[] { "Reads, never controls", "It only reads the League client on this PC. It never clicks, picks or changes anything." },
-            new[] { "No champions during champ select", "Picks are sent on the loading screen, once everyone can see them. Nothing the client hides is shown." },
-            new[] { "Custom games only", "Normal, ranked and other queue games are ignored. Only custom games go to Bridge Night." },
-        };
+            var l = Ui.Label(this, text, Theme.H1, Theme.Ink, X0, 18, 400, 44);
+            l.AutoSize = true;
+            l.Height = Theme.Px(44);
+            if (help == null) return;
+            var q = new IconButton("?", "Help for " + text, 26) { Round = true, Plain = true };
+            q.Location = new Point(l.Right + Theme.Px(10), l.Top + (l.Height - q.Height) / 2 + Theme.Px(1));
+            q.Click += delegate { Win.OpenHelp(help); };
+            Controls.Add(q);
+        }
 
-        readonly Settings settings;
-        readonly Action<bool> onPause;
-        readonly Action<string> log;
+        protected static Label L(Control parent, string text, Font font, Color color, int x, int y, int w, int h)
+        {
+            return Ui.Label(parent, text, font, color, x, y, w, h);
+        }
+    }
+
+    class MainWindow : Form
+    {
+        public const int SidebarW = 216, TitleH = 40;
+        public const string SiteUrl = "https://bridge-night.bridge-night.workers.dev";
+        public const string ReleasesUrl = "https://github.com/kasakuma99/bridge-night-/releases";
+        public const string RepoUrl = "https://github.com/kasakuma99/bridge-night-";
+        public const string DiscordUrl = "https://discord.gg/mEAF2C9Qq";
+
+        public readonly Settings Settings;
+        public readonly Action<bool> SetPausedAction;
+        public readonly Action<string> Log;
+        public readonly Action OpenMini;
+
         readonly List<NavItem> nav = new List<NavItem>();
-        readonly List<Control> pages = new List<Control>();
+        readonly List<Page> pages = new List<Page>();
         readonly System.Windows.Forms.Timer timer = new System.Windows.Forms.Timer();
+        Page current, live;
+        Control pill;
+        int ticks;
+        TourOverlay tour;
 
-        // Settings page
-        InputBox server, token;
-        ToggleSwitch paused, autostart;
-        bool syncing;
-        // Status page
-        Card banner, leagueCard, serverCard, queueCard, sendCard;
-        Label bannerTitle, phaseValue, customValue, sentValue, sentWhat, errorText, queueText, sendTitle, sendText;
-        string lastLog;
-        DotLabel leagueBig, serverBig, footer;
-        Gauge cpuGauge, gpuGauge;
-        int hwTick;
-        const int GaugeTop = 446;
-        FlatButton pauseButton, copyButton;
-        // Log page
-        readonly ListBox logBox = new ListBox();
-        int logExtent;
-        DateTime copiedUntil;
+        public HomePage Home;
+        public PerformancePage Performance;
+        public NetworkPage Network;
+        public GameModePage GameModeP;
+        public AudioPage Audio;
+        public HelpPage Help;
+        public SettingsPage SettingsP;
 
-        public SettingsForm(Settings s, List<string> lines, string statusText, Action<bool> onPause, Action<string> log)
+        public MainWindow(Settings s, List<string> lines, Action<bool> onPause, Action<string> log, Action openMini)
         {
-            settings = s;
-            this.onPause = onPause;
-            this.log = log;
+            Settings = s;
+            SetPausedAction = onPause;
+            Log = log;
+            OpenMini = openMini;
 
             SuspendLayout();
-            AutoScaleDimensions = new SizeF(96f, 96f);
-            AutoScaleMode = AutoScaleMode.Dpi;
+            AutoScaleMode = AutoScaleMode.None;
             Font = Theme.Body;
-            Text = Program.Title + " " + Program.Version;
+            Text = Program.Title;
             Icon = Theme.LargeIcon;
-            FormBorderStyle = FormBorderStyle.FixedSingle;
-            MaximizeBox = false;
+            FormBorderStyle = FormBorderStyle.None;
             StartPosition = FormStartPosition.CenterScreen;
-            ClientSize = new Size(SidebarWidth + PageWidth, PageHeight);
-            BackColor = Theme.Sidebar;
+            ClientSize = new Size(Theme.Px(Theme.WindowW), Theme.Px(Theme.WindowH));
+            BackColor = Theme.Base;
             ForeColor = Theme.Ink;
             DoubleBuffered = true;
+            KeyPreview = true;
 
-            BuildSidebar(statusText);
-            BuildStatus();
-            BuildSetup();
-            BuildSettings();
-            BuildLog(lines);
-            BuildAbout();
+            BuildTitleBar();
+            Home = Add(new HomePage(this));
+            Performance = Add(new PerformancePage(this));
+            Network = Add(new NetworkPage(this));
+            GameModeP = Add(new GameModePage(this));
+            Audio = Add(new AudioPage(this));
+            Help = Add(new HelpPage(this, lines));
+            SettingsP = Add(new SettingsPage(this));
+            BuildSidebar();
             ResumeLayout(false);
 
-            ShowPage(string.IsNullOrEmpty(s.Token) ? 1 : 0);
-            UpdatePauseUi();
-            RefreshStatus();
-            timer.Interval = 500;
-            timer.Tick += delegate
+            ShowPage(string.IsNullOrEmpty(s.Token) ? (Page)SettingsP : Home);
+            timer.Interval = 1000;
+            timer.Tick += delegate { OnTick(); };
+            AudioCtl.Changed += OnAudioChanged;
+            Updater.Changed += OnUpdaterChanged;
+        }
+
+        T Add<T>(T page) where T : Page
+        {
+            pages.Add(page);
+            Controls.Add(page);
+            return page;
+        }
+
+        /* ------------------------------------------------------------ title bar */
+
+        [DllImport("user32.dll")] static extern bool ReleaseCapture();
+        [DllImport("user32.dll")] static extern IntPtr SendMessage(IntPtr hWnd, int msg, IntPtr wParam, IntPtr lParam);
+
+        /// Lets a borderless window be dragged by `c`.
+        public static void MakeDraggable(Control c, Form f)
+        {
+            c.MouseDown += delegate (object o, MouseEventArgs e)
             {
-                RefreshStatus();
-                // CPU/GPU gauges: once a second, and only while the window is open (no cost in the tray).
-                if (Visible && ++hwTick % 2 == 0)
-                {
-                    cpuGauge.Value = HwMonitor.CpuPercent();
-                    gpuGauge.Value = HwMonitor.GpuPercent();
-                }
+                if (e.Button != MouseButtons.Left) return;
+                ReleaseCapture();
+                SendMessage(f.Handle, 0xA1, (IntPtr)2, IntPtr.Zero); // WM_NCLBUTTONDOWN on the caption
             };
-            timer.Start();
         }
 
-        /* ------------------------------------------------------------ building blocks */
-
-        static Label AddLabel(Control parent, string text, Font font, Color color, int x, int y, int w, int h)
+        void BuildTitleBar()
         {
-            var l = new Label { Text = text, Font = font, ForeColor = color, Bounds = new Rectangle(x, y, w, h), AutoEllipsis = true, UseMnemonic = false };
-            if (parent is SkyPanel) l.BackColor = Color.Transparent;
-            parent.Controls.Add(l);
-            return l;
-        }
-
-        static Card AddCard(Control parent, string title, int x, int y, int w, int h)
-        {
-            var c = new Card(title) { Bounds = new Rectangle(x, y, w, h) };
-            parent.Controls.Add(c);
-            return c;
-        }
-
-        static void AddDivider(Control parent, int x, int y, int w)
-        {
-            parent.Controls.Add(new Panel { BackColor = Theme.Border, Bounds = new Rectangle(x, y, w, 1) });
-        }
-
-        /// A "Name ........ value" row; returns the value label.
-        static Label AddRow(Control parent, string name, int y)
-        {
-            AddLabel(parent, name, Theme.Body, Theme.Mute, 20, y, 130, 24).TextAlign = ContentAlignment.MiddleLeft;
-            var v = AddLabel(parent, "", Theme.Strong, Theme.Ink, 150, y, parent.Width - 170, 24);
-            v.TextAlign = ContentAlignment.MiddleRight;
-            v.AccessibleName = name;
-            return v;
-        }
-
-        static FlatButton AddButton(Control parent, string text, bool primary, int x, int y)
-        {
-            var b = new FlatButton(text, primary) { Location = new Point(x, y) };
-            parent.Controls.Add(b);
-            return b;
-        }
-
-        SkyPanel AddPage(string title, string subtitle)
-        {
-            var p = new SkyPanel { Bounds = new Rectangle(SidebarWidth, 0, PageWidth, PageHeight), Visible = false, AccessibleName = title, AccessibleRole = AccessibleRole.PropertyPage };
-            AddLabel(p, title, Theme.H1, Theme.Ink, Left0, 26, Inner, 40);
-            AddLabel(p, subtitle, Theme.Body, Theme.Mute, Left0, 66, Inner, 24);
-            Controls.Add(p);
-            pages.Add(p);
-            return p;
-        }
-
-        static void GradientText(Graphics g, string text, string family, FontStyle style, float pt, PointF at)
-        {
-            using (var f = new FontFamily(family))
-            using (var path = new GraphicsPath())
+            var bar = new Backdrop { Bounds = Theme.R(0, 0, Theme.WindowW, TitleH), AccessibleName = "Title bar" };
+            bar.Paint += delegate (object o, PaintEventArgs e)
             {
-                path.AddString(text, f, (int)style, pt * 96f / 72f * Theme.Scale, at, StringFormat.GenericTypographic);
-                using (var b = Theme.Sunset(path.GetBounds(), 0f)) g.FillPath(b, path);
-            }
-        }
-
-        static void Open(string url)
-        {
-            try { Process.Start(url); } catch (Exception e) { MessageBox.Show("Could not open the browser: " + e.Message, "Bridge Night Helper"); }
+                e.Graphics.InterpolationMode = InterpolationMode.HighQualityBicubic;
+                Theme.DrawLogo(e.Graphics, Theme.R(14, 12, 16, 16));
+                TextRenderer.DrawText(e.Graphics, Program.Title, Theme.Small, new Point(Theme.Px(40), Theme.Px(11)), Theme.Ink2, TextFormatFlags.NoPrefix);
+            };
+            MakeDraggable(bar, this);
+            var close = new IconButton("\uE8BB", "Close to the tray", 34) { Plain = true };
+            close.Location = new Point(Theme.Px(Theme.WindowW - 6 - 34), Theme.Px(3));
+            close.Click += delegate { Hide(); };
+            var min = new IconButton("\uE921", "Minimize", 34) { Plain = true };
+            min.Location = new Point(close.Left - Theme.Px(38), close.Top);
+            min.Click += delegate { WindowState = FormWindowState.Minimized; };
+            var mini = new IconButton("\uE944", "Mini window", 34) { Plain = true };
+            mini.Location = new Point(min.Left - Theme.Px(38), close.Top);
+            mini.Click += delegate { if (OpenMini != null) OpenMini(); };
+            var tip = new ToolTip();
+            tip.SetToolTip(mini, "Mini window: a slim strip that stays on top");
+            tip.SetToolTip(min, "Minimize");
+            tip.SetToolTip(close, "Close (keeps running by the clock)");
+            bar.Controls.Add(mini);
+            bar.Controls.Add(min);
+            bar.Controls.Add(close);
+            Controls.Add(bar);
         }
 
         /* ------------------------------------------------------------ sidebar */
 
-        void BuildSidebar(string statusText)
+        void BuildSidebar()
         {
-            var side = new Panel { Bounds = new Rectangle(0, 0, SidebarWidth, PageHeight), BackColor = Theme.Sidebar };
+            var side = new Backdrop { Bounds = Theme.R(0, TitleH, SidebarW, Theme.WindowH - TitleH), AccessibleName = "Pages" };
             side.Paint += delegate (object o, PaintEventArgs e)
             {
                 var g = e.Graphics;
-                g.SmoothingMode = SmoothingMode.AntiAlias;
-                Theme.DrawMark(g, new RectangleF(Theme.Px(20), Theme.Px(24), Theme.Px(38), Theme.Px(38)));
-                GradientText(g, "Bridge Night", "Segoe UI Semibold", FontStyle.Regular, 13f, new PointF(Theme.Px(68), Theme.Px(24)));
-                TextRenderer.DrawText(g, "Helper  v" + Program.Version, Theme.Small, new Point(Theme.Px(68), Theme.Px(46)), Theme.Mute);
-                TextRenderer.DrawText(g, "THIS PC", Theme.Caps, new Point(Theme.Px(22), Theme.Px(GaugeTop - 24)), Theme.Mute);
-                using (var p = new Pen(Theme.Border)) g.DrawLine(p, side.Width - 1, 0, side.Width - 1, side.Height);
+                g.InterpolationMode = InterpolationMode.HighQualityBicubic;
+                Theme.DrawLogo(g, Theme.R(20, 8, 40, 40));
+                TextRenderer.DrawText(g, "Bridge Night", Theme.CardTitle, new Point(Theme.Px(70), Theme.Px(8)), Theme.Ink, TextFormatFlags.NoPrefix);
+                TextRenderer.DrawText(g, "Helper " + Program.Version, Theme.Small, new Point(Theme.Px(70), Theme.Px(29)), Theme.Mute, TextFormatFlags.NoPrefix);
+                using (var p = new Pen(Theme.Border))
+                    g.DrawLine(p, Theme.Px(24), Theme.Px(112), Theme.Px(SidebarW - 24), Theme.Px(112));
             };
-            string[][] items = { new[] { "Status", "\uE9D9" }, new[] { "Setup", "\uE9D5" }, new[] { "Settings", "\uE713" }, new[] { "Log", "\uE8A5" }, new[] { "About", "\uE946" } };
-            for (var i = 0; i < items.Length; i++)
-            {
-                var item = new NavItem(items[i][0], items[i][1]) { Location = new Point(12, 92 + i * 46) };
-                var page = i;
-                item.Click += delegate { ShowPage(page); };
-                side.Controls.Add(item);
-                nav.Add(item);
-            }
-            cpuGauge = new Gauge("CPU") { Bounds = new Rectangle(22, GaugeTop, 80, 80), BackColor = Theme.Sidebar };
-            gpuGauge = new Gauge("GPU") { Bounds = new Rectangle(118, GaugeTop, 80, 80), BackColor = Theme.Sidebar };
-            side.Controls.Add(cpuGauge);
-            side.Controls.Add(gpuGauge);
-            footer = new DotLabel { Bounds = new Rectangle(20, PageHeight - 48, SidebarWidth - 36, 24), Font = Theme.Small, ForeColor = Theme.Mute, Text = statusText, AccessibleName = "Helper status" };
-            side.Controls.Add(footer);
+            AddNav(side, "Home", "\uE80F", Home, 64);
+            AddNav(side, "Performance", "\uE9D9", Performance, 124);
+            AddNav(side, "Network", "\uE839", Network, 164);
+            AddNav(side, "Game mode", "\uE7FC", GameModeP, 204);
+            AddNav(side, "Audio", "\uE7F6", Audio, 244);
+            AddNav(side, "Help", "\uE897", Help, 482);
+            AddNav(side, "Settings", "\uE713", SettingsP, 522);
+            pill = new StatusPill(this) { Bounds = Theme.R(10, 574, SidebarW - 20, 44) };
+            side.Controls.Add(pill);
             Controls.Add(side);
         }
 
-        void ShowPage(int index)
+        void AddNav(Control side, string text, string glyph, Page page, int y)
         {
-            for (var i = 0; i < pages.Count; i++)
+            var item = new NavItem(text, glyph) { Location = new Point(Theme.Px(8), Theme.Px(y)), Tag = page };
+            item.Click += delegate { ShowPage(page); };
+            side.Controls.Add(item);
+            nav.Add(item);
+        }
+
+        public void ShowPage(Page page)
+        {
+            if (current != null && current != page) current.Visible = false;
+            current = page;
+            page.Visible = true;
+            foreach (var n in nav) n.Selected = n.Tag == page;
+            UpdateLive();
+        }
+
+        public void OpenHelp(string section) { Help.Open(section); ShowPage(Help); }
+        public void OpenPerformance(int tab) { Performance.Tab = tab; ShowPage(Performance); }
+
+        /// Starts/stops the visible page's live views: only while the window is on screen and not minimized.
+        void UpdateLive()
+        {
+            var want = Visible && WindowState != FormWindowState.Minimized ? current : null;
+            if (want == live) return;
+            if (live != null) live.Hidden();
+            live = want;
+            if (live != null) { live.Shown(); live.Tick(); UpdateBadges(); pill.Invalidate(); }
+            if (live != null) timer.Start(); else timer.Stop();
+        }
+
+        void OnTick()
+        {
+            if (live == null) return;
+            live.Tick();
+            pill.Invalidate();
+            if (++ticks % 30 == 0) UpdateBadges();
+        }
+
+        /// Game mode nav badge: how many checks found a problem.
+        void UpdateBadges()
+        {
+            var n = 0;
+            try
             {
-                pages[i].Visible = i == index;
-                nav[i].Selected = i == index;
+                foreach (var c in GameMode.BeforeNight()) if (c.Problem) n++;
+                foreach (var c in GameMode.Fixes()) if (c.Problem) n++;
             }
+            catch { }
+            foreach (var item in nav) if (item.Tag == GameModeP) item.Badge = n > 0 ? n.ToString() : "";
         }
 
-        /* ------------------------------------------------------------ status page */
+        void OnAudioChanged() { if (live == Audio || live == Home) live.Tick(); }
+        void OnUpdaterChanged() { if (live == Home || live == SettingsP) live.Tick(); }
 
-        void BuildStatus()
+        protected override void OnVisibleChanged(EventArgs e) { base.OnVisibleChanged(e); UpdateLive(); }
+        protected override void OnResize(EventArgs e) { base.OnResize(e); if (IsHandleCreated) UpdateLive(); }
+
+        /* ------------------------------------------------------------ tour */
+
+        public void ShowTour()
         {
-            var p = AddPage("Status", "What the helper sees right now. Updates by itself.");
-
-            banner = AddCard(p, null, Left0, Top0, Inner, 64);
-            banner.Glow = true;
-            banner.Visible = false;
-            bannerTitle = AddLabel(banner, "", Theme.Strong, Theme.Ink, 20, 11, 440, 22);
-            AddLabel(banner, "A newer Bridge Night Helper is ready on GitHub.", Theme.Small, Theme.Mute, 20, 33, 440, 20);
-            var get = new FlatButton("Get the update", true);
-            get.Location = new Point(Inner - 17 - get.Width, 11);
-            get.Click += delegate { Open(ReleasesUrl); };
-            banner.Controls.Add(get);
-
-            const int half = 330, right = Left0 + half + 16;
-            leagueCard = AddCard(p, "League client", Left0, Top0, half, 210);
-            leagueBig = new DotLabel { Bounds = new Rectangle(20, 42, half - 40, 32), Font = Theme.Big, ForeColor = Theme.Ink, AccessibleName = "League client" };
-            leagueCard.Controls.Add(leagueBig);
-            AddDivider(leagueCard, 20, 86, half - 40);
-            phaseValue = AddRow(leagueCard, "Phase", 100);
-            customValue = AddRow(leagueCard, "Custom game", 130);
-            AddLabel(leagueCard, "Only custom games are sent.", Theme.Small, Theme.Mute, 20, 170, half - 40, 20);
-
-            serverCard = AddCard(p, "Server", right, Top0, half, 210);
-            serverBig = new DotLabel { Bounds = new Rectangle(20, 42, half - 40, 32), Font = Theme.Big, ForeColor = Theme.Ink, AccessibleName = "Server" };
-            serverCard.Controls.Add(serverBig);
-            AddDivider(serverCard, 20, 86, half - 40);
-            sentValue = AddRow(serverCard, "Last check", 100);
-            sentWhat = AddLabel(serverCard, "", Theme.Small, Theme.Mute, 20, 128, half - 40, 20);
-            errorText = AddLabel(serverCard, "", Theme.Small, Theme.Mute, 20, 154, half - 40, 40);
-
-            queueCard = AddCard(p, "Last message", Left0, Top0 + 226, half, 160);
-            queueText = AddLabel(queueCard, "Nothing yet.", Theme.Body, Theme.Ink, 20, 40, half - 40, 100);
-            queueText.AccessibleName = "Last message from the helper";
-
-            sendCard = AddCard(p, "Sending", right, Top0 + 226, half, 160);
-            sendTitle = AddLabel(sendCard, "", Theme.Big, Theme.Ink, 20, 38, half - 40, 30);
-            sendText = AddLabel(sendCard, "", Theme.Small, Theme.Mute, 20, 68, half - 40, 20);
-            pauseButton = AddButton(sendCard, "Pause sending", false, 17, 100);
-            pauseButton.Size = new Size(half - 34, 46);
-            pauseButton.Click += delegate { onPause(!settings.Paused); };
+            if (tour != null) return;
+            tour = new TourOverlay(this);
+            Controls.Add(tour);
+            tour.BringToFront();
+            tour.Focus();
         }
 
-        static void Set(Label l, string text) { if (l.Text != text) l.Text = text; }
-        static void Set(Label l, string text, Color color) { Set(l, text); if (l.ForeColor != color) l.ForeColor = color; }
-
-        static string When(DateTime t) { return t.Date == DateTime.Today ? t.ToString("HH:mm:ss") : t.ToString("d MMM, HH:mm"); }
-
-        void RefreshStatus()
+        public void TourClosed()
         {
-            var s = HelperStatus.Read();
-
-            Set(leagueBig, s.LeagueConnected ? "Connected" : "Waiting for League");
-            leagueBig.Dot = s.LeagueConnected ? Theme.Teal : Theme.Amber;
-            // LCU phases are CamelCase ("ChampSelect"): show them as words.
-            Set(phaseValue, string.IsNullOrEmpty(s.Phase) ? "-" : Regex.Replace(s.Phase, "(?<=[a-z])(?=[A-Z])", " "));
-            Set(customValue, !s.LeagueConnected ? "-" : s.CustomGame ? "Yes" : "No", s.CustomGame ? Theme.Amber : Theme.Ink);
-
-            if (s.ServerOk == null) { Set(serverBig, "Not checked yet"); serverBig.Dot = Theme.Mute; }
-            else if (s.ServerOk.Value) { Set(serverBig, "OK"); serverBig.Dot = Theme.Teal; }
-            else { Set(serverBig, "Problem"); serverBig.Dot = Theme.Coral; }
-            Set(sentValue, s.LastSentAt.HasValue ? When(s.LastSentAt.Value) : "Nothing yet");
-            Set(sentWhat, s.LastSent ?? "");
-            if (string.IsNullOrEmpty(s.LastError)) Set(errorText, "No errors.", Theme.Mute);
-            else Set(errorText, "Last error: " + s.LastError, Theme.Coral);
-
-            if (lastLog != null) Set(queueText, lastLog);
-
-            var update = !string.IsNullOrEmpty(s.UpdateVersion);
-            if (update) Set(bannerTitle, "Update available: v" + s.UpdateVersion.TrimStart('v', 'V'));
-            if (banner.Visible != update)
-            {
-                banner.Visible = update;
-                var shift = (update ? 1 : -1) * (banner.Height + Theme.Px(16));
-                foreach (var c in new Control[] { leagueCard, serverCard, queueCard, sendCard }) c.Top += shift;
-            }
-
-            footer.Dot = settings.Paused ? Theme.Coral : s.LeagueConnected ? Theme.Teal : Theme.Amber;
-            if (copiedUntil != DateTime.MinValue && DateTime.Now > copiedUntil) { copyButton.Text = "Copy log"; copiedUntil = DateTime.MinValue; }
+            if (tour == null) return;
+            Controls.Remove(tour);
+            tour.Dispose();
+            tour = null;
+            Settings.TourDone = true;
+            try { Settings.Save(); } catch { }
         }
 
-        void UpdatePauseUi()
-        {
-            var p = settings.Paused;
-            Set(sendTitle, p ? "Paused" : "Sending is on", p ? Theme.Amber : Theme.Ink);
-            Set(sendText, p ? "Nothing is sent until you resume." : "Your custom games go to Bridge Night.");
-            pauseButton.Text = p ? "Resume sending" : "Pause sending";
-            pauseButton.Primary = p;
-        }
+        /* ------------------------------------------------------------ calls from the tray */
 
-        /* ------------------------------------------------------------ setup page */
-
-        void BuildSetup()
-        {
-            var p = AddPage("Setup", "Three steps, once. After that the helper works on its own.");
-            var cards = new List<Card>();
-            for (var i = 0; i < SetupSteps.Length; i++)
-            {
-                var c = AddCard(p, null, Left0, Top0 + i * 104, Inner, 88);
-                var number = (i + 1).ToString();
-                c.Paint += delegate (object o, PaintEventArgs e)
-                {
-                    e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
-                    var badge = new RectangleF(Theme.Px(24), Theme.Px(24), Theme.Px(40), Theme.Px(40));
-                    using (var b = Theme.Sunset(badge, 45f)) e.Graphics.FillEllipse(b, badge);
-                    TextRenderer.DrawText(e.Graphics, number, StepTitle, Rectangle.Round(badge), Theme.OnAccent,
-                        TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding);
-                };
-                AddLabel(c, SetupSteps[i][0], StepTitle, Theme.Ink, 84, 19, 420, 26).AccessibleName = "Step " + number + ": " + SetupSteps[i][0];
-                AddLabel(c, SetupSteps[i][1], Theme.Body, Theme.Mute, 84, 46, i == 0 ? 420 : 572, 24);
-                cards.Add(c);
-            }
-            var open = new FlatButton("Open Settings", false);
-            open.Location = new Point(Inner - 17 - open.Width, 23);
-            open.Click += delegate { ShowPage(2); };
-            cards[0].Controls.Add(open);
-
-            // Short sunset lines join the step badges.
-            p.Paint += delegate (object o, PaintEventArgs e)
-            {
-                using (var pen = new Pen(Color.FromArgb(160, Theme.Amber), 2 * Theme.Scale))
-                    for (var i = 0; i + 1 < cards.Count; i++)
-                    {
-                        var x = cards[i].Left + Theme.Px(44);
-                        e.Graphics.DrawLine(pen, x, cards[i].Bottom, x, cards[i + 1].Top);
-                    }
-            };
-        }
-
-        /* ------------------------------------------------------------ settings page */
-
-        void BuildSettings()
-        {
-            var p = AddPage("Settings", "Connection to the Bridge Night site and how the helper runs.");
-
-            var conn = AddCard(p, "Connection", Left0, Top0, Inner, 216);
-            AddLabel(conn, "Server URL", Theme.Strong, Theme.Ink, 20, 40, 300, 22);
-            server = new InputBox("Server URL") { Bounds = new Rectangle(17, 62, Inner - 34, 42) };
-            server.Box.Text = settings.Server;
-            conn.Controls.Add(server);
-            AddLabel(conn, "Helper token", Theme.Strong, Theme.Ink, 20, 112, 300, 22);
-            token = new InputBox("Helper token") { Bounds = new Rectangle(17, 134, Inner - 34, 42) };
-            token.Box.Text = settings.Token;
-            token.Box.UseSystemPasswordChar = true;
-            conn.Controls.Add(token);
-            AddLabel(conn, "Make it on the site's Helper page (\"Your helper token\"). Stored encrypted for your Windows account.",
-                Theme.Small, Theme.Mute, 20, 182, Inner - 40, 22);
-
-            var beh = AddCard(p, "Behaviour", Left0, Top0 + 232, Inner, 160);
-            paused = AddToggle(beh, "Pause sending", "Nothing is sent while paused. Same as Pause in the tray menu.", 40);
-            paused.Checked = settings.Paused;
-            paused.CheckedChanged += delegate { if (!syncing) onPause(paused.Checked); };
-            AddDivider(beh, 20, 96, Inner - 40);
-            autostart = AddToggle(beh, "Start with Windows", "Starts the helper when you sign in to Windows.", 106);
-            try { autostart.Checked = Settings.Autostart; } catch { }
-            autostart.CheckedChanged += delegate
-            {
-                try { Settings.Autostart = autostart.Checked; } catch (Exception e) { MessageBox.Show("Could not change that: " + e.Message); }
-            };
-
-            var actions = AddCard(p, null, Left0, Top0 + 408, Inner, 68);
-            AddLabel(actions, "Saving uses the new settings right away.", Theme.Small, Theme.Mute, 20, 24, 300, 20);
-            var test = new FlatButton("Save and test connection", true);
-            test.Location = new Point(Inner - 17 - test.Width, 13);
-            test.Click += delegate { SaveSettings(); TestConnection(); };
-            var save = new FlatButton("Save", false);
-            save.Location = new Point(test.Left - 8 - save.Width, 13);
-            save.Click += delegate { SaveSettings(); };
-            actions.Controls.Add(test);
-            actions.Controls.Add(save);
-        }
-
-        static ToggleSwitch AddToggle(Control card, string title, string help, int y)
-        {
-            AddLabel(card, title, Theme.Strong, Theme.Ink, 20, y, 520, 22);
-            AddLabel(card, help, Theme.Small, Theme.Mute, 20, y + 23, 540, 20);
-            var t = new ToggleSwitch(title) { AccessibleDescription = help };
-            t.Location = new Point(card.Width - 15 - t.Width, y + 4);
-            card.Controls.Add(t);
-            return t;
-        }
-
-        void SaveSettings()
-        {
-            var url = server.Box.Text.Trim();
-            if (!url.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
-            {
-                MessageBox.Show("The server URL must start with https://", "Bridge Night Helper");
-                return;
-            }
-            settings.Server = url;
-            settings.Token = token.Box.Text.Trim();
-            try { settings.Save(); log("Settings saved"); }
-            catch (Exception e) { MessageBox.Show("Could not save: " + e.Message); }
-        }
-
-        void TestConnection()
-        {
-            var s = settings;
-            ThreadPool.QueueUserWorkItem(delegate
-            {
-                string note;
-                object reply;
-                int code;
-                var d = new Dictionary<string, object>();
-                d["type"] = "hello";
-                var ok = Watcher.Post(s, d, out note, out reply, out code);
-                log("Connection test: " + note);
-                HelperStatus.SetSent(ok, "Connection test: " + note);
-                BeginInvoke((Action)delegate { MessageBox.Show(this, ok ? "Works! " + note : "Not working: " + note, Program.Title); });
-            });
-        }
-
-        /* ------------------------------------------------------------ log page */
-
-        [DllImport("uxtheme.dll", CharSet = CharSet.Unicode)]
-        static extern int SetWindowTheme(IntPtr hwnd, string appName, string idList);
-
-        void BuildLog(List<string> lines)
-        {
-            var p = AddPage("Log", "The last 200 messages. The full log is helper-log.txt in the log folder.");
-            var card = AddCard(p, "Last messages", Left0, Top0, Inner, 392);
-            logBox.Bounds = new Rectangle(20, 42, Inner - 36, 334);
-            logBox.BorderStyle = BorderStyle.None;
-            logBox.BackColor = Theme.Surface;
-            logBox.ForeColor = Theme.Ink;
-            logBox.IntegralHeight = false;
-            logBox.HorizontalScrollbar = true;
-            logBox.DrawMode = DrawMode.OwnerDrawFixed;
-            logBox.ItemHeight = Theme.Px(24);
-            logBox.AccessibleName = "Log messages";
-            logBox.DrawItem += DrawLogLine;
-            // Dark scroll bars on Windows 10/11; older versions keep the default ones.
-            logBox.HandleCreated += delegate { try { SetWindowTheme(logBox.Handle, "DarkMode_Explorer", null); } catch { } };
-            foreach (var l in lines) AddLogItem(l);
-            if (lines.Count > 0) lastLog = lines[lines.Count - 1];
-            card.Controls.Add(logBox);
-
-            var actions = AddCard(p, null, Left0, Top0 + 408, Inner, 68);
-            AddLabel(actions, "Your helper token is never written to the log.", Theme.Small, Theme.Mute, 20, 24, 320, 20);
-            var folder = new FlatButton("Open log folder", false);
-            folder.Location = new Point(Inner - 17 - folder.Width, 13);
-            folder.Click += delegate
-            {
-                try
-                {
-                    var dir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "BridgeNightHelper");
-                    Directory.CreateDirectory(dir);
-                    Process.Start("explorer.exe", "\"" + dir + "\"");
-                }
-                catch (Exception e) { MessageBox.Show("Could not open the folder: " + e.Message, "Bridge Night Helper"); }
-            };
-            copyButton = new FlatButton("Copy log", false);
-            copyButton.Location = new Point(folder.Left - 8 - copyButton.Width, 13);
-            copyButton.Click += delegate
-            {
-                if (logBox.Items.Count == 0) return;
-                var all = new string[logBox.Items.Count];
-                logBox.Items.CopyTo(all, 0);
-                try
-                {
-                    Clipboard.SetText(string.Join(Environment.NewLine, all));
-                    copyButton.Text = "Copied";
-                    copiedUntil = DateTime.Now.AddSeconds(1.5);
-                }
-                catch (Exception e) { MessageBox.Show("Could not copy: " + e.Message, "Bridge Night Helper"); }
-            };
-            actions.Controls.Add(copyButton);
-            actions.Controls.Add(folder);
-            ScrollLog();
-        }
-
-        static void SplitLine(string line, out string time, out string text)
-        {
-            var i = line.IndexOf("  ", StringComparison.Ordinal);
-            time = i > 0 ? line.Substring(0, i) : "";
-            text = i > 0 ? line.Substring(i + 2) : line;
-        }
-
-        void DrawLogLine(object sender, DrawItemEventArgs e)
-        {
-            if (e.Index < 0) return;
-            var g = e.Graphics;
-            var selected = (e.State & DrawItemState.Selected) != 0;
-            using (var b = new SolidBrush(selected ? Theme.NavActive : Theme.Surface)) g.FillRectangle(b, e.Bounds);
-            string time, text;
-            SplitLine((string)logBox.Items[e.Index], out time, out text);
-            var tw = Theme.Px(78);
-            var bad = text.IndexOf("error", StringComparison.OrdinalIgnoreCase) >= 0 || text.IndexOf("fail", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                text.StartsWith("Connection test: Not", StringComparison.OrdinalIgnoreCase);
-            const TextFormatFlags flags = TextFormatFlags.VerticalCenter | TextFormatFlags.NoPrefix | TextFormatFlags.SingleLine;
-            TextRenderer.DrawText(g, time, Theme.Mono, new Rectangle(e.Bounds.X + Theme.Px(4), e.Bounds.Y, tw, e.Bounds.Height), Theme.Mute, flags);
-            TextRenderer.DrawText(g, text, Theme.Body, new Rectangle(e.Bounds.X + Theme.Px(4) + tw, e.Bounds.Y, Math.Max(1, e.Bounds.Width - tw), e.Bounds.Height),
-                bad ? Theme.Coral : Theme.Ink, flags);
-        }
-
-        void AddLogItem(string line)
-        {
-            logBox.Items.Add(line);
-            string time, text;
-            SplitLine(line, out time, out text);
-            var w = Theme.Px(90) + TextRenderer.MeasureText(text, Theme.Body).Width;
-            if (w > logExtent) { logExtent = w; logBox.HorizontalExtent = w; }
-        }
-
-        public void AddLog(string line) { lastLog = line; AddLogItem(line); while (logBox.Items.Count > 200) logBox.Items.RemoveAt(0); ScrollLog(); }
-        void ScrollLog() { if (logBox.Items.Count > 0) logBox.TopIndex = logBox.Items.Count - 1; }
-
-        /* ------------------------------------------------------------ about page */
-
-        void BuildAbout()
-        {
-            var p = AddPage("About", "What the helper does, and what it never does.");
-            var hero = AddCard(p, null, Left0, Top0, Inner, 128);
-            hero.Paint += delegate (object o, PaintEventArgs e)
-            {
-                e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
-                Theme.DrawMark(e.Graphics, new RectangleF(Theme.Px(24), Theme.Px(24), Theme.Px(80), Theme.Px(80)));
-                GradientText(e.Graphics, "Bridge Night Helper", "Segoe UI Semibold", FontStyle.Regular, 20f, new PointF(Theme.Px(124), Theme.Px(24)));
-            };
-            AddLabel(hero, "Version " + Program.Version, Theme.Body, Theme.Mute, 124, 62, 300, 22);
-            AddLabel(hero, "Closing this window keeps it running by the clock. To quit: right-click the BN icon, Exit.",
-                Theme.Small, Theme.Mute, 124, 88, 380, 34);
-            var gh = new FlatButton("Open on GitHub", false);
-            gh.Location = new Point(Inner - 17 - gh.Width, 43);
-            gh.Click += delegate { Open(RepoUrl); };
-            hero.Controls.Add(gh);
-
-            var fair = AddCard(p, "Fair play", Left0, Top0 + 144, Inner, 252);
-            for (var i = 0; i < FairPlay.Length; i++)
-            {
-                var y = 42 + i * 68;
-                AddLabel(fair, "\uE73E", Theme.Glyph, Theme.Orange, 20, y, 24, 22).AccessibleName = "";
-                AddLabel(fair, FairPlay[i][0], Theme.Strong, Theme.Ink, 52, y, Inner - 72, 22);
-                AddLabel(fair, FairPlay[i][1], Theme.Body, Theme.Mute, 52, y + 23, Inner - 72, 40);
-            }
-        }
+        public void AddLog(string line) { Help.AddLog(line); }
+        public void SetStatus(string s) { pill.Invalidate(); }
+        public void SetPaused(bool p) { SettingsP.SyncPaused(p); if (live != null) live.Tick(); pill.Invalidate(); }
 
         /* ------------------------------------------------------------ window */
 
         [DllImport("dwmapi.dll")]
         static extern int DwmSetWindowAttribute(IntPtr hwnd, int attribute, ref int value, int size);
 
-        protected override void OnHandleCreated(EventArgs e)
+        /// Windows 11: rounded corners and a thin border colour for borderless windows (ignored elsewhere).
+        public static void RoundCorners(Form f)
         {
-            base.OnHandleCreated(e);
             try
             {
-                // Dark title bar: attribute 20 on Windows 10 20H1+ and 11, 19 on older Windows 10 builds.
-                var on = 1;
-                if (DwmSetWindowAttribute(Handle, 20, ref on, 4) != 0) DwmSetWindowAttribute(Handle, 19, ref on, 4);
-                // Windows 11 only (ignored elsewhere): caption in the sidebar violet, title in off-white. COLORREF is 0x00BBGGRR.
-                var caption = Theme.Sidebar.R | Theme.Sidebar.G << 8 | Theme.Sidebar.B << 16;
-                var ink = Theme.Ink.R | Theme.Ink.G << 8 | Theme.Ink.B << 16;
-                DwmSetWindowAttribute(Handle, 35, ref caption, 4);
-                DwmSetWindowAttribute(Handle, 36, ref ink, 4);
+                var round = 2; // DWMWCP_ROUND
+                DwmSetWindowAttribute(f.Handle, 33, ref round, 4);
+                var border = Theme.BorderHi.R | Theme.BorderHi.G << 8 | Theme.BorderHi.B << 16;
+                DwmSetWindowAttribute(f.Handle, 34, ref border, 4);
             }
             catch { }
         }
 
-        protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
+        protected override CreateParams CreateParams
         {
-            if (keyData == Keys.Escape) { Hide(); return true; } // Escape closes to the tray, like the X
-            return base.ProcessCmdKey(ref msg, keyData);
+            get
+            {
+                var cp = base.CreateParams;
+                cp.Style |= 0x20000 | 0x80000;  // WS_MINIMIZEBOX | WS_SYSMENU: taskbar click minimizes and restores
+                cp.ClassStyle |= 0x20000;        // CS_DROPSHADOW
+                return cp;
+            }
         }
 
-        public void SetStatus(string s) { footer.Text = s; }
+        protected override void OnHandleCreated(EventArgs e) { base.OnHandleCreated(e); RoundCorners(this); }
 
-        public void SetPaused(bool p)
+        protected override void OnPaint(PaintEventArgs e)
         {
-            syncing = true; // the tray already saved it; don't send it back through onPause
-            paused.Checked = p;
-            syncing = false;
-            UpdatePauseUi();
+            base.OnPaint(e);
+            using (var p = new Pen(Theme.BorderHi)) e.Graphics.DrawRectangle(p, 0, 0, ClientSize.Width - 1, ClientSize.Height - 1);
+        }
+
+        protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
+        {
+            if (keyData == Keys.Escape)
+            {
+                if (tour != null) TourClosed(); else Hide(); // Escape closes to the tray, like the X
+                return true;
+            }
+            return base.ProcessCmdKey(ref msg, keyData);
         }
 
         protected override void OnFormClosing(FormClosingEventArgs e)
@@ -598,8 +339,58 @@ namespace BridgeNight
 
         protected override void Dispose(bool disposing)
         {
-            if (disposing) timer.Dispose();
+            if (disposing)
+            {
+                if (live != null) { live.Hidden(); live = null; }
+                timer.Dispose();
+                AudioCtl.Changed -= OnAudioChanged;
+                Updater.Changed -= OnUpdaterChanged;
+            }
             base.Dispose(disposing);
+        }
+    }
+
+    /// Sidebar status pill: "Sending · custom games", "Paused · nothing is sent" or "In game · 14:20". Click = Home.
+    class StatusPill : PaintedControl
+    {
+        readonly MainWindow win;
+
+        public StatusPill(MainWindow win) { this.win = win; AccessibleName = "Sending status"; }
+
+        void Read(out Color dot, out string bold, out string rest)
+        {
+            var start = PcServices.GameStartedAt;
+            if (win.Settings.Paused) { dot = Theme.Warn; bold = "Paused"; rest = "nothing is sent"; }
+            else if (string.IsNullOrEmpty(win.Settings.Token)) { dot = Theme.Warn; bold = "No token"; rest = "see Settings"; }
+            else if (start.HasValue) { dot = Theme.Good; bold = "In game"; rest = Ui.Clock(DateTime.Now - start.Value); }
+            else { dot = Theme.Good; bold = "Sending"; rest = "custom games"; }
+        }
+
+        protected override void OnClick(EventArgs e) { win.ShowPage(win.Home); base.OnClick(e); }
+
+        protected override void OnPaint(PaintEventArgs e)
+        {
+            Color dot; string bold, rest;
+            Read(out dot, out bold, out rest);
+            AccessibleDescription = bold + ", " + rest;
+            var g = e.Graphics;
+            g.SmoothingMode = SmoothingMode.AntiAlias;
+            var r = new RectangleF(.5f, .5f, Width - 1.5f, Height - 1.5f);
+            using (var path = Theme.Round(r, Theme.Px(Theme.CardRadius)))
+            {
+                using (var b = new SolidBrush(Hover ? Theme.NavActive : Theme.NavHover)) g.FillPath(b, path);
+                using (var p = new Pen(Theme.Border)) g.DrawPath(p, path);
+            }
+            var d = Theme.Px(8);
+            var c = new RectangleF(Theme.Px(14), (Height - d) / 2f, d, d);
+            using (var halo = new SolidBrush(Color.FromArgb(60, dot))) g.FillEllipse(halo, RectangleF.Inflate(c, 3 * Theme.Scale, 3 * Theme.Scale));
+            using (var b = new SolidBrush(dot)) g.FillEllipse(b, c);
+            var x = Theme.Px(32);
+            var bw = TextRenderer.MeasureText(g, bold, Theme.SmallStrong, Size.Empty, TextFormatFlags.NoPadding).Width;
+            const TextFormatFlags f = TextFormatFlags.VerticalCenter | TextFormatFlags.NoPrefix | TextFormatFlags.NoPadding | TextFormatFlags.EndEllipsis;
+            TextRenderer.DrawText(g, bold, Theme.SmallStrong, new Rectangle(x, 0, bw + 2, Height), Theme.Ink, f);
+            TextRenderer.DrawText(g, " · " + rest, Theme.Small, new Rectangle(x + bw, 0, Width - x - bw - Theme.Px(8), Height), Theme.Ink2, f);
+            Ring(g, r, Theme.Px(Theme.CardRadius));
         }
     }
 }
