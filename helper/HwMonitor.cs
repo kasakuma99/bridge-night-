@@ -1,6 +1,7 @@
 // Bridge Night Helper: CPU and GPU load for the small gauges in the sidebar. Read-only, no admin rights.
 //  * CPU: GetSystemTimes (kernel32), works in every Windows language (performance counter names are translated).
 //  * GPU: the "GPU Engine" performance counters (3D engines, like Task Manager), busiest graphics card.
+//    Read all at once with ReadCategory: one counter object per instance (often 600+) cost ~180 ms CPU per reading.
 // Both are "load since the last call", so every caller needs its own HwReader: the sidebar uses the shared
 // one behind HwMonitor, PerfMon (PcPerf.cs) has its own on its sampler thread.
 
@@ -34,8 +35,8 @@ namespace BridgeNight
 
         readonly object gate = new object();
         long lastIdle, lastBusyTotal;
-        readonly Dictionary<string, PerformanceCounter> gpu = new Dictionary<string, PerformanceCounter>();
-        DateTime gpuRefresh = DateTime.MinValue;
+        PerformanceCounterCategory gpuCategory;
+        InstanceDataCollection lastGpu; // previous raw samples, per engine instance
         bool gpuMissing;
 
         public float? CpuPercent()
@@ -61,13 +62,21 @@ namespace BridgeNight
                 if (gpuMissing) return null;
                 try
                 {
-                    if (DateTime.UtcNow > gpuRefresh) RefreshGpu();
+                    if (gpuCategory == null) gpuCategory = new PerformanceCounterCategory("GPU Engine");
+                    var now = gpuCategory.ReadCategory()["Utilization Percentage"];
+                    var before = lastGpu;
+                    lastGpu = now;
+                    if (now == null) { gpuMissing = true; return null; }
+                    if (before == null) return null; // load is "since the last call": nothing to compare yet
                     var perAdapter = new Dictionary<string, float>();
-                    foreach (var kv in gpu)
+                    foreach (InstanceData d in now.Values)
                     {
+                        if (d.InstanceName.IndexOf("engtype_3D", StringComparison.OrdinalIgnoreCase) < 0) continue;
+                        var old = before[d.InstanceName]; // null when the process behind it just started
+                        if (old == null) continue;
                         float v;
-                        try { v = kv.Value.NextValue(); } catch { continue; } // the process behind it may have ended
-                        var a = Adapter(kv.Key);
+                        try { v = CounterSample.Calculate(old.Sample, d.Sample); } catch { continue; }
+                        var a = Adapter(d.InstanceName);
                         float sum;
                         perAdapter.TryGetValue(a, out sum);
                         perAdapter[a] = sum + v;
@@ -92,33 +101,12 @@ namespace BridgeNight
             return s >= 0 && e > s ? instance.Substring(s, e - s) : "";
         }
 
-        /// Processes come and go, so the list of 3D engine counters is refreshed every 10 seconds.
-        void RefreshGpu()
-        {
-            gpuRefresh = DateTime.UtcNow.AddSeconds(10);
-            var keep = new HashSet<string>();
-            foreach (var n in new PerformanceCounterCategory("GPU Engine").GetInstanceNames())
-            {
-                if (n.IndexOf("engtype_3D", StringComparison.OrdinalIgnoreCase) < 0) continue;
-                keep.Add(n);
-                if (!gpu.ContainsKey(n)) gpu[n] = new PerformanceCounter("GPU Engine", "Utilization Percentage", n, true);
-            }
-            foreach (var n in new List<string>(gpu.Keys))
-            {
-                if (keep.Contains(n)) continue;
-                gpu[n].Dispose();
-                gpu.Remove(n);
-            }
-        }
-
         /// Frees the counters (the sampler calls this when measuring stops).
         public void Reset()
         {
             lock (gate)
             {
-                foreach (var c in gpu.Values) c.Dispose();
-                gpu.Clear();
-                gpuRefresh = DateTime.MinValue;
+                lastGpu = null;
                 lastIdle = lastBusyTotal = 0;
             }
         }

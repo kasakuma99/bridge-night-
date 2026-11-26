@@ -97,7 +97,7 @@ namespace BridgeNight
         // 0.7 options (Settings page). Defaults keep the PC light: only what the user switches on runs.
         public bool AutoUpdate = true;      // install new versions by itself (never during a game)
         public bool LiveMeasure = true;     // Performance page measures while it is open
-        public int MeasureEvery = 2;        // seconds: 1, 2 or 5
+        public int MeasureEvery = 1;        // seconds: 1, 2 or 5
         public bool RecordLastGame = true;  // keep a light performance record of each custom game
         public bool ResultAlerts = true;    // pop-up when a result is saved
         public bool GameModeAuto = true;    // apply game mode when a game starts
@@ -135,8 +135,8 @@ namespace BridgeNight
                 s.Paused = Json.Bool(d, "paused") ?? false;
                 s.AutoUpdate = Json.Bool(d, "autoUpdate") ?? true;
                 s.LiveMeasure = Json.Bool(d, "liveMeasure") ?? true;
-                var every = Json.Long(d, "measureEvery") ?? 2;
-                s.MeasureEvery = every == 1 || every == 5 ? (int)every : 2;
+                var every = Json.Long(d, "measureEvery") ?? 1;
+                s.MeasureEvery = every == 2 || every == 5 ? (int)every : 1;
                 s.RecordLastGame = Json.Bool(d, "recordLastGame") ?? true;
                 s.ResultAlerts = Json.Bool(d, "resultAlerts") ?? true;
                 s.GameModeAuto = Json.Bool(d, "gameModeAuto") ?? true;

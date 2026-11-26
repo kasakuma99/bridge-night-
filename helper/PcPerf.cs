@@ -22,7 +22,7 @@ namespace BridgeNight
         static readonly List<PerfSample> history = new List<PerfSample>();
         static readonly Dictionary<string, int> users = new Dictionary<string, int>();
         static readonly AutoResetEvent wake = new AutoResetEvent(false);
-        static int interval = 2;
+        static int interval = 1;
         static Thread sampler;
         static bool recording;
         static List<PerfSample> recorded;
@@ -102,6 +102,7 @@ namespace BridgeNight
             try
             {
                 hw.CpuPercent();
+                hw.GpuPercent(); // both are "since the last call": prime them so the first sample has values
                 probe.Prime();
                 wake.WaitOne(1000);
                 while (true)
@@ -113,6 +114,7 @@ namespace BridgeNight
                         if (!live && !recording) return;
                         period = live ? interval : 5;
                     }
+                    var took = Stopwatch.StartNew();
                     var s = probe.Read(hw);
                     lock (gate)
                     {
@@ -124,7 +126,8 @@ namespace BridgeNight
                             lastRecorded = s.At;
                         }
                     }
-                    wake.WaitOne(period * 1000);
+                    // Keep a steady beat: a reading takes ~200 ms (WMI), so wait only for the rest of the period.
+                    wake.WaitOne(Math.Max(50, period * 1000 - (int)took.ElapsedMilliseconds));
                 }
             }
             finally

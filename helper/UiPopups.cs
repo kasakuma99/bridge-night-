@@ -66,7 +66,7 @@ namespace BridgeNight
     {
         readonly Settings settings;
         readonly Action openFull;
-        readonly System.Windows.Forms.Timer timer = new System.Windows.Forms.Timer { Interval = 2000 };
+        readonly System.Windows.Forms.Timer timer = new System.Windows.Forms.Timer { Interval = 1000 };
         readonly IconButton mic, output, expand;
         string title = "", sub = "", ping = "–", gpu = "–";
         Color dot = Theme.Mute;
