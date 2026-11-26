@@ -1,6 +1,6 @@
 # Self-test of the PC features (PcServices.cs and the Pc*.cs files) WITHOUT starting the helper.
 # Loads the TEST build, calls only read-only functions and checks the pure logic. It never mutes the mic,
-# switches the output, changes the power plan, monitor, mouse, Sticky Keys or app volumes, closes apps,
+# switches the output, changes the monitor, mouse, Sticky Keys or app volumes, closes apps,
 # keeps hotkeys registered, or downloads/installs an update. Its files go to a temp folder (BN_HELPER_DIR),
 # never to %APPDATA%\BridgeNightHelper.
 #
@@ -45,7 +45,6 @@ $log = [Delegate]::CreateDelegate([Action[string]], $logQ, "Enqueue")
 $settings = New-Pc "Settings"
 $settings.Hotkeys = $false; $settings.AutoUpdate = $false; $settings.GameModeAuto = $false
 $settings.MusicQuieter = $false; $settings.RecordLastGame = $false
-if ($settings.PSObject.Properties["PowerPlanInGame"]) { $settings.PowerPlanInGame = $false } # gone in 0.7
 Invoke-Pc "PcServices" "Start" @($settings, $log) | Out-Null
 
 try {
@@ -83,6 +82,18 @@ try {
     Check "scrub: no user or PC name" ($clean -notmatch ("\b(" + [Regex]::Escape([Environment]::UserName) + "|" + [Regex]::Escape([Environment]::MachineName) + ")\b"))
     Check "scrub: no IP or email" ($clean -notmatch '\d{1,3}(\.\d{1,3}){3}' -and $clean -notmatch '@')
     Check "scrub: version numbers stay" ((Invoke-Pc PcServices Scrub @("Helper is up to date (0.7.0)")) -eq "Helper is up to date (0.7.0)")
+
+    # The window's own log cleaner (HelperUi.cs, 0.7): user folder, PC name and token out. Skipped in builds without it.
+    $tray = $asm.GetType("BridgeNight.TrayApp", $false)
+    $trayScrub = if ($tray) { $tray.GetMethod("Scrub", $flags, $null, [Type[]]@([string], [string]), $null) } else { $null }
+    if ($null -eq $trayScrub) { Show "TrayApp.Scrub" "not in this build, skipped" } else {
+        $tok = "bn_test_" + [Guid]::NewGuid().ToString("N")
+        $t = $trayScrub.Invoke($null, [object[]]@(("Sent with $tok from $home_\x on " + [Environment]::MachineName), $tok))
+        Show "TrayApp.Scrub" $t
+        Check "tray scrub: no token" ($t.IndexOf($tok) -lt 0 -and $t.Contains("[token]"))
+        Check "tray scrub: no user folder" ($t.IndexOf($home_, [StringComparison]::OrdinalIgnoreCase) -lt 0)
+        Check "tray scrub: no PC name" ($t -notmatch ("\b" + [Regex]::Escape([Environment]::MachineName) + "\b"))
+    }
 
     function Sample($cpu, $gpu, $mem, $total, [float[]]$threads = @()) {
         $s = New-Pc "PerfSample"; $s.At = [DateTime]::Now
