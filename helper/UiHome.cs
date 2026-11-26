@@ -73,13 +73,14 @@ namespace BridgeNight
     {
         Card hero;
         DotLabel heroTitle;
-        Label heroSub, timer, timerCaption, sentText, pingBig, pingSub, pingState, pcNote, gameWhen, gameLimit, gameEmpty;
+        Label sentIcon, heroSub, timer, timerCaption, sentText, pingBig, pingSub, pingState, pcNote, gameWhen, gameLimit, gameEmpty;
         ChainChips chain;
         FlatButton pause, report;
         Tile mic, output, gameMode, update;
         Chart pingChart;
         BarRow cpu, gpu, ram, vram, gameCpu, gameGpu;
         int slow;
+        static readonly string[] MicKeys = { "Ctrl", "Alt", "M" }, OutKeys = { "Ctrl", "Alt", "H" };
 
         public HomePage(MainWindow w) : base(w, "Home")
         {
@@ -112,17 +113,17 @@ namespace BridgeNight
         void BuildTiles()
         {
             const int w = 185, gap = 12, y = 186;
-            mic = AddTile(0, w, gap, y, new[] { "Ctrl", "Alt", "M" });
+            mic = AddTile(0, w, gap, y, MicKeys);
             mic.Click += delegate { AudioCtl.ToggleMic(); Tick(); };
-            output = AddTile(1, w, gap, y, new[] { "Ctrl", "Alt", "H" });
+            output = AddTile(1, w, gap, y, OutKeys);
             output.Click += delegate { AudioCtl.NextOutput(); Tick(); };
             gameMode = AddTile(2, w, gap, y, null);
             gameMode.Click += delegate { Win.ShowPage(Win.GameModeP); };
             update = AddTile(3, w, gap, y, null);
             update.Click += delegate
             {
-                if (Updater.NewVersion == "") { Win.ShowPage(Win.SettingsP); return; }
-                SettingsPage.InstallUpdate(Win);
+                if (Updater.NewVersion == "") { Win.OpenSettings("Updates"); return; }
+                SettingsPopup.InstallUpdate(Win);
             };
         }
 
@@ -136,7 +137,7 @@ namespace BridgeNight
         void BuildSent()
         {
             var row = Ui.Card(this, null, X0, 318, W0, 50);
-            Ui.Icon(row, "\uE930", Theme.Good, 14, 13);
+            sentIcon = Ui.Icon(row, "\uE930", Theme.Good, 14, 13);
             sentText = L(row, "", Theme.Body, Theme.Ink, 46, 13, 560, 24);
             sentText.TextAlign = ContentAlignment.MiddleLeft;
             sentText.AccessibleName = "Last sent";
@@ -151,16 +152,16 @@ namespace BridgeNight
             pingState.TextAlign = ContentAlignment.TopRight;
             pingBig = L(ping, "–", Theme.Big, Theme.Ink, 14, 44, 90, 40);
             pingBig.AccessibleName = "Ping";
-            pingSub = L(ping, "", Theme.Small, Theme.Mute, 100, 58, 140, 22);
+            pingSub = L(ping, "", Theme.Small, Theme.Mute, 100, 60, 140, 22);
             pingChart = new Chart { Bounds = Theme.R(16, 96, w - 32, 124), Max = 60, AutoMax = true, Empty = "Measuring…" };
             ping.Controls.Add(pingChart);
 
             var pc = Ui.Card(this, "This PC", X0 + w + gap, y, w + 1, h);
             Ui.Link(pc, "Details", w - 14, 12).Click += delegate { Win.OpenPerformance(0); };
-            cpu = Row(pc, 50, w);
-            gpu = Row(pc, 84, w);
-            ram = Row(pc, 118, w);
-            vram = Row(pc, 152, w);
+            cpu = Row(pc, 50, w, Theme.CpuLine);
+            gpu = Row(pc, 84, w, Theme.GpuLine);
+            ram = Row(pc, 118, w, Theme.MemLine);
+            vram = Row(pc, 152, w, Theme.VramLine);
             pcNote = L(pc, "", Theme.Small, Theme.Mute, 16, 196, w - 32, 22);
 
             var game = Ui.Card(this, "Last game", X0 + 2 * (w + gap) + 1, y, w, h);
@@ -169,15 +170,15 @@ namespace BridgeNight
             gameEmpty = L(game, "Play a game to see how your PC handled it.", Theme.Body, Theme.Mute, 16, 60, w - 32, 120);
             gameEmpty.TextAlign = ContentAlignment.MiddleCenter;
             gameWhen = L(game, "", Theme.Small, Theme.Mute, 16, 42, w - 32, 20);
-            gameCpu = Row(game, 70, w);
-            gameGpu = Row(game, 104, w);
+            gameCpu = Row(game, 70, w, Theme.CpuLine);
+            gameGpu = Row(game, 104, w, Theme.GpuLine);
             gameCpu.LabelWidth = gameGpu.LabelWidth = 76;
             gameLimit = L(game, "", Theme.Small, Theme.Ink2, 16, 140, w - 32, 80);
         }
 
-        static BarRow Row(Control card, int y, int w)
+        static BarRow Row(Control card, int y, int w, Color color)
         {
-            var r = new BarRow { Bounds = Theme.R(16, y, w - 32, 26), Color = Theme.Ink2 };
+            var r = new BarRow { Bounds = Theme.R(16, y, w - 32, 26), Color = color };
             card.Controls.Add(r);
             return r;
         }
@@ -200,6 +201,8 @@ namespace BridgeNight
             var s = HelperStatus.Read();
             UpdateHero(s);
             UpdateTiles();
+            var failed = s.ServerOk == false;
+            Ui.Set(sentIcon, failed ? "" : "", failed ? Theme.Warn : s.LastSentAt.HasValue ? Theme.Good : Theme.Mute);
             if (s.LastSentAt.HasValue) Ui.Set(sentText, "Last sent: " + s.LastSent + " · " + Ui.Ago(s.LastSentAt.Value));
             else Ui.Set(sentText, "Last sent: nothing yet. Custom games are sent while you play.");
             UpdatePing();
@@ -234,20 +237,22 @@ namespace BridgeNight
             pause.Left = Theme.Px(W0 - 20) - pause.Width;
         }
 
+        static void SetKeys(Tile t, string[] keys) { if (t.Keys != keys) { t.Keys = keys; t.Invalidate(); } }
+
         void UpdateTiles()
         {
             var micName = AudioCtl.MicName;
             var muted = AudioCtl.MicMuted;
-            mic.Keys = S.Hotkeys ? new[] { "Ctrl", "Alt", "M" } : null;
+            SetKeys(mic, S.Hotkeys ? MicKeys : null);
             if (string.IsNullOrEmpty(micName)) mic.Set("\uE720", "", "Mic", "Not available on this PC", false, false);
             else mic.Set(muted ? "\uF781" : "\uE720", "", muted ? "Mic muted" : "Mic on", micName, false, muted);
 
             var outName = AudioCtl.OutputName;
-            output.Keys = S.Hotkeys ? new[] { "Ctrl", "Alt", "H" } : null;
+            SetKeys(output, S.Hotkeys ? OutKeys : null);
             output.Set("\uE7F6", "", "Sound output", string.IsNullOrEmpty(outName) ? "Not available on this PC" : outName, false, false);
 
             var active = GameMode.Active;
-            gameMode.Set("\uEC4A", S.GameModeAuto ? "Auto" : "Off", active ? "Game mode on" : "Game mode",
+            gameMode.Set("\uE7FC", S.GameModeAuto ? "Auto" : "Off", active ? "Game mode on" : "Game mode",
                 active ? (GameMode.ActiveText == "" ? "On while you play" : GameMode.ActiveText) : S.GameModeAuto ? "Waiting for a game" : "Switched off", active, false);
 
             var nv = Updater.NewVersion;

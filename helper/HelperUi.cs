@@ -7,6 +7,7 @@ using System.Drawing;
 using System.IO;
 using System.Linq;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading;
 using System.Windows.Forms;
 
@@ -92,8 +93,24 @@ namespace BridgeNight
             catch { }
         }
 
+        static readonly string Profile = SafeRead(delegate { return Environment.GetFolderPath(Environment.SpecialFolder.UserProfile); });
+        static readonly string Machine = SafeRead(delegate { return Environment.MachineName; });
+        static string SafeRead(Func<string> f) { try { return f() ?? ""; } catch { return ""; } }
+
+        /// Error texts from Windows can contain the user folder (with the Windows user name) or the PC name.
+        /// Those, and the token, never reach the log file or the Log on the Help page.
+        static string Scrub(string line, string token)
+        {
+            if (string.IsNullOrEmpty(line)) return line ?? "";
+            if (!string.IsNullOrEmpty(token) && token.Length >= 6) line = line.Replace(token, "[token]");
+            if (Profile.Length > 3) line = Regex.Replace(line, Regex.Escape(Profile), "%USERPROFILE%", RegexOptions.IgnoreCase);
+            if (Machine.Length >= 3) line = Regex.Replace(line, @"\b" + Regex.Escape(Machine) + @"\b", "[pc]", RegexOptions.IgnoreCase);
+            return line;
+        }
+
         void Log(string line)
         {
+            line = Scrub(line, settings.Token);
             var text = DateTime.Now.ToString("HH:mm:ss") + "  " + line;
             WriteLogFile(text);
             var saved = ReportSent(line);

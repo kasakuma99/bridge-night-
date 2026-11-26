@@ -239,7 +239,7 @@ namespace BridgeNight
             var outName = AudioCtl.OutputName;
             output.Set("\uE7F6", "", "Sound output", outName == "" ? "Not available" : outName, false, false);
             var active = GameMode.Active;
-            game.Set("\uEC4A", "", active ? "Game mode on" : "Game mode", settings.GameModeAuto ? (active ? "Auto · on" : "Auto") : "Off", active, false);
+            game.Set("\uE7FC", "", active ? "Game mode on" : "Game mode", settings.GameModeAuto ? (active ? "Auto · on" : "Auto") : "Off", active, false);
             pause.Text = settings.Paused ? "Resume sending" : "Pause sending";
             pause.FitWidth();
         }
@@ -329,7 +329,56 @@ namespace BridgeNight
         }
     }
 
-    /// First-start tour: the window dims behind a card with four short steps. Skippable, replayable from Help.
+    /// Backdrops for the pop-ups drawn inside the main window (Settings, the tour).
+    static class Overlay
+    {
+        /// A blurred and darkened picture of the window below `top` (device pixels).
+        public static Bitmap Frosted(Form w, int top)
+        {
+            int width = Math.Max(1, w.ClientSize.Width), height = Math.Max(1, w.ClientSize.Height - top);
+            var result = new Bitmap(width, height, PixelFormat.Format32bppPArgb);
+            using (var full = new Bitmap(width, Math.Max(1, w.ClientSize.Height), PixelFormat.Format32bppPArgb))
+            using (var attr = new ImageAttributes())
+            {
+                try { w.DrawToBitmap(full, new Rectangle(Point.Empty, w.ClientSize)); } catch { }
+                attr.SetWrapMode(WrapMode.TileFlipXY); // no dark seams at the edges
+                // Blur by shrinking to 1/8 and growing back in two steps: cheap and smooth, no per-pixel loops.
+                int sw = Math.Max(1, width / 8), sh = Math.Max(1, height / 8);
+                using (var small = new Bitmap(sw, sh, PixelFormat.Format32bppPArgb))
+                using (var mid = new Bitmap(Math.Max(1, width / 3), Math.Max(1, height / 3), PixelFormat.Format32bppPArgb))
+                {
+                    using (var g = Graphics.FromImage(small))
+                    {
+                        g.InterpolationMode = InterpolationMode.HighQualityBilinear;
+                        g.DrawImage(full, new Rectangle(0, 0, sw, sh), 0, top, width, height, GraphicsUnit.Pixel, attr);
+                    }
+                    using (var g = Graphics.FromImage(mid))
+                    {
+                        g.InterpolationMode = InterpolationMode.HighQualityBicubic;
+                        g.DrawImage(small, new Rectangle(0, 0, mid.Width, mid.Height), 0, 0, sw, sh, GraphicsUnit.Pixel, attr);
+                    }
+                    using (var g = Graphics.FromImage(result))
+                    {
+                        g.InterpolationMode = InterpolationMode.HighQualityBicubic;
+                        g.DrawImage(mid, new Rectangle(0, 0, width, height), 0, 0, mid.Width, mid.Height, GraphicsUnit.Pixel, attr);
+                        using (var b = new SolidBrush(Color.FromArgb(150, 8, 6, 12))) g.FillRectangle(b, 0, 0, width, height);
+                    }
+                }
+            }
+            return result;
+        }
+
+        /// Soft shadow around a pop-up card, drawn on the backdrop.
+        public static void Shadow(Graphics g, Rectangle card)
+        {
+            g.SmoothingMode = SmoothingMode.AntiAlias;
+            for (var i = 14; i >= 2; i -= 2)
+                using (var path = Theme.Round(RectangleF.Inflate(card, Theme.Px(i), Theme.Px(i)), Theme.Px(Theme.CardRadius + i)))
+                using (var b = new SolidBrush(Color.FromArgb(14, 0, 0, 0))) g.FillPath(b, path);
+        }
+    }
+
+    /// First-start tour: the window blurs and dims behind a card with four short steps. Skippable, replayable from Help.
     class TourOverlay : Control
     {
         static readonly string[][] Steps =
@@ -359,11 +408,7 @@ namespace BridgeNight
             Bounds = new Rectangle(0, Theme.Px(MainWindow.TitleH), w.ClientSize.Width, w.ClientSize.Height - Theme.Px(MainWindow.TitleH));
             AccessibleRole = AccessibleRole.Dialog;
             AccessibleName = "Welcome tour";
-            // A dimmed picture of the window behind the card.
-            backdrop = new Bitmap(w.ClientSize.Width, w.ClientSize.Height, PixelFormat.Format32bppPArgb);
-            try { w.DrawToBitmap(backdrop, new Rectangle(Point.Empty, w.ClientSize)); } catch { }
-            using (var g = Graphics.FromImage(backdrop))
-            using (var b = new SolidBrush(Color.FromArgb(170, 8, 6, 12))) g.FillRectangle(b, 0, 0, backdrop.Width, backdrop.Height);
+            backdrop = Overlay.Frosted(w, Top); // a blurred, dimmed picture of the window behind the card
 
             card = new Panel { Bounds = new Rectangle((Width - Theme.Px(560)) / 2, (Height - Theme.Px(476)) / 2, Theme.Px(560), Theme.Px(476)), BackColor = Theme.Card };
             card.Paint += PaintCard;
@@ -405,7 +450,8 @@ namespace BridgeNight
 
         protected override void OnPaint(PaintEventArgs e)
         {
-            e.Graphics.DrawImage(backdrop, 0, -Top);
+            e.Graphics.DrawImage(backdrop, 0, 0);
+            Overlay.Shadow(e.Graphics, card.Bounds);
             var r = card.Bounds;
             r.Inflate(1, 1);
             using (var p = new Pen(Theme.BorderHi)) e.Graphics.DrawRectangle(p, r.X, r.Y, r.Width - 1, r.Height - 1);

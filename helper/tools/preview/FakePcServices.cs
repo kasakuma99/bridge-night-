@@ -89,6 +89,7 @@ namespace BridgeNight
         }
         public static TimeSpan Uptime { get { return new TimeSpan(9, 4, 12, 0); } }
         public static bool RestartPending { get { return false; } }
+        public static int? OpenApps { get { return 6; } }
         public static List<GameReport> LastGames()
         {
             var list = new List<GameReport>();
@@ -151,7 +152,7 @@ namespace BridgeNight
         }
         public static bool Fix(string id, out string note) { note = "Done: switched off for your account."; return true; }
         public static bool Active { get { return Fake.Env("BN_FAKE_GAME"); } }
-        public static string ActiveText { get { return "High performance plan, music at 30 %"; } }
+        public static string ActiveText { get { return "Music at 30 %"; } }
     }
 
     sealed class AudioDevice { public string Id, Name; public bool IsDefault; }

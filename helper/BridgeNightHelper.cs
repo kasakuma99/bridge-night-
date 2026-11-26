@@ -101,7 +101,6 @@ namespace BridgeNight
         public bool RecordLastGame = true;  // keep a light performance record of each custom game
         public bool ResultAlerts = true;    // pop-up when a result is saved
         public bool GameModeAuto = true;    // apply game mode when a game starts
-        public bool PowerPlanInGame = true; // high-performance power plan during games
         public bool MusicQuieter = false;   // turn music apps down during games
         public bool BreakReminder = false;  // remind after long sessions
         public bool Hotkeys = true;         // Ctrl+Alt+M (mic) and Ctrl+Alt+H (output)
@@ -140,7 +139,6 @@ namespace BridgeNight
                 s.RecordLastGame = Json.Bool(d, "recordLastGame") ?? true;
                 s.ResultAlerts = Json.Bool(d, "resultAlerts") ?? true;
                 s.GameModeAuto = Json.Bool(d, "gameModeAuto") ?? true;
-                s.PowerPlanInGame = Json.Bool(d, "powerPlanInGame") ?? true;
                 s.MusicQuieter = Json.Bool(d, "musicQuieter") ?? false;
                 s.BreakReminder = Json.Bool(d, "breakReminder") ?? false;
                 s.Hotkeys = Json.Bool(d, "hotkeys") ?? true;
@@ -176,7 +174,6 @@ namespace BridgeNight
             d["recordLastGame"] = RecordLastGame;
             d["resultAlerts"] = ResultAlerts;
             d["gameModeAuto"] = GameModeAuto;
-            d["powerPlanInGame"] = PowerPlanInGame;
             d["musicQuieter"] = MusicQuieter;
             d["breakReminder"] = BreakReminder;
             d["hotkeys"] = Hotkeys;

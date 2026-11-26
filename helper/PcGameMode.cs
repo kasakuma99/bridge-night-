@@ -1,5 +1,5 @@
 // Bridge Night Helper: Game mode page. Checks before game night, gamer fixes for this Windows user, and the
-// in-game changes (power plan, music quieter) that are always put back exactly when the game ends.
+// in-game change (music quieter, only if switched on) that is always put back exactly when the game ends.
 // No admin rights. Towards League only one read-only GET (the patch version) while the client runs.
 
 using System;
@@ -37,19 +37,12 @@ namespace BridgeNight
         static extern bool SystemParametersInfo(int action, int param, int[] value, int winIni);
         [DllImport("user32.dll", SetLastError = true)]
         static extern bool SystemParametersInfo(int action, int param, ref StickyKeys value, int winIni);
-        [DllImport("powrprof.dll")]
-        static extern int PowerGetActiveScheme(IntPtr root, out IntPtr scheme);
-        [DllImport("powrprof.dll")]
-        static extern int PowerSetActiveScheme(IntPtr root, ref Guid scheme);
-        [DllImport("kernel32.dll")]
-        static extern IntPtr LocalFree(IntPtr mem);
 
         const int EnumCurrent = -1, DmPelsWidth = 0x80000, DmPelsHeight = 0x100000, DmBitsPerPel = 0x40000, DmFrequency = 0x400000;
         const int CdsUpdateRegistry = 1, DmInterlaced = 2;
         const int SpiGetMouse = 3, SpiSetMouse = 4, SpiGetStickyKeys = 0x3A, SpiSetStickyKeys = 0x3B;
         const int SpifUpdateIniFile = 1, SpifSendChange = 2;
         const uint SkfHotkeyActive = 4;
-        static readonly Guid HighPerformance = new Guid("8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c");
 
         /* ---- before game night */
 
@@ -239,34 +232,18 @@ namespace BridgeNight
         /* ---- in game */
 
         static readonly object gate = new object();
-        static Guid? planBefore;       // set while the high performance plan is ours
         static List<KeyValuePair<AudioSessions.Volume, float>> quieted; // music sessions and their volume before
 
-        /// Applies what the settings ask for. True if anything changed.
+        /// Applies what the settings ask for (music quieter, only if switched on). True if anything changed.
         internal static bool Apply()
         {
             var s = PcServices.Options;
             if (s == null) return false;
             lock (gate)
             {
-                if (s.PowerPlanInGame && !planBefore.HasValue) PcServices.Safe("power plan", SetPlan);
                 if (s.MusicQuieter && quieted == null) PcServices.Safe("music quieter", delegate { quieted = AudioSessions.Lower(0.3f); });
                 return ActiveImpl();
             }
-        }
-
-        static void SetPlan()
-        {
-            IntPtr p;
-            if (PowerGetActiveScheme(IntPtr.Zero, out p) != 0) { PcServices.Log("Power plan: could not read the active plan"); return; }
-            Guid before;
-            try { before = (Guid)Marshal.PtrToStructure(p, typeof(Guid)); } finally { LocalFree(p); }
-            if (before == HighPerformance) return; // already there: nothing to put back
-            var hp = HighPerformance;
-            int r = PowerSetActiveScheme(IntPtr.Zero, ref hp);
-            if (r != 0) { PcServices.Log("Power plan: this PC has no High performance plan (code " + r + "), skipped"); return; }
-            planBefore = before;
-            PcServices.Log("Power plan: High performance for the game");
         }
 
         /// Puts back exactly what Apply changed. Safe to call any time.
@@ -274,17 +251,6 @@ namespace BridgeNight
         {
             lock (gate)
             {
-                if (planBefore.HasValue)
-                {
-                    var g = planBefore.Value;
-                    try
-                    {
-                        int r = PowerSetActiveScheme(IntPtr.Zero, ref g);
-                        PcServices.Log(r == 0 ? "Power plan: back to the plan from before the game" : "Power plan: could not switch back (code " + r + ")");
-                    }
-                    catch (Exception e) { PcServices.Log("Power plan restore failed: " + e.Message); }
-                    planBefore = null;
-                }
                 if (quieted != null)
                 {
                     var q = quieted;
@@ -294,17 +260,8 @@ namespace BridgeNight
             }
         }
 
-        static bool ActiveImpl() { lock (gate) return planBefore.HasValue || (quieted != null && quieted.Count > 0); }
+        static bool ActiveImpl() { lock (gate) return quieted != null && quieted.Count > 0; }
 
-        static string ActiveTextImpl()
-        {
-            lock (gate)
-            {
-                var parts = new List<string>();
-                if (planBefore.HasValue) parts.Add("High performance plan");
-                if (quieted != null && quieted.Count > 0) parts.Add("music at 30 %");
-                return string.Join(", ", parts);
-            }
-        }
+        static string ActiveTextImpl() { lock (gate) return quieted != null && quieted.Count > 0 ? "Music at 30 %" : ""; }
     }
 }

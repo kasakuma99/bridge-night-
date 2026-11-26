@@ -55,6 +55,7 @@ namespace BridgeNight
         public static readonly Font SmallStrong = new Font(StrongFamily, 9.5f);
         public static readonly Font CardTitle = new Font(StrongFamily, 11f);
         public static readonly Font H1 = new Font(DisplayFamily, 18f);
+        public static readonly Font H2 = new Font(DisplayFamily, 13.5f);
         public static readonly Font Hero = new Font(DisplayFamily, 19f);
         public static readonly Font Big = new Font(DisplayFamily, 17f);
         public static readonly Font Huge = new Font(DisplayFamily, 28f);

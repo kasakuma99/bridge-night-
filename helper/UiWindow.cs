@@ -1,5 +1,5 @@
 // Bridge Night Helper: the main window. Own title bar (with the mini-window button), sidebar, and the pages
-// (UiHome.cs, UiPerformance.cs, UiPcPages.cs, UiSettingsHelp.cs). Pop-ups and the tour: UiPopups.cs.
+// (UiHome.cs, UiPerformance.cs, UiPcPages.cs, UiSettingsHelp.cs). Settings pop-up: UiSettings.cs. Pop-ups and the tour: UiPopups.cs.
 // Layout numbers are 96-dpi units, turned into device pixels with Theme.Px / Theme.R.
 
 using System;
@@ -7,6 +7,7 @@ using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Runtime.InteropServices;
+using System.Threading;
 using System.Windows.Forms;
 
 namespace BridgeNight
@@ -79,7 +80,9 @@ namespace BridgeNight
         public GameModePage GameModeP;
         public AudioPage Audio;
         public HelpPage Help;
-        public SettingsPage SettingsP;
+        SettingsPopup settingsPopup;
+        Control side;
+        bool badgeBusy;
 
         public MainWindow(Settings s, List<string> lines, Action<bool> onPause, Action<string> log, Action openMini)
         {
@@ -108,11 +111,10 @@ namespace BridgeNight
             GameModeP = Add(new GameModePage(this));
             Audio = Add(new AudioPage(this));
             Help = Add(new HelpPage(this, lines));
-            SettingsP = Add(new SettingsPage(this));
             BuildSidebar();
             ResumeLayout(false);
 
-            ShowPage(string.IsNullOrEmpty(s.Token) ? (Page)SettingsP : Home);
+            ShowPage(Home); // no token yet: Settings opens on top once the window shows (OnShown)
             timer.Interval = 1000;
             timer.Tick += delegate { OnTick(); };
             AudioCtl.Changed += OnAudioChanged;
@@ -175,7 +177,7 @@ namespace BridgeNight
 
         void BuildSidebar()
         {
-            var side = new Backdrop { Bounds = Theme.R(0, TitleH, SidebarW, Theme.WindowH - TitleH), AccessibleName = "Pages" };
+            side = new Backdrop { Bounds = Theme.R(0, TitleH, SidebarW, Theme.WindowH - TitleH), AccessibleName = "Pages" };
             side.Paint += delegate (object o, PaintEventArgs e)
             {
                 var g = e.Graphics;
@@ -192,7 +194,9 @@ namespace BridgeNight
             AddNav(side, "Game mode", "\uE7FC", GameModeP, 204);
             AddNav(side, "Audio", "\uE7F6", Audio, 244);
             AddNav(side, "Help", "\uE897", Help, 482);
-            AddNav(side, "Settings", "\uE713", SettingsP, 522);
+            var settingsItem = new NavItem("Settings", "\uE713") { Location = new Point(Theme.Px(8), Theme.Px(522)), AccessibleDescription = "Opens on top of this page" };
+            settingsItem.Click += delegate { OpenSettings(null); };
+            side.Controls.Add(settingsItem);
             pill = new StatusPill(this) { Bounds = Theme.R(10, 574, SidebarW - 20, 44) };
             side.Controls.Add(pill);
             Controls.Add(side);
@@ -206,52 +210,115 @@ namespace BridgeNight
             nav.Add(item);
         }
 
+        [DllImport("user32.dll")] static extern bool RedrawWindow(IntPtr hWnd, IntPtr rect, IntPtr region, int flags);
+        const int WmSetRedraw = 0x0B, RdwInvalidate = 0x1, RdwErase = 0x4, RdwAllChildren = 0x80, RdwUpdateNow = 0x100;
+
+        /// Switches pages in one go: drawing is held until the new page has its data and layout, so nothing jumps.
         public void ShowPage(Page page)
         {
-            if (current != null && current != page) current.Visible = false;
-            current = page;
-            page.Visible = true;
-            foreach (var n in nav) n.Selected = n.Tag == page;
-            UpdateLive();
+            if (settingsPopup != null) CloseSettings();
+            var hold = IsHandleCreated && Visible;
+            if (hold) SendMessage(Handle, WmSetRedraw, IntPtr.Zero, IntPtr.Zero);
+            try
+            {
+                if (current != null && current != page) current.Visible = false;
+                current = page;
+                page.Visible = true;
+                foreach (var n in nav) n.Selected = n.Tag == page;
+                UpdateLive();
+            }
+            finally
+            {
+                if (hold)
+                {
+                    SendMessage(Handle, WmSetRedraw, (IntPtr)1, IntPtr.Zero);
+                    RedrawWindow(Handle, IntPtr.Zero, IntPtr.Zero, RdwInvalidate | RdwErase | RdwAllChildren | RdwUpdateNow);
+                }
+            }
         }
 
         public void OpenHelp(string section) { Help.Open(section); ShowPage(Help); }
         public void OpenPerformance(int tab) { Performance.Tab = tab; ShowPage(Performance); }
 
-        /// Starts/stops the visible page's live views: only while the window is on screen and not minimized.
+        /* ------------------------------------------------------------ settings pop-up */
+
+        /// Opens Settings on top of the window (blurred behind), at `section` ("Game mode", ...) or where it was.
+        public void OpenSettings(string section)
+        {
+            if (tour != null) return;
+            if (settingsPopup != null) { settingsPopup.ShowSection(section); return; }
+            settingsPopup = new SettingsPopup(this, section);
+            // The page behind is only a picture now: keep Tab inside the pop-up and stop its live views.
+            side.Enabled = false;
+            if (current != null) current.Enabled = false;
+            Controls.Add(settingsPopup);
+            settingsPopup.BringToFront();
+            settingsPopup.FocusFirst();
+            UpdateLive();
+        }
+
+        public void CloseSettings()
+        {
+            if (settingsPopup == null) return;
+            var p = settingsPopup;
+            settingsPopup = null;
+            side.Enabled = true;
+            if (current != null) current.Enabled = true;
+            Controls.Remove(p);
+            p.Dispose();
+            UpdateLive(); // the page starts again with the new settings
+            if (current != null) current.Focus();
+        }
+
+        /// Starts/stops live views: the visible page only while the window is on screen, not minimized and not
+        /// covered by Settings; the Settings pop-up has its own one-second refresh.
         void UpdateLive()
         {
-            var want = Visible && WindowState != FormWindowState.Minimized ? current : null;
-            if (want == live) return;
-            if (live != null) live.Hidden();
-            live = want;
-            if (live != null) { live.Shown(); live.Tick(); UpdateBadges(); pill.Invalidate(); }
-            if (live != null) timer.Start(); else timer.Stop();
+            var onScreen = Visible && WindowState != FormWindowState.Minimized;
+            var want = onScreen && settingsPopup == null ? current : null;
+            if (want != live)
+            {
+                if (live != null) live.Hidden();
+                live = want;
+                if (live != null) { live.Shown(); live.Tick(); UpdateBadges(); pill.Invalidate(); }
+            }
+            if (onScreen && settingsPopup != null) settingsPopup.Tick();
+            if (onScreen && (live != null || settingsPopup != null)) timer.Start(); else timer.Stop();
         }
 
         void OnTick()
         {
+            if (settingsPopup != null) { settingsPopup.Tick(); return; }
             if (live == null) return;
             live.Tick();
             pill.Invalidate();
             if (++ticks % 30 == 0) UpdateBadges();
         }
 
-        /// Game mode nav badge: how many checks found a problem.
+        /// Game mode nav badge: how many checks found a problem. Reading the monitor modes takes ~35 ms,
+        /// so the checks run on a pool thread and only the result comes back to the window.
         void UpdateBadges()
         {
-            var n = 0;
-            try
+            if (badgeBusy) return;
+            badgeBusy = true;
+            ThreadPool.QueueUserWorkItem(delegate
             {
-                foreach (var c in GameMode.BeforeNight()) if (c.Problem) n++;
-                foreach (var c in GameMode.Fixes()) if (c.Problem) n++;
-            }
-            catch { }
-            foreach (var item in nav) if (item.Tag == GameModeP) item.Badge = n > 0 ? n.ToString() : "";
+                var n = 0;
+                try
+                {
+                    foreach (var c in GameMode.BeforeNight()) if (c.Problem) n++;
+                    foreach (var c in GameMode.Fixes()) if (c.Problem) n++;
+                }
+                catch { }
+                try { BeginInvoke((Action)delegate { badgeBusy = false; SetBadge(n); }); }
+                catch (InvalidOperationException) { badgeBusy = false; } // window closed meanwhile
+            });
         }
 
-        void OnAudioChanged() { if (live == Audio || live == Home) live.Tick(); }
-        void OnUpdaterChanged() { if (live == Home || live == SettingsP) live.Tick(); }
+        public void SetBadge(int n) { foreach (var item in nav) if (item.Tag == GameModeP) item.Badge = n > 0 ? n.ToString() : ""; }
+
+        void OnAudioChanged() { if (live == Audio) Audio.RefreshAll(); else if (live == Home) live.Tick(); }
+        void OnUpdaterChanged() { if (settingsPopup != null) settingsPopup.Tick(); else if (live == Home) live.Tick(); }
 
         protected override void OnVisibleChanged(EventArgs e) { base.OnVisibleChanged(e); UpdateLive(); }
         protected override void OnResize(EventArgs e) { base.OnResize(e); if (IsHandleCreated) UpdateLive(); }
@@ -275,13 +342,21 @@ namespace BridgeNight
             tour = null;
             Settings.TourDone = true;
             try { Settings.Save(); } catch { }
+            if (string.IsNullOrEmpty(Settings.Token)) OpenSettings("Connection");
+        }
+
+        /// First start without a token: Settings opens at Connection (after the tour, if that shows).
+        protected override void OnShown(EventArgs e)
+        {
+            base.OnShown(e);
+            BeginInvoke((Action)delegate { if (!IsDisposed && tour == null && string.IsNullOrEmpty(Settings.Token)) OpenSettings("Connection"); });
         }
 
         /* ------------------------------------------------------------ calls from the tray */
 
         public void AddLog(string line) { Help.AddLog(line); }
         public void SetStatus(string s) { pill.Invalidate(); }
-        public void SetPaused(bool p) { SettingsP.SyncPaused(p); if (live != null) live.Tick(); pill.Invalidate(); }
+        public void SetPaused(bool p) { if (settingsPopup != null) settingsPopup.Sync(); if (live != null) live.Tick(); pill.Invalidate(); }
 
         /* ------------------------------------------------------------ window */
 
@@ -324,7 +399,9 @@ namespace BridgeNight
         {
             if (keyData == Keys.Escape)
             {
-                if (tour != null) TourClosed(); else Hide(); // Escape closes to the tray, like the X
+                if (tour != null) TourClosed();
+                else if (settingsPopup != null) CloseSettings();
+                else Hide(); // Escape closes to the tray, like the X
                 return true;
             }
             return base.ProcessCmdKey(ref msg, keyData);

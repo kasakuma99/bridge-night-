@@ -378,6 +378,7 @@ namespace BridgeNight
         readonly string glyph;
         bool selected;
         string badge = "";
+        public Color HoverFill = Theme.NavHover, SelectedFill = Theme.NavActive;
 
         public NavItem(string text, string glyph)
         {
@@ -414,7 +415,7 @@ namespace BridgeNight
             var radius = Theme.Px(Theme.ControlRadius);
             if (selected || Hover)
                 using (var path = Theme.Round(r, radius))
-                using (var b = new SolidBrush(selected ? Theme.NavActive : Theme.NavHover)) g.FillPath(b, path);
+                using (var b = new SolidBrush(selected ? SelectedFill : HoverFill)) g.FillPath(b, path);
             if (selected)
             {
                 var bar = new RectangleF(r.X, r.Y + Theme.Px(10), Theme.Px(3), r.Height - Theme.Px(20));
@@ -424,7 +425,7 @@ namespace BridgeNight
             var ink = selected || Hover ? Theme.Ink : Theme.Ink2;
             TextRenderer.DrawText(g, glyph, Theme.Glyph, new Rectangle(Theme.Px(14), 0, Theme.Px(22), Height), ink,
                 TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding);
-            TextRenderer.DrawText(g, Text, Theme.Body, new Rectangle(Theme.Px(48), 0, Width - Theme.Px(90), Height), ink,
+            TextRenderer.DrawText(g, Text, Theme.Body, new Rectangle(Theme.Px(48), 0, Width - Theme.Px(badge == "" ? 54 : 90), Height), ink,
                 TextFormatFlags.VerticalCenter | TextFormatFlags.NoPrefix | TextFormatFlags.EndEllipsis);
             if (badge != "")
             {
@@ -454,6 +455,7 @@ namespace BridgeNight
             Glyph = glyph; Corner = corner; Title = title; Sub = sub; Active = active; Alert = alert;
             AccessibleName = title;
             AccessibleDescription = sub + (Keys != null ? ", hotkey " + string.Join(" ", Keys) : "");
+            Ui.TipIfCut(this, sub, Compact ? Theme.Tiny : Theme.Small, Width - Theme.Px(Compact ? 50 : 32), title + ": " + sub);
             Invalidate();
         }
 
@@ -756,6 +758,109 @@ namespace BridgeNight
         }
     }
 
+    /// Label painted through a back buffer, so live values change without flicker.
+    class SmoothLabel : Label
+    {
+        public SmoothLabel() { DoubleBuffered = true; }
+    }
+
+    /// Small read-only state pill ("On" / "Off"). AnchorRight keeps its right edge in place when the text changes.
+    class Pill : Control
+    {
+        bool on;
+        public int AnchorRight = -1;
+
+        public Pill()
+        {
+            SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.SupportsTransparentBackColor, true);
+            TabStop = false;
+            AccessibleRole = AccessibleRole.StaticText;
+            Height = Theme.Px(22);
+        }
+
+        public void Set(string text, bool on)
+        {
+            if (text == Text && on == this.on && Width > 0) return;
+            Text = text;
+            this.on = on;
+            AccessibleName = text;
+            Width = TextRenderer.MeasureText(text, Theme.Tiny).Width + Theme.Px(18);
+            if (AnchorRight >= 0) Left = AnchorRight - Width;
+            Invalidate();
+        }
+
+        protected override void OnPaintBackground(PaintEventArgs e) { Ui.PaintParent(this, e); }
+
+        protected override void OnPaint(PaintEventArgs e)
+        {
+            var g = e.Graphics;
+            g.SmoothingMode = SmoothingMode.AntiAlias;
+            var r = new RectangleF(.5f, .5f, Width - 1.5f, Height - 1.5f);
+            using (var path = Theme.Round(r, r.Height / 2))
+            {
+                using (var b = new SolidBrush(on ? Color.FromArgb(38, Theme.Good) : Theme.Raised)) g.FillPath(b, path);
+                using (var p = new Pen(on ? Color.FromArgb(90, Theme.Good) : Theme.Border)) g.DrawPath(p, path);
+            }
+            TextRenderer.DrawText(g, Text, Theme.Tiny, ClientRectangle, on ? Theme.Good : Theme.Mute,
+                TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPrefix | TextFormatFlags.NoPadding);
+        }
+    }
+
+    /// Compact summary of settings that live in the Settings pop-up: "● Measuring every 1 s | ⚙ Change".
+    /// The whole chip is a button that opens Settings at the right section.
+    class SummaryChip : PaintedControl
+    {
+        readonly string link;
+        Color dot = Theme.Mute;
+        public int AnchorRight = -1;
+
+        public SummaryChip(string link)
+        {
+            this.link = link;
+            Font = Theme.Small;
+            Height = Theme.Px(32);
+            Ui.Tips.SetToolTip(this, "Change in Settings");
+        }
+
+        public void Set(string text, Color dotColor)
+        {
+            if (text == Text && dotColor == dot && Width > Theme.Px(40)) return;
+            Text = text;
+            dot = dotColor;
+            AccessibleName = text + ". Change in Settings";
+            Width = Theme.Px(30) + TextRenderer.MeasureText(text, Font).Width + Theme.Px(25) + Theme.Px(20) + TextRenderer.MeasureText(link, Theme.SmallStrong).Width + Theme.Px(10);
+            if (AnchorRight >= 0) Left = AnchorRight - Width;
+            Invalidate();
+        }
+
+        protected override void OnPaint(PaintEventArgs e)
+        {
+            var g = e.Graphics;
+            g.SmoothingMode = SmoothingMode.AntiAlias;
+            var r = new RectangleF(Theme.Px(1), Theme.Px(1), Width - Theme.Px(2) - 1, Height - Theme.Px(2) - 1);
+            using (var path = Theme.Round(r, r.Height / 2))
+            {
+                using (var b = new SolidBrush(Pressed ? Theme.Card : Hover ? Theme.Raised : Theme.Card)) g.FillPath(b, path);
+                using (var p = new Pen(Hover ? Theme.BorderHi : Theme.Border)) g.DrawPath(p, path);
+            }
+            var d = Theme.Px(7);
+            using (var b = new SolidBrush(dot)) g.FillEllipse(b, Theme.Px(14), (Height - d) / 2f, d, d);
+            const TextFormatFlags f = TextFormatFlags.VerticalCenter | TextFormatFlags.NoPrefix | TextFormatFlags.NoPadding;
+            var tw = TextRenderer.MeasureText(Text, Font).Width;
+            var x = Theme.Px(30);
+            TextRenderer.DrawText(g, Text, Font, new Rectangle(x, 0, tw + 2, Height), Theme.Ink2, f);
+            x += tw + Theme.Px(12);
+            using (var p = new Pen(Theme.Border)) g.DrawLine(p, x, Theme.Px(8), x, Height - Theme.Px(8));
+            x += Theme.Px(12);
+            var ink = Hover ? Theme.Ink : Theme.Ink2;
+            TextRenderer.DrawText(g, "", Theme.GlyphSmall, new Rectangle(x, 0, Theme.Px(14), Height), ink, f);
+            x += Theme.Px(20);
+            var lw = TextRenderer.MeasureText(link, Theme.SmallStrong).Width;
+            TextRenderer.DrawText(g, link, Theme.SmallStrong, new Rectangle(x, 0, lw + 2, Height), ink, f);
+            Ring(g, r, r.Height / 2);
+        }
+    }
+
     /// Shared helpers for building the pages (positions in 96-dpi units).
     static class Ui
     {
@@ -815,9 +920,20 @@ namespace BridgeNight
             return total;
         }
 
+        /// Shared tooltip for painted controls whose text is cut (labels show their own: AutoEllipsis).
+        public static readonly ToolTip Tips = new ToolTip();
+
+        /// Sets the tooltip only when the text does not fit in `width`; clears it otherwise.
+        public static void TipIfCut(Control c, string text, Font font, int width, string full)
+        {
+            var cut = !string.IsNullOrEmpty(text) && TextRenderer.MeasureText(text, font).Width > width;
+            var want = cut ? full : null;
+            if (Tips.GetToolTip(c) != (want ?? "")) Tips.SetToolTip(c, want);
+        }
+
         public static Label Label(Control parent, string text, Font font, Color color, int x, int y, int w, int h)
         {
-            var l = new Label { Text = text, Font = font, ForeColor = color, Bounds = Theme.R(x, y, w, h), AutoEllipsis = true, UseMnemonic = false };
+            var l = new SmoothLabel { Text = text, Font = font, ForeColor = color, Bounds = Theme.R(x, y, w, h), AutoEllipsis = true, UseMnemonic = false };
             l.BackColor = parent is Card ? parent.BackColor : Color.Transparent;
             parent.Controls.Add(l);
             return l;
