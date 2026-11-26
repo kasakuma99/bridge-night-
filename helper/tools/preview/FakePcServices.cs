@@ -26,6 +26,7 @@ namespace BridgeNight
 
     static class PcServices
     {
+        internal static string Scrub(string text) { return text; }
         public static void Start(Settings settings, Action<string> log) { }
         public static void Tick() { }
         public static void Stop() { }

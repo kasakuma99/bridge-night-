@@ -180,155 +180,226 @@ namespace BridgeNight
         }
     }
 
+    /// Game mode: one glance (ready ring + state), the checks as tiles with their fix button, and how long you played.
     class GameModePage : Page
     {
-        const int Slots = 4;
-        Card before, fixes;
-        readonly Label[][] beforeRows = new Label[Slots][], fixRows = new Label[Slots][];
-        readonly FlatButton[] beforeFix = new FlatButton[Slots], fixFix = new FlatButton[Slots];
-        List<PcCheck> beforeList = new List<PcCheck>(), fixList = new List<PcCheck>();
-        Label note, nowIcon, nowTitle, nowText;
+        const int Slots = 6, TileW = 250, TileH = 104, Gap = 13;
+        ReadyRing ring;
+        Label heroTitle, heroSub, stateBig, stateCaption, todayText, lengthsNote;
         Pill autoPill, musicPill, breakPill;
+        FlatButton change;
+        readonly Card[] tiles = new Card[Slots];
+        readonly Label[] tileIcon = new Label[Slots], tileTitle = new Label[Slots], tileDetail = new Label[Slots], tileOk = new Label[Slots];
+        readonly FlatButton[] tileFix = new FlatButton[Slots];
+        List<PcCheck> checks = new List<PcCheck>();
+        Bars lengths;
+        BarRow today;
+        DateTime noteUntil = DateTime.MinValue, checkedAt;
+        int slow;
+        Card again;
+        Label againWhen;
 
         public GameModePage(MainWindow w) : base(w, "Game mode")
         {
             Heading("Game mode", "Game mode");
 
-            before = Ui.Card(this, "Before game night", X0, Y0, 382, 200);
-            fixes = Ui.Card(this, "Gamer fixes", X0, Y0 + 214, 382, 260);
+            // 1. One glance: how ready the PC is, and what happens when a game starts.
+            var hero = Ui.Card(this, null, X0, Y0, W0, 140);
+            ring = new ReadyRing { Bounds = Theme.R(18, 16, 108, 108) };
+            hero.Controls.Add(ring);
+            heroTitle = L(hero, "", Theme.Big, Theme.Ink, 146, 18, 420, 32);
+            heroSub = L(hero, "", Theme.Small, Theme.Ink2, 146, 52, 440, 22);
+            autoPill = HeroPill(hero, 146);
+            musicPill = HeroPill(hero, 146);
+            breakPill = HeroPill(hero, 146);
+            change = Ui.Link(hero, "Change in Settings", 600, 92);
+            change.Click += delegate { Win.OpenSettings("Game mode"); };
+            stateBig = L(hero, "", Theme.Huge, Theme.Ink, W0 - 200, 26, 182, 50);
+            stateBig.TextAlign = ContentAlignment.MiddleRight;
+            stateCaption = L(hero, "", Theme.Small, Theme.Mute, W0 - 230, 78, 212, 20);
+            stateCaption.TextAlign = ContentAlignment.TopRight;
+
+            // 2. Every check is a tile: green when fine, amber with its fix button when not.
             for (var i = 0; i < Slots; i++)
             {
-                beforeRows[i] = Row(before, i, out beforeFix[i]);
-                fixRows[i] = Row(fixes, i, out fixFix[i]);
+                var t = tiles[i] = Ui.Card(this, null, X0 + (i % 3) * (TileW + Gap), Y0 + 152 + (i / 3) * (TileH + Gap), TileW, TileH);
+                tileIcon[i] = Ui.Icon(t, "", Theme.Good, 14, 14);
+                tileTitle[i] = L(t, "", Theme.Strong, Theme.Ink, 44, 12, TileW - 56, 22);
+                tileDetail[i] = L(t, "", Theme.Small, Theme.Mute, 44, 34, TileW - 56, 34);
+                tileOk[i] = L(t, "All good", Theme.Small, Theme.Good, 44, 74, 140, 20);
+                tileFix[i] = Ui.ButtonRight(t, "Fix", false, TileW - 14, 66);
                 var k = i;
-                beforeFix[i].Click += delegate { Fix(beforeList, k); };
-                fixFix[i].Click += delegate { Fix(fixList, k); };
+                tileFix[i].Click += delegate { Fix(k); };
             }
-            note = L(this, "", Theme.Small, Theme.Ink2, X0, Y0 + 480, 382, 40);
 
-            // Right column: what game mode does, read-only. The switches are in Settings.
-            const int rx = X0 + 394, rw = 382;
-            var when = Ui.Card(this, "When a game starts", rx, Y0, rw, 230);
-            Ui.Link(when, "Change in Settings", rw - 12, 12).Click += delegate { Win.OpenSettings("Game mode"); };
-            autoPill = StateRow(when, "", "Automatic game mode", "On while a League game runs", 46, true);
-            musicPill = StateRow(when, "", "Music quieter in game", "Music apps at 30 % while you play", 106, true);
-            breakPill = StateRow(when, "", "Break reminder", "A short nudge after 2 hours of play", 166, false);
+            // A free tile slot becomes "Check again", so the grid never has a hole.
+            again = Ui.Card(this, null, 0, 0, TileW, TileH);
+            Ui.Icon(again, "", Theme.Ink2, 14, 14);
+            L(again, "Check again", Theme.Strong, Theme.Ink, 44, 12, TileW - 56, 22);
+            againWhen = L(again, "", Theme.Small, Theme.Mute, 44, 34, TileW - 56, 34);
+            Ui.ButtonRight(again, "Check now", false, TileW - 14, 66).Click += delegate { Fill(); };
 
-            var now = Ui.Card(this, "Right now", rx, Y0 + 244, rw, 120);
-            nowIcon = L(now, "", Theme.GlyphBig, Theme.Ink2, 16, 50, 40, 40);
-            nowIcon.TextAlign = ContentAlignment.MiddleCenter;
-            nowIcon.BackColor = Theme.NavActive;
-            nowIcon.AccessibleRole = AccessibleRole.Graphic;
-            nowTitle = L(now, "", Theme.Strong, Theme.Ink, 70, 48, 296, 22);
-            nowText = L(now, "", Theme.Small, Theme.Mute, 70, 70, 296, 40);
-
-            var safe = Ui.Card(this, null, rx, Y0 + 378, rw, 96);
-            Ui.Icon(safe, "", Theme.Good, 16, 18);
-            L(safe, "Safe to leave on", Theme.Strong, Theme.Ink, 50, 16, 316, 22);
-            L(safe, "No admin rights, League itself is never touched, and the music volume goes back when the game ends.", Theme.Small, Theme.Ink2, 50, 40, 316, 44);
+            // 3. A small picture of your play: length of the last games, and today's total against the break reminder.
+            var play = Ui.Card(this, "Your last games", X0, Y0 + 152 + 2 * (TileH + Gap), W0, 150);
+            lengths = new Bars { Bounds = Theme.R(16, 40, 390, 100), Color = Theme.Orange, HighlightLast = true, Empty = "Play a custom game and its length shows up here." };
+            play.Controls.Add(lengths);
+            L(play, "Played today", Theme.Small, Theme.Ink2, 440, 46, 200, 20);
+            todayText = L(play, "", Theme.Big, Theme.Ink, 440, 68, 130, 32);
+            today = new BarRow { Bounds = Theme.R(574, 74, 186, 24), LabelWidth = 0, ValueWidth = 0, Gradient = true };
+            play.Controls.Add(today);
+            lengthsNote = L(play, "", Theme.Small, Theme.Mute, 440, 108, 320, 20);
         }
 
-        Pill StateRow(Card card, string glyph, string title, string sub, int y, bool divider)
+        Pill HeroPill(Card hero, int x)
         {
-            Ui.Icon(card, glyph, Theme.Ink2, 14, y + 10);
-            L(card, title, Theme.Body, Theme.Ink, 48, y, 250, 22);
-            L(card, sub, Theme.Small, Theme.Mute, 48, y + 22, 250, 20);
-            var p = new Pill { AnchorRight = card.Width - Theme.Px(16), Top = Theme.Px(y + 9) };
-            card.Controls.Add(p);
+            var p = new Pill { Left = Theme.Px(x), Top = Theme.Px(94) };
+            hero.Controls.Add(p);
             p.Set("Off", false);
-            if (divider) Ui.Divider(card, 16, y + 52, 350);
             return p;
         }
 
-        Label[] Row(Card card, int i, out FlatButton fix)
+        /// Pills sit in one row after each other, the Settings link right after them.
+        void LayoutPills()
         {
-            var y = 46 + i * 56;
-            var icon = Ui.Icon(card, "", Theme.Good, 14, y + 8);
-            var title = L(card, "", Theme.Body, Theme.Ink, 48, y, 210, 24);
-            var detail = L(card, "", Theme.Small, Theme.Mute, 48, y + 23, 210, 20);
-            fix = Ui.ButtonRight(card, "Fix", false, 366, y + 4);
-            return new[] { icon, title, detail };
+            var x = autoPill.Left;
+            foreach (var p in new[] { autoPill, musicPill, breakPill }) { p.Left = x; x = p.Right + Theme.Px(8); }
+            change.Left = x + Theme.Px(4);
         }
 
-        void Fix(List<PcCheck> list, int i)
+        void Fix(int i)
         {
-            if (i >= list.Count) return;
-            var c = list[i];
+            if (i >= checks.Count) return;
+            var c = checks[i];
             if (c.FixLabel.IndexOf("restart", StringComparison.OrdinalIgnoreCase) >= 0 &&
                 MessageBox.Show(this, "Restart Windows now? Save your work first.", Program.Title, MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes) return;
             string text;
             var ok = GameMode.Fix(c.Id, out text);
-            Ui.Set(note, string.IsNullOrEmpty(text) ? (ok ? "Done." : "That did not work.") : text, ok ? Theme.Ink2 : Theme.Warn);
+            Ui.Set(heroSub, string.IsNullOrEmpty(text) ? (ok ? "Done." : "That did not work.") : text, ok ? Theme.Good : Theme.Warn);
+            noteUntil = DateTime.UtcNow.AddSeconds(8);
             Win.Log("Game mode fix " + c.Id + ": " + (ok ? "done" : "failed") + (string.IsNullOrEmpty(text) ? "" : " (" + text + ")"));
             Fill();
         }
 
         void Fill()
         {
-            beforeList = GameMode.BeforeNight() ?? new List<PcCheck>();
-            fixList = GameMode.Fixes() ?? new List<PcCheck>();
-            var h1 = Show(before, beforeRows, beforeFix, beforeList, "Nothing to check right now.");
-            before.Height = Theme.Px(h1);
-            fixes.Top = before.Bottom + Theme.Px(14);
-            var h2 = Show(fixes, fixRows, fixFix, fixList, "Nothing to fix: your settings look right.");
-            fixes.Height = Theme.Px(h2);
-            note.Top = fixes.Bottom + Theme.Px(10);
-            var problems = 0;
-            foreach (var c in beforeList) if (c.Problem) problems++;
-            foreach (var c in fixList) if (c.Problem) problems++;
-            Win.SetBadge(problems);
-        }
-
-        static int Show(Card card, Label[][] rows, FlatButton[] buttons, List<PcCheck> list, string empty)
-        {
+            var all = new List<PcCheck>();
+            all.AddRange(GameMode.BeforeNight() ?? new List<PcCheck>());
+            all.AddRange(GameMode.Fixes() ?? new List<PcCheck>());
+            // Things to fix first, then the ones that are fine.
+            checks = all.Where(c => c.Problem).Concat(all.Where(c => !c.Problem)).Take(Slots).ToList();
+            var problems = all.Count(c => c.Problem);
             for (var i = 0; i < Slots; i++)
             {
-                var has = i < list.Count || (i == 0 && list.Count == 0);
-                foreach (var l in rows[i]) Ui.Show(l, has);
-                Ui.Show(buttons[i], i < list.Count && list[i].FixLabel != "");
+                var has = i < checks.Count;
+                Ui.Show(tiles[i], has);
                 if (!has) continue;
-                if (list.Count == 0)
+                var c = checks[i];
+                Ui.Set(tileIcon[i], c.Problem ? "" : "", c.Problem ? Theme.Warn : Theme.Good);
+                Ui.Set(tileTitle[i], c.Title);
+                Ui.Set(tileDetail[i], c.Detail);
+                var canFix = c.Problem && c.FixLabel != "";
+                Ui.Show(tileFix[i], canFix);
+                Ui.Show(tileOk[i], !canFix);
+                Ui.Set(tileOk[i], c.Problem ? "Worth a look" : "All good", c.Problem ? Theme.Warn : Theme.Good);
+                if (canFix)
                 {
-                    Ui.Set(rows[0][0], "\uE930", Theme.Good);
-                    Ui.Set(rows[0][1], empty);
-                    rows[0][1].Width = card.Width - Theme.Px(64);
-                    Ui.Set(rows[0][2], "");
-                    continue;
+                    tileFix[i].Text = c.FixLabel;
+                    tileFix[i].FitWidth();
+                    tileFix[i].Left = tiles[i].Width - Theme.Px(14) - tileFix[i].Width;
+                    tileFix[i].AccessibleDescription = c.Title;
                 }
-                var c = list[i];
-                Ui.Set(rows[i][0], c.Problem ? "\uE7BA" : "\uE930", c.Problem ? Theme.Warn : Theme.Good);
-                Ui.Set(rows[i][1], c.Title);
-                Ui.Set(rows[i][2], c.Detail);
-                var btnW = c.FixLabel != "" ? buttons[i].Width : 0;
-                if (c.FixLabel != "")
-                {
-                    buttons[i].Text = c.FixLabel;
-                    buttons[i].FitWidth();
-                    buttons[i].Left = card.Width - Theme.Px(16) - buttons[i].Width;
-                    buttons[i].AccessibleDescription = c.Title;
-                    btnW = buttons[i].Width;
-                }
-                rows[i][1].Width = rows[i][2].Width = card.Width - Theme.Px(48 + 24) - btnW;
             }
-            return 46 + Math.Max(1, Math.Min(Slots, list.Count)) * 56 + 6;
+            checkedAt = DateTime.Now;
+            Ui.Set(againWhen, "Last checked at " + checkedAt.ToString("HH:mm", Ui.En));
+            Ui.Show(again, checks.Count < Slots);
+            if (checks.Count < Slots) again.Location = tiles[checks.Count].Location;
+            ring.Set(all.Count - problems, all.Count);
+            Ui.Set(heroTitle, all.Count == 0 ? "Checking your PC…" : problems == 0 ? "Ready for game night" : problems == 1 ? "1 quick fix before game night" : problems + " quick fixes before game night");
+            if (DateTime.UtcNow >= noteUntil)
+                Ui.Set(heroSub, problems == 0 ? "Everything below looks right on this PC." : "Fixes only happen when you click them. Nothing changes by itself.", Theme.Ink2);
+            Win.SetBadge(problems);
+            FillPlay();
         }
 
-        public override void Shown() { Fill(); }
+        void FillPlay()
+        {
+            var games = PerfMon.LastGames() ?? new List<GameReport>();
+            var shown = games.Take(5).Reverse().ToList(); // oldest left, newest right
+            var mins = shown.Select(g => (float)Math.Max(1, (g.End - g.Start).TotalMinutes)).ToList();
+            var top = mins.Count == 0 ? 1f : Math.Max(30f, mins.Max());
+            lengths.Values = mins.Select(m => 100f * m / top).ToArray();
+            lengths.TopLabels = mins.Select(m => Math.Round(m) + " min").ToArray();
+            lengths.BottomLabels = shown.Select(g => g.Start.ToString("ddd", Ui.En)).ToArray();
+            lengths.Invalidate();
+            var played = TimeSpan.Zero;
+            foreach (var g in games) if (g.Start.Date == DateTime.Today) played += g.End - g.Start;
+            var start = PcServices.GameStartedAt;
+            if (start.HasValue) played += DateTime.Now - start.Value;
+            Ui.Set(todayText, played.TotalMinutes < 1 ? "–" : played.TotalHours >= 1 ? (int)played.TotalHours + " h " + played.Minutes + " min" : played.Minutes + " min");
+            today.Set("", (float)(played.TotalMinutes / 120.0), "");
+            Ui.Set(lengthsNote, S.BreakReminder ? "Full bar = 2 hours, then the break reminder." : "Full bar = 2 hours of play.");
+        }
+
+        public override void Shown() { slow = 0; Fill(); }
 
         public override void Tick()
         {
             var auto = S.GameModeAuto;
-            autoPill.Set(auto ? "On" : "Off", auto);
-            musicPill.Set(S.MusicQuieter ? "On" : "Off", auto && S.MusicQuieter);
-            breakPill.Set(S.BreakReminder ? "On" : "Off", auto && S.BreakReminder);
-            var active = GameMode.Active;
+            autoPill.Set(auto ? "Automatic: on" : "Automatic: off", auto);
+            musicPill.Set(S.MusicQuieter ? "Music quieter: on" : "Music quieter: off", auto && S.MusicQuieter);
+            breakPill.Set(S.BreakReminder ? "Break reminder: on" : "Break reminder: off", auto && S.BreakReminder);
+            LayoutPills();
             var start = PcServices.GameStartedAt;
-            Ui.Set(nowIcon, active ? "" : start.HasValue ? "" : "", active ? Theme.Good : Theme.Ink2);
-            Ui.Set(nowTitle, active ? "Game mode is on" : start.HasValue ? "In game · " + Ui.Clock(DateTime.Now - start.Value) : "No game right now");
-            Ui.Set(nowText, active ? (GameMode.ActiveText == "" ? "Everything goes back to normal when the game ends." : GameMode.ActiveText + ". Back to normal when the game ends.")
-                : !auto ? "Automatic is off: nothing changes when a game starts."
-                : S.MusicQuieter ? "When a game starts, music gets quieter. It goes back when the game ends."
-                : "Nothing to change when a game starts: music quieter is off.");
+            var active = GameMode.Active;
+            Ui.Set(stateBig, start.HasValue ? Ui.Clock(DateTime.Now - start.Value) : "No game", start.HasValue ? Theme.Ink : Theme.Mute);
+            Ui.Set(stateCaption, start.HasValue ? (active ? "in game · game mode on" : "in game") : auto ? "game mode starts with the game" : "automatic game mode is off");
+            if (noteUntil != DateTime.MinValue && DateTime.UtcNow >= noteUntil) { noteUntil = DateTime.MinValue; Fill(); }
+            if (++slow % 30 == 0) FillPlay();
+        }
+    }
+
+    /// Ring that fills with the share of checks that are fine; the count sits in the middle.
+    class ReadyRing : Control
+    {
+        int ok, total = -1;
+
+        public ReadyRing()
+        {
+            SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw, true);
+            BackColor = Theme.Card;
+            TabStop = false;
+            AccessibleRole = AccessibleRole.ProgressBar;
+        }
+
+        public void Set(int okCount, int totalCount)
+        {
+            if (okCount == ok && totalCount == total) return;
+            ok = okCount;
+            total = totalCount;
+            AccessibleName = total <= 0 ? "Checking" : ok + " of " + total + " checks fine";
+            Invalidate();
+        }
+
+        protected override void OnPaint(PaintEventArgs e)
+        {
+            var g = e.Graphics;
+            g.Clear(BackColor);
+            g.SmoothingMode = SmoothingMode.AntiAlias;
+            float w = Theme.Px(10);
+            var r = new RectangleF(w / 2f + 1, w / 2f + 1, Width - w - 2, Height - w - 2);
+            using (var track = new Pen(Color.FromArgb(28, 255, 255, 255), w)) g.DrawEllipse(track, r);
+            if (total > 0 && ok > 0)
+            {
+                var sweep = ok == total ? 359.9f : 360f * ok / total;
+                using (var b = ok == total ? (Brush)new SolidBrush(Theme.Good) : Theme.Sunset(r, 45f))
+                using (var p = new Pen(b, w) { StartCap = LineCap.Round, EndCap = LineCap.Round })
+                    g.DrawArc(p, r, -90, sweep);
+            }
+            var big = total <= 0 ? "…" : ok + "/" + total;
+            TextRenderer.DrawText(g, big, Theme.Big, new Rectangle(0, 0, Width, Height - Theme.Px(12)), Theme.Ink,
+                TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding);
+            TextRenderer.DrawText(g, "checks fine", Theme.Tiny, new Rectangle(0, Height / 2 + Theme.Px(10), Width, Theme.Px(18)), Theme.Mute,
+                TextFormatFlags.HorizontalCenter | TextFormatFlags.NoPadding);
         }
     }
 
