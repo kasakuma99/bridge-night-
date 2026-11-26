@@ -1,4 +1,5 @@
-// Bridge Night Helper: Network page. Pings the EUW game server once a second while the page is open, and on
+// Bridge Night Helper: Network page. Pings the EUW game server only while something shows it: once a second while
+// the Network page is open (needed for jitter), every 5 s for the Home tile and the mini window, never in the tray. On
 // request finds where the time goes (this PC, router, provider, Riot) with TTL-limited pings. No admin rights.
 
 using System;
@@ -19,6 +20,9 @@ namespace BridgeNight
         const string Fallback = "speedtest.ams1.nl.leaseweb.net";
         const string RiotName = "Riot " + ServerName, FallbackName = "Amsterdam, next to " + ServerName + " (Riot does not answer pings)";
         static volatile string activeTarget = Target, activeName = RiotName;
+        static volatile bool riotSilent; // remembered for this run, so Riot is not tried again each time a page opens
+        /// The caller key the Network page uses with Start/Stop: only it gets one ping per second.
+        public const string FastCaller = "network";
 
         static readonly object gate = new object();
         static readonly Dictionary<string, int> users = new Dictionary<string, int>();
@@ -61,11 +65,13 @@ namespace BridgeNight
                     var clock = Stopwatch.StartNew();
                     activeTarget = Target;
                     activeName = RiotName;
+                    if (riotSilent) UseFallback(ping);
                     int riotTries = 0;
                     bool riotAnswered = false;
                     while (true)
                     {
-                        lock (gate) if (users.Count == 0) return;
+                        bool fast;
+                        lock (gate) { if (users.Count == 0) return; fast = users.ContainsKey(FastCaller); }
                         var started = clock.ElapsedMilliseconds;
                         int? ms = null;
                         try
@@ -77,7 +83,13 @@ namespace BridgeNight
                         if (activeTarget == Target && !riotAnswered)
                         {
                             riotAnswered = ms.HasValue;
-                            if (!riotAnswered && ++riotTries == 3 && UseFallback(ping)) { lock (gate) pings.Clear(); continue; }
+                            if (!riotAnswered)
+                            {
+                                // Probe Riot quickly and keep its misses out of the history, so the first seconds
+                                // don't say "no internet" before the Amsterdam fallback takes over.
+                                if (++riotTries == 3 && UseFallback(ping)) { lock (gate) pings.Clear(); continue; }
+                                if (riotTries < 3) { wake.WaitOne(1000); continue; }
+                            }
                         }
                         lock (gate)
                         {
@@ -85,7 +97,7 @@ namespace BridgeNight
                             pings.Add(new KeyValuePair<DateTime, int?>(now, ms));
                             while (pings.Count > 0 && now - pings[0].Key > TimeSpan.FromMinutes(10)) pings.RemoveAt(0);
                         }
-                        var wait = 1000 - (int)(clock.ElapsedMilliseconds - started);
+                        var wait = (fast ? 1000 : 5000) - (int)(clock.ElapsedMilliseconds - started);
                         if (wait > 0) wake.WaitOne(wait);
                     }
                 }
@@ -108,6 +120,8 @@ namespace BridgeNight
             try { if (ping.Send(ip, 1000).Status != IPStatus.Success) return false; } catch { return false; }
             activeTarget = ip;
             activeName = FallbackName;
+            if (riotSilent) return true;
+            riotSilent = true;
             PcServices.Log("Network: Riot's EUW server does not answer pings, measuring to Amsterdam next to it instead");
             return true;
         }
