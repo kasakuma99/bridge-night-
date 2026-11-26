@@ -85,12 +85,12 @@ namespace BridgeNight
             live.CheckedChanged += delegate { if (!syncing) { S.LiveMeasure = live.Checked; Save(); } };
             Ui.Divider(perf, 16, 88, col - 32);
             L(perf, "Measure every", Theme.Body, Theme.Ink, 16, 104, 200, 24).TextAlign = ContentAlignment.MiddleLeft;
-            every = new Segmented("Measure every", new[] { "1s", "5s", "10s" }, 9);
+            every = new Segmented("Measure every", new[] { "1s", "2s", "5s" }, 9);
             every.Location = new Point(Theme.Px(col - 16) - every.Width, Theme.Px(99));
             every.Changed += delegate
             {
                 if (syncing) return;
-                S.MeasureEvery = every.Selected == 0 ? 1 : every.Selected == 1 ? 5 : 10;
+                S.MeasureEvery = every.Selected == 0 ? 1 : every.Selected == 1 ? 2 : 5;
                 PerfMon.IntervalSeconds = S.MeasureEvery;
                 Save();
             };
@@ -159,7 +159,7 @@ namespace BridgeNight
             paused.Checked = S.Paused;
             autoUpdate.Checked = S.AutoUpdate;
             live.Checked = S.LiveMeasure;
-            every.Selected = S.MeasureEvery == 1 ? 0 : S.MeasureEvery == 10 ? 2 : 1;
+            every.Selected = S.MeasureEvery == 1 ? 0 : S.MeasureEvery == 5 ? 2 : 1;
             record.Checked = S.RecordLastGame;
             syncing = false;
         }
@@ -228,7 +228,7 @@ namespace BridgeNight
         static readonly string[][] Sections =
         {
             new[] { "Home", "\uE80F", "Home shows whether the League client, this helper and the site are connected. The tiles mute your mic, switch the sound output and show game mode and updates. \"Last sent\" is what reached the site. Below: your ping to EUW, how busy this PC is, and how it handled your last game." },
-            new[] { "Performance", "\uE9D9", "Live shows processor, graphics card, memory and graphics memory while the page is open. Last game is a light record of your last custom game and says what held your PC back. Apps lists what uses the most memory (Close asks the app politely) and what starts with Windows. Measuring stops when you leave the page; switch it off or slow it down with Measure and 1s / 5s / 10s." },
+            new[] { "Performance", "\uE9D9", "Live shows processor, graphics card, memory and graphics memory while the page is open. Last game is a light record of your last custom game and says what held your PC back. Apps lists what uses the most memory (Close asks the app politely) and what starts with Windows. Measuring stops when you leave the page; switch it off or slow it down with Measure and 1s / 2s / 5s." },
             new[] { "Network", "\uE839", "Ping, jitter and packet loss to the EUW game server, measured once a second while the page is open. \"Where the time goes\" checks each step (this PC, your router, your internet provider, Riot), so you can see where lag comes from." },
             new[] { "Game mode", "\uE7FC", "Before game night lists things to sort out first, like a pending Windows restart. When a game starts, the helper can switch to the high-performance power plan and turn music down, and puts everything back after the game. Gamer fixes change one Windows setting for your account only. No admin rights are needed." },
             new[] { "Audio", "\uE7F6", "Ctrl+Alt+M mutes your microphone in Windows, so every app goes quiet at once. Ctrl+Alt+H switches between headset, speakers and monitor. A short sound and a small \"Muted\" badge show when you are muted; both can be switched off." },

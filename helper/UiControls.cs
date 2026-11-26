@@ -242,7 +242,7 @@ namespace BridgeNight
         }
     }
 
-    /// A row of options, one chosen (1s / 5s / 10s, page tabs). Arrow keys move the choice.
+    /// A row of options, one chosen (1s / 2s / 5s, page tabs). Arrow keys move the choice.
     class Segmented : PaintedControl
     {
         readonly string[] options;

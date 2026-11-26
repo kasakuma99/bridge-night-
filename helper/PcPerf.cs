@@ -22,7 +22,7 @@ namespace BridgeNight
         static readonly List<PerfSample> history = new List<PerfSample>();
         static readonly Dictionary<string, int> users = new Dictionary<string, int>();
         static readonly AutoResetEvent wake = new AutoResetEvent(false);
-        static int interval = 5;
+        static int interval = 2;
         static Thread sampler;
         static bool recording;
         static List<PerfSample> recorded;

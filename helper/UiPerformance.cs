@@ -104,12 +104,12 @@ namespace BridgeNight
             tabPicker.Location = new Point(Theme.Px(X0 + W0) - tabPicker.Width, Theme.Px(22));
             tabPicker.Changed += delegate { ShowTab(); };
             Controls.Add(tabPicker);
-            every = new Segmented("Measure every", new[] { "1s", "5s", "10s" }, 9);
+            every = new Segmented("Measure every", new[] { "1s", "2s", "5s" }, 9);
             every.Location = new Point(tabPicker.Left - Theme.Px(16) - every.Width, Theme.Px(22));
             every.Changed += delegate
             {
                 if (syncing) return;
-                S.MeasureEvery = every.Selected == 0 ? 1 : every.Selected == 1 ? 5 : 10;
+                S.MeasureEvery = every.Selected == 0 ? 1 : every.Selected == 1 ? 2 : 5;
                 PerfMon.IntervalSeconds = S.MeasureEvery;
                 Save();
             };
@@ -212,9 +212,9 @@ namespace BridgeNight
         void TickLive()
         {
             var secs = PerfMon.IntervalSeconds * 60;
-            // 60 samples: 60 s, 5 min or 10 min back.
-            var unit = PerfMon.IntervalSeconds == 1 ? " s" : " min";
-            var span = PerfMon.IntervalSeconds == 1 ? 60 : PerfMon.IntervalSeconds;
+            // 60 samples: 60 s, 120 s or 5 min back.
+            var unit = secs <= 120 ? " s" : " min";
+            var span = secs <= 120 ? secs : secs / 60;
             var labels = new[] { span + unit, span * 4 / 5 + "", span * 3 / 5 + "", span * 2 / 5 + "", span / 5 + "", "now" };
             var p = S.LiveMeasure ? PerfMon.Latest : null;
             var h = S.LiveMeasure ? PerfMon.History(secs) : new List<PerfSample>();
@@ -484,7 +484,7 @@ namespace BridgeNight
         {
             syncing = true;
             measure.Checked = S.LiveMeasure;
-            every.Selected = S.MeasureEvery == 1 ? 0 : S.MeasureEvery == 10 ? 2 : 1;
+            every.Selected = S.MeasureEvery == 1 ? 0 : S.MeasureEvery == 5 ? 2 : 1;
             syncing = false;
             PerfMon.IntervalSeconds = S.MeasureEvery;
             if (S.LiveMeasure) PerfMon.Start("perf");

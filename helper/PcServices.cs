@@ -188,7 +188,7 @@ namespace BridgeNight
         /// Live measuring for the open Performance page / Home tile. Start/Stop are reference counted per caller key.
         public static void Start(string who) { StartImpl(who); }
         public static void Stop(string who) { StopImpl(who); }
-        public static int IntervalSeconds { get { return interval; } set { interval = value <= 1 ? 1 : value >= 10 ? 10 : 5; wake.Set(); } } // 1, 5 or 10
+        public static int IntervalSeconds { get { return interval; } set { interval = value <= 1 ? 1 : value >= 5 ? 5 : 2; wake.Set(); } } // 1, 2 or 5
 
         public static PerfSample Latest { get { lock (gate) return history.Count == 0 ? null : history[history.Count - 1]; } }
         /// Samples of the last `seconds` seconds, oldest first.
