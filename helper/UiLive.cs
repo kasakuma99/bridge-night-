@@ -17,7 +17,8 @@ namespace BridgeNight
         public static readonly Color Blue = Color.FromArgb(0x5a, 0xa9, 0xff), Red = Color.FromArgb(0xff, 0x5d, 0x6c);
         const int Rows = 5, RowH = 54, TeamW = 382, ScoreH = 104, Bottom = 524;
 
-        Card empty, blueCard, redCard, logCard;
+        Card empty, blueCard, redCard;
+        Label timelineTitle;
         ScoreBar score;
         Label blueHead, redHead;
         readonly PlayerRow[] blue = new PlayerRow[Rows], red = new PlayerRow[Rows];
@@ -50,9 +51,10 @@ namespace BridgeNight
                 redCard.Controls.Add(red[i]);
             }
 
-            logCard = Ui.Card(this, "Timeline", X0, Y0 + ScoreH + 12, W0, 120);
-            timeline = new Timeline { Bounds = Theme.R(16, 42, W0 - 32, 70) };
-            logCard.Controls.Add(timeline);
+            // The timeline sits right on the page, no box around it: a heading, then dots on a line.
+            timelineTitle = L(this, "Timeline", Theme.CardTitle, Theme.Ink, X0 + 4, Y0 + ScoreH + 12, 200, 24);
+            timeline = new Timeline { Bounds = Theme.R(X0, Y0 + ScoreH + 40, W0, 120) };
+            Controls.Add(timeline);
         }
 
         Card TeamCard(int x, string title, Color side, out Label head)
@@ -75,7 +77,7 @@ namespace BridgeNight
             var players = g == null ? null : Json.List(g, "allPlayers");
             var has = players != null && players.Length > 0;
             Ui.Show(empty, !has);
-            foreach (Control c in new Control[] { score, blueCard, redCard, logCard }) Ui.Show(c, has);
+            foreach (Control c in new Control[] { score, blueCard, redCard, timelineTitle, timeline }) Ui.Show(c, has);
             if (!has) return;
 
             double t = 0;
@@ -89,14 +91,14 @@ namespace BridgeNight
             Fill(red, redCard, chaos);
 
             // The timeline takes the rest of the page, so small games show more of it.
-            logCard.Top = Math.Max(blueCard.Bottom, redCard.Bottom) + Theme.Px(12);
-            logCard.Height = Math.Max(Theme.Px(110), Theme.Px(Y0 + Bottom) - logCard.Top);
-            timeline.Height = logCard.Height - Theme.Px(50);
+            timelineTitle.Top = Math.Max(blueCard.Bottom, redCard.Bottom) + Theme.Px(16);
+            timeline.Top = timelineTitle.Bottom + Theme.Px(6);
+            timeline.Height = Math.Max(Theme.Px(80), Theme.Px(Y0 + Bottom + 24) - timeline.Top);
 
             var teams = new Dictionary<string, Color>(StringComparer.OrdinalIgnoreCase);
             foreach (var p in order) foreach (var n in Names(p)) teams[n] = Blue;
             foreach (var p in chaos) foreach (var n in Names(p)) teams[n] = Red;
-            timeline.Set(Json.List(Json.Dict(g, "events"), "Events"), teams);
+            timeline.Set(Json.List(Json.Dict(g, "events"), "Events"), teams, t);
         }
 
         static IEnumerable<string> Names(object p)
@@ -314,38 +316,56 @@ namespace BridgeNight
         }
     }
 
-    /// Newest first: time, a coloured dot (killer's team, or orange for objectives) and the line with names in bold.
+    /// Newest on top, on one line with dots: time, a coloured dot (killer's team, or orange for objectives) and the
+    /// line with names in bold. What happened in the last 30 s of game time is highlighted, and a new event slides in.
     class Timeline : Control
     {
-        sealed class Line { public double At; public Color Dot; public List<KeyValuePair<string, bool>> Parts = new List<KeyValuePair<string, bool>>(); }
+        sealed class Line { public double At; public Color Dot; public string Key = ""; public List<KeyValuePair<string, bool>> Parts = new List<KeyValuePair<string, bool>>(); }
         List<Line> lines = new List<Line>();
-        string key = "";
-        const int LineH = 24;
+        string key = "", firstKey = "";
+        double now;
+        const int LineH = 28, FreshSeconds = 30;
+        readonly Timer slide = new Timer { Interval = 15 };
+        float offset; // pixels the list is still shifted up while a new event slides in
 
         public Timeline()
         {
-            SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw, true);
-            BackColor = Theme.Card;
+            SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw | ControlStyles.SupportsTransparentBackColor, true);
             TabStop = false;
             AccessibleRole = AccessibleRole.List;
+            slide.Tick += delegate
+            {
+                offset = Math.Max(0, offset - Theme.Px(3));
+                if (offset <= 0) slide.Stop();
+                Invalidate();
+            };
         }
 
-        public void Set(object[] events, Dictionary<string, Color> teams)
+        public void Set(object[] events, Dictionary<string, Color> teams, double gameTime)
         {
             var list = new List<Line>();
             if (events != null)
-                for (var i = events.Length - 1; i >= 0 && list.Count < 12; i--)
+                for (var i = events.Length - 1; i >= 0 && list.Count < 14; i--)
                 {
                     var l = Make(events[i], teams);
                     if (l != null) list.Add(l);
                 }
-            var now = string.Join("\n", list.Select(l => l.At + string.Join("", l.Parts.Select(p => p.Key)).ToString()).ToArray());
-            if (now == key) return;
-            key = now;
+            var freshNow = list.Count > 0 && gameTime - list[0].At < FreshSeconds;
+            var wasFresh = lines.Count > 0 && now - lines[0].At < FreshSeconds;
+            now = gameTime;
+            var k = string.Join("\n", list.Select(l => l.Key).ToArray());
+            if (k == key && freshNow == wasFresh) return;
+            // A new event on top: slide it in (only when the page is on screen; the timer stops by itself).
+            var newFirst = list.Count > 0 ? list[0].Key : "";
+            if (firstKey != "" && newFirst != firstKey && Visible) { offset = Theme.Px(LineH); slide.Start(); }
+            firstKey = newFirst;
+            key = k;
             lines = list;
             AccessibleName = string.Join(". ", list.Select(l => string.Join("", l.Parts.Select(p => p.Key))).ToArray());
             Invalidate();
         }
+
+        protected override void Dispose(bool disposing) { if (disposing) slide.Dispose(); base.Dispose(disposing); }
 
         static Line Make(object e, Dictionary<string, Color> teams)
         {
@@ -377,6 +397,7 @@ namespace BridgeNight
                 case "GameEnd": Bold(l, "Game over"); l.Dot = Theme.Mute; break;
                 default: return null;
             }
+            l.Key = l.At.ToString("0.0", Ui.En) + string.Join("", l.Parts.Select(p => p.Key));
             return l;
         }
 
@@ -395,48 +416,69 @@ namespace BridgeNight
             return hash > 0 ? name.Substring(0, hash) : name;
         }
 
+        protected override void OnPaintBackground(PaintEventArgs e) { Ui.PaintParent(this, e); }
+
         protected override void OnPaint(PaintEventArgs e)
         {
             var g = e.Graphics;
-            g.Clear(BackColor);
             g.SmoothingMode = SmoothingMode.AntiAlias;
             const TextFormatFlags f = TextFormatFlags.NoPrefix | TextFormatFlags.NoPadding | TextFormatFlags.VerticalCenter;
+            var lh = Theme.Px(LineH);
+            var timeW = Theme.Px(52);
+            var axis = timeW + Theme.Px(16); // x of the line through the dots
             if (lines.Count == 0)
             {
-                TextRenderer.DrawText(g, "Nothing yet. Kills, dragons and towers show up here.", Theme.Small, new Rectangle(0, 0, Width, Theme.Px(LineH)), Theme.Mute, f);
+                TextRenderer.DrawText(g, "Nothing yet. Kills, dragons and towers show up here.", Theme.Small, new Rectangle(axis + Theme.Px(20), 0, Width - axis, lh), Theme.Mute, f);
                 return;
             }
-            var lh = Theme.Px(LineH);
             var fit = Math.Max(1, Height / lh);
-            // Two columns when there is room for more lines than height allows in one.
-            var cols = lines.Count > fit ? 2 : 1;
-            var colW = Width / cols;
-            var timeW = Theme.Px(50);
-            var axisX = timeW + Theme.Px(6);
-            for (var c = 0; c < cols; c++)
+            var count = Math.Min(fit, lines.Count);
+
+            // The line through the dots, fading out at the bottom.
+            var top = lh / 2f - offset;
+            var bottom = (count - 1) * lh + lh / 2f;
+            if (bottom > top)
+                using (var lb = new LinearGradientBrush(new RectangleF(0, top - 1, 1, bottom - top + 2), Theme.BorderHi, Color.FromArgb(0, Theme.BorderHi), 90f))
+                using (var p = new Pen(lb, Theme.Px(2)))
+                    g.DrawLine(p, axis, top, axis, bottom);
+
+            for (var i = 0; i < count; i++)
             {
-                var x0 = c * colW;
-                var shown = 0;
-                for (var i = c * fit; i < lines.Count && shown < fit; i++, shown++)
+                var l = lines[i];
+                var y = i * lh - offset;
+                var fresh = i == 0 && now - l.At < FreshSeconds;
+                var fade = i == 0 ? 255 : Math.Max(110, 255 - i * 14); // older lines get a little quieter
+                TextRenderer.DrawText(g, Ui.Clock(TimeSpan.FromSeconds(l.At)), fresh ? Theme.SmallStrong : Theme.Small, new Rectangle(0, (int)y, timeW, lh), fresh ? Theme.Ink : Theme.Mute, f | TextFormatFlags.Right);
+
+                // Dot; the newest one glows.
+                var d = Theme.Px(fresh ? 12 : 9);
+                var cy = y + lh / 2f;
+                if (fresh)
+                    using (var glow = new SolidBrush(Color.FromArgb(60, l.Dot))) g.FillEllipse(glow, axis - d, cy - d, d * 2, d * 2);
+                using (var ring = new SolidBrush(Theme.Base)) g.FillEllipse(ring, axis - d / 2f - Theme.Px(2), cy - d / 2f - Theme.Px(2), d + Theme.Px(4), d + Theme.Px(4));
+                using (var b = new SolidBrush(l.Dot)) g.FillEllipse(b, axis - d / 2f, cy - d / 2f, d, d);
+
+                var x = axis + Theme.Px(22);
+                foreach (var part in l.Parts)
                 {
-                    var l = lines[i];
-                    var y = shown * lh;
-                    // Faint vertical line linking the dots.
-                    if (shown < fit - 1 && i < lines.Count - 1)
-                        using (var p = new Pen(Theme.Border)) g.DrawLine(p, x0 + axisX + Theme.Px(4), y + lh / 2, x0 + axisX + Theme.Px(4), y + lh + lh / 2);
-                    TextRenderer.DrawText(g, Ui.Clock(TimeSpan.FromSeconds(l.At)), Theme.Small, new Rectangle(x0, y, timeW, lh), Theme.Mute, f | TextFormatFlags.Right);
-                    var d = Theme.Px(9);
-                    using (var b = new SolidBrush(l.Dot)) g.FillEllipse(b, x0 + axisX, y + (lh - d) / 2f, d, d);
-                    var x = x0 + axisX + Theme.Px(20);
-                    foreach (var part in l.Parts)
+                    var font = fresh ? (part.Value ? Theme.Strong : Theme.Body) : part.Value ? Theme.SmallStrong : Theme.Small;
+                    var color = fresh ? (part.Value ? Theme.Ink : Theme.Ink2) : Color.FromArgb(fade, part.Value ? Theme.Ink : Theme.Ink2);
+                    var w = TextRenderer.MeasureText(g, part.Key, font, Size.Empty, TextFormatFlags.NoPrefix | TextFormatFlags.NoPadding).Width;
+                    var room = Width - Theme.Px(80) - x;
+                    if (room <= 0) break;
+                    TextRenderer.DrawText(g, part.Key, font, new Rectangle(x, (int)y, Math.Min(w + 1, room), lh), color, f | TextFormatFlags.EndEllipsis);
+                    x += w;
+                }
+                if (fresh)
+                {
+                    // Small "NOW" tag after the newest line.
+                    var tag = new RectangleF(x + Theme.Px(10), cy - Theme.Px(9), Theme.Px(40), Theme.Px(18));
+                    using (var path = Theme.Round(tag, tag.Height / 2))
                     {
-                        var font = part.Value ? Theme.SmallStrong : Theme.Small;
-                        var w = TextRenderer.MeasureText(g, part.Key, font, Size.Empty, TextFormatFlags.NoPrefix | TextFormatFlags.NoPadding).Width;
-                        var room = x0 + colW - Theme.Px(12) - x;
-                        if (room <= 0) break;
-                        TextRenderer.DrawText(g, part.Key, font, new Rectangle(x, y, Math.Min(w + 1, room), lh), part.Value ? Theme.Ink : Theme.Ink2, f | TextFormatFlags.EndEllipsis);
-                        x += w;
+                        using (var b = new SolidBrush(Color.FromArgb(40, l.Dot))) g.FillPath(b, path);
+                        using (var p = new Pen(Color.FromArgb(120, l.Dot))) g.DrawPath(p, path);
                     }
+                    TextRenderer.DrawText(g, "NOW", Theme.Tiny, Rectangle.Round(tag), Theme.Ink, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding);
                 }
             }
         }
