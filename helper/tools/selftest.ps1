@@ -1,6 +1,6 @@
 # Self-test of the PC features (PcServices.cs and the Pc*.cs files) WITHOUT starting the helper.
 # Loads the TEST build, calls only read-only functions and checks the pure logic. It never mutes the mic,
-# switches the output, changes the power plan, monitor, mouse, Sticky Keys or app volumes, closes apps,
+# switches the output, changes the monitor, mouse, Sticky Keys or app volumes, closes apps,
 # keeps hotkeys registered, or downloads/installs an update. Its files go to a temp folder (BN_HELPER_DIR),
 # never to %APPDATA%\BridgeNightHelper.
 #
@@ -40,10 +40,11 @@ function Show([string]$label, $value) { Write-Host ("  " + $label.PadRight(22) +
 
 # Start with everything that could change the PC switched off (no hotkeys, no auto update, no game mode).
 $logQ = New-Object 'System.Collections.Concurrent.ConcurrentQueue[string]'
+$logged = New-Object 'System.Collections.Generic.List[string]'
 $log = [Delegate]::CreateDelegate([Action[string]], $logQ, "Enqueue")
 $settings = New-Pc "Settings"
 $settings.Hotkeys = $false; $settings.AutoUpdate = $false; $settings.GameModeAuto = $false
-$settings.MusicQuieter = $false; $settings.PowerPlanInGame = $false; $settings.RecordLastGame = $false
+$settings.MusicQuieter = $false; $settings.RecordLastGame = $false
 Invoke-Pc "PcServices" "Start" @($settings, $log) | Out-Null
 
 try {
@@ -72,6 +73,27 @@ try {
     Check "url: null refused" (-not (Invoke-Pc Updater AllowedUrl @($null)))
     Check "notes: markdown marks dropped" ((Invoke-Pc Updater PlainNotes @("## New`n- **Faster** [site](https://x)")) -eq ("New`n" + [char]0x2022 + " Faster site"))
     Check "ago: minutes" ((Invoke-Pc Updater Ago @([TimeSpan]::FromMinutes(2))) -eq "2 min ago")
+
+    $home_ = [Environment]::GetFolderPath("UserProfile")
+    $dirty = "Access to the path '$home_\AppData\x.exe' is denied. " + [Environment]::UserName + " on " + [Environment]::MachineName + " via 192.168.1.1, mail a.b@example.com"
+    $clean = Invoke-Pc PcServices Scrub @($dirty)
+    Show "scrubbed" $clean
+    Check "scrub: no user folder" ($clean.IndexOf($home_, [StringComparison]::OrdinalIgnoreCase) -lt 0)
+    Check "scrub: no user or PC name" ($clean -notmatch ("\b(" + [Regex]::Escape([Environment]::UserName) + "|" + [Regex]::Escape([Environment]::MachineName) + ")\b"))
+    Check "scrub: no IP or email" ($clean -notmatch '\d{1,3}(\.\d{1,3}){3}' -and $clean -notmatch '@')
+    Check "scrub: version numbers stay" ((Invoke-Pc PcServices Scrub @("Helper is up to date (0.7.0)")) -eq "Helper is up to date (0.7.0)")
+
+    # The window's own log cleaner (HelperUi.cs, 0.7): user folder, PC name and token out. Skipped in builds without it.
+    $tray = $asm.GetType("BridgeNight.TrayApp", $false)
+    $trayScrub = if ($tray) { $tray.GetMethod("Scrub", $flags, $null, [Type[]]@([string], [string]), $null) } else { $null }
+    if ($null -eq $trayScrub) { Show "TrayApp.Scrub" "not in this build, skipped" } else {
+        $tok = "bn_test_" + [Guid]::NewGuid().ToString("N")
+        $t = $trayScrub.Invoke($null, [object[]]@(("Sent with $tok from $home_\x on " + [Environment]::MachineName), $tok))
+        Show "TrayApp.Scrub" $t
+        Check "tray scrub: no token" ($t.IndexOf($tok) -lt 0 -and $t.Contains("[token]"))
+        Check "tray scrub: no user folder" ($t.IndexOf($home_, [StringComparison]::OrdinalIgnoreCase) -lt 0)
+        Check "tray scrub: no PC name" ($t -notmatch ("\b" + [Regex]::Escape([Environment]::MachineName) + "\b"))
+    }
 
     function Sample($cpu, $gpu, $mem, $total, [float[]]$threads = @()) {
         $s = New-Pc "PerfSample"; $s.At = [DateTime]::Now
@@ -158,6 +180,31 @@ try {
     Show "uptime" (Get-Pc PerfMon Uptime)
     Show "restart pending" (Get-Pc PerfMon RestartPending)
 
+    $sw = [Diagnostics.Stopwatch]::StartNew()
+    while ($sw.Elapsed.TotalSeconds -lt 10 -and $null -eq (Get-Pc PerfMon OpenApps)) { Start-Sleep -Milliseconds 200 }
+    $open = Get-Pc PerfMon OpenApps
+    $skip = "ApplicationFrameHost", "TextInputHost", "ShellExperienceHost", "StartMenuExperienceHost", "SearchHost", "explorer"
+    $byNet = @{} # the slow way, Process.MainWindowHandle per process, to compare
+    foreach ($pr in [Diagnostics.Process]::GetProcesses()) { try { if ($pr.MainWindowHandle -ne [IntPtr]::Zero -and $pr.MainWindowTitle -ne "" -and $skip -notcontains $pr.ProcessName) { $byNet[$pr.ProcessName] = 1 } } catch {}; $pr.Dispose() }
+    Show "open apps" ("{0} (MainWindowHandle way: {1})" -f $open, $byNet.Count)
+    Check "open apps counted" ($null -ne $open -and $open -ge 0)
+    Check "open apps match the MainWindowHandle way (+-1)" ($null -ne $open -and [Math]::Abs($open - $byNet.Count) -le 1)
+
+    # The window calls these on its UI thread: after the first call they must return at once from the cache.
+    $fast = [ordered]@{
+        "TopApps"     = { Invoke-Pc PerfMon TopApps @(6) }
+        "OpenApps"    = { Get-Pc PerfMon OpenApps }
+        "LastGames"   = { Invoke-Pc PerfMon LastGames }
+        "StartupApps" = { Invoke-Pc PerfMon StartupApps }
+        "Drives"      = { Invoke-Pc PerfMon Drives }
+        "Tip"         = { Invoke-Pc PerfMon Tip }
+    }
+    foreach ($k in $fast.Keys) {
+        & $fast[$k] | Out-Null
+        $sw = [Diagnostics.Stopwatch]::StartNew(); & $fast[$k] | Out-Null; $ms = $sw.Elapsed.TotalMilliseconds
+        Check ("{0} second call is fast ({1:0.00} ms < 5)" -f $k, $ms) ($ms -lt 5)
+    }
+
     Invoke-Pc PerfMon Stop @("selftest") | Out-Null
     Start-Sleep -Milliseconds 1500
     Check "sampler keeps running while one caller is left" ($null -ne (Get-PcField PerfMon sampler))
@@ -215,12 +262,24 @@ try {
     Check "test build refuses to install" (-not $r -and $a[0] -eq "Test build: updates are off")
     Check "no new exe downloaded" (-not (Test-Path "$Exe.new"))
     Check "whats new empty (not after an update)" ((Get-Pc Updater WhatsNew) -eq "")
+
+    Write-Host "`n== Privacy of what the helper wrote"
+    $line = $null
+    while ($logQ.TryDequeue([ref]$line)) { $logged.Add($line) }
+    $all = ($logged -join "`n") + "`n" + (Get-Pc Updater State)
+    foreach ($f in (Get-ChildItem $scratch -File)) { $all += "`n" + (Get-Content $f.FullName -Raw) } # games.json, update.json
+    Show "log lines" $logged.Count
+    Check "no IPv4 address (trace hops, router, ping target)" ($all -notmatch '(?<![\d.])\d{1,3}(\.\d{1,3}){3}(?![\d.])')
+    Check "no user folder" ($all.IndexOf([Environment]::GetFolderPath("UserProfile"), [StringComparison]::OrdinalIgnoreCase) -lt 0)
+    Check "no Windows user or PC name" ($all -notmatch ("\b(" + [Regex]::Escape([Environment]::UserName) + "|" + [Regex]::Escape([Environment]::MachineName) + ")\b"))
+    Check "no email address" ($all -notmatch '[\w.+-]+@[\w-]+\.[\w.-]+')
 }
 finally {
     Invoke-Pc PcServices Stop | Out-Null
     Write-Host "`n== Log"
     $line = $null
-    while ($logQ.TryDequeue([ref]$line)) { Write-Host ("  " + $line) }
+    while ($logQ.TryDequeue([ref]$line)) { $logged.Add($line) }
+    foreach ($line in $logged) { Write-Host ("  " + $line) }
     Remove-Item -Recurse -Force $scratch -ErrorAction SilentlyContinue
 }
 Write-Host ""

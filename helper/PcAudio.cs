@@ -110,7 +110,7 @@ namespace BridgeNight
                     bool ok = pc.SetDefaultEndpoint(id, Console) == 0;
                     ok &= pc.SetDefaultEndpoint(id, Multimedia) == 0;
                     ok &= pc.SetDefaultEndpoint(id, Communications) == 0;
-                    PcServices.Log(ok ? "Sound output: " + OutputNameImpl() : "Windows refused to switch the sound output");
+                    PcServices.Log(ok ? "Sound output switched" : "Windows refused to switch the sound output"); // no device name: Bluetooth names often hold a person's name
                     RaiseChanged();
                     return ok;
                 }

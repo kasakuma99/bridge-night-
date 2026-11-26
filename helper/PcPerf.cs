@@ -164,10 +164,13 @@ namespace BridgeNight
             {
                 if (s.MemTotalGb > 0 && s.MemUsedGb / s.MemTotalGb >= 0.85f && DateTime.Now - bigAt > TimeSpan.FromSeconds(30))
                 {
-                    bigAt = DateTime.Now;
-                    var top = Group(false);
-                    bigName = top.Count > 0 ? top[0].Name : null;
-                    bigGb = top.Count > 0 ? top[0].MemGb : 0;
+                    var top = apps.Get(); // sorted by memory; filled in the background
+                    if (top != null)
+                    {
+                        bigAt = DateTime.Now;
+                        bigName = top.Count > 0 ? top[0].Name : null;
+                        bigGb = top.Count > 0 ? top[0].MemGb : 0;
+                    }
                 }
             }
             catch { }
@@ -246,11 +249,13 @@ namespace BridgeNight
         static readonly object fileGate = new object();
         static string GamesFile { get { return Path.Combine(Settings.Dir, "games.json"); } }
 
+        static List<GameReport> games; // games.json in memory, newest first; read once, then kept in step by SaveReport
+
         static void SaveReport(GameReport r)
         {
             lock (fileGate)
             {
-                var list = LastGamesImpl();
+                var list = Games();
                 list.Insert(0, r);
                 if (list.Count > 5) list.RemoveRange(5, list.Count - 5);
                 var arr = new List<object>();
@@ -261,21 +266,62 @@ namespace BridgeNight
             PcServices.Log("Saved the performance report of the game: " + r.Limit);
         }
 
-        static List<GameReport> LastGamesImpl()
+        /// A copy, so the window can keep it. PcServices.Start reads the file in the background first.
+        static List<GameReport> LastGamesImpl() { lock (fileGate) return new List<GameReport>(Games()); }
+
+        static List<GameReport> Games() // caller holds fileGate
         {
-            var list = new List<GameReport>();
+            if (games != null) return games;
+            games = new List<GameReport>();
             try
             {
-                lock (fileGate)
-                {
-                    if (!File.Exists(GamesFile)) return list;
-                    var arr = Json.Parse(File.ReadAllText(GamesFile, Encoding.UTF8)) as object[];
-                    if (arr == null) return list;
-                    foreach (var o in arr) { var g = FromJson(o); if (g != null) list.Add(g); }
-                }
+                if (!File.Exists(GamesFile)) return games;
+                var arr = Json.Parse(File.ReadAllText(GamesFile, Encoding.UTF8)) as object[];
+                if (arr == null) return games;
+                foreach (var o in arr) { var g = FromJson(o); if (g != null) games.Add(g); }
             }
             catch (Exception e) { PcServices.Log("Could not read games.json: " + e.Message); }
-            return list;
+            return games;
+        }
+
+        /// Called once by PcServices.Start: fills the caches on background threads, so the first page has data.
+        internal static void Preload()
+        {
+            PcServices.Background("read games", delegate { LastGamesImpl(); });
+            startup.Get();
+            drives.Get();
+        }
+
+        /* ---- caches for the window: the getters return at once, the work runs on a background thread */
+
+        static readonly Cached<List<AppUse>> apps = new Cached<List<AppUse>>("list apps", 3, delegate
+        {
+            var l = Group(true, AppsKept); // CPU % since the previous refresh
+            if (l.Count > AppsKept) l.RemoveRange(AppsKept, l.Count - AppsKept);
+            return l;
+        });
+        static readonly Cached<int?> openApps = new Cached<int?>("count open apps", 5, CountOpenApps);
+        static readonly Cached<List<StartupApp>> startup = new Cached<List<StartupApp>>("startup apps", 30, StartupAppsRead);
+        static readonly Cached<List<DriveUse>> drives = new Cached<List<DriveUse>>("drives", 30, DrivesRead);
+        const int AppsKept = 12;
+
+        static int? OpenAppsImpl() { return openApps.Get(); }
+
+        static readonly HashSet<string> WindowsParts = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+            { "ApplicationFrameHost", "TextInputHost", "ShellExperienceHost", "StartMenuExperienceHost", "SearchHost", "explorer" };
+
+        /// Apps with a window, like the taskbar shows; not the 300+ background processes Windows always runs.
+        static int? CountOpenApps()
+        {
+            var windows = PcNative.MainWindows();
+            var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var p in Process.GetProcesses())
+                using (p)
+                {
+                    bool titled;
+                    if (windows.TryGetValue(p.Id, out titled) && titled && !WindowsParts.Contains(p.ProcessName)) names.Add(p.ProcessName);
+                }
+            return names.Count;
         }
 
         // Saved samples leave out the per-thread values to keep the file small.
@@ -352,11 +398,15 @@ namespace BridgeNight
         static bool IsProtected(string name)
         {
             if (Protected.Contains(name)) return true;
-            try { using (var me = Process.GetCurrentProcess()) return string.Equals(name, me.ProcessName, StringComparison.OrdinalIgnoreCase); }
-            catch { return true; }
+            if (selfName == null)
+                try { using (var me = Process.GetCurrentProcess()) selfName = me.ProcessName; } // ProcessName reads all processes: once
+                catch { return true; }
+            return string.Equals(name, selfName, StringComparison.OrdinalIgnoreCase);
         }
 
-        static readonly object appGate = new object();
+        static string selfName;
+        static int session = -1;
+
         static Dictionary<int, TimeSpan> lastCpu;
         static DateTime lastCpuAt;
 
@@ -369,8 +419,8 @@ namespace BridgeNight
             var groups = new Dictionary<string, Agg>(StringComparer.OrdinalIgnoreCase);
             var cpuNow = new Dictionary<int, TimeSpan>();
             var now = DateTime.UtcNow;
-            int session = 0;
-            try { using (var me = Process.GetCurrentProcess()) session = me.SessionId; } catch { }
+            if (session < 0)
+                try { using (var me = Process.GetCurrentProcess()) session = me.SessionId; } catch { session = 0; } // once, it never changes
             try
             {
                 foreach (var p in all)
@@ -395,13 +445,14 @@ namespace BridgeNight
                 var list = new List<Agg>(groups.Values);
                 list.Sort(delegate(Agg x, Agg y) { return y.Mem.CompareTo(x.Mem); });
                 var result = new List<AppUse>();
+                var windows = closeCheckCount > 0 ? PcNative.MainWindows() : null;
                 for (int i = 0; i < list.Count; i++)
                 {
                     var a = list[i];
                     var u = new AppUse { Name = a.Name, MemGb = a.Mem / PcNative.Gb };
                     if (elapsedMs > 0) u.CpuPercent = (float)Math.Min(100, 100 * a.CpuMs / elapsedMs);
                     if (i < closeCheckCount && !IsProtected(a.Name))
-                        foreach (var p in a.Procs) { try { if (p.MainWindowHandle != IntPtr.Zero) { u.CanClose = true; break; } } catch { } }
+                        foreach (var p in a.Procs) if (windows.ContainsKey(p.Id)) { u.CanClose = true; break; }
                     result.Add(u);
                 }
                 return result;
@@ -409,18 +460,12 @@ namespace BridgeNight
             finally { foreach (var p in all) p.Dispose(); }
         }
 
+        /// The last list from the background (empty until the first one is ready), at most `count` apps.
         static List<AppUse> TopAppsImpl(int count)
         {
-            try
-            {
-                lock (appGate)
-                {
-                    var all = Group(true, count);
-                    if (all.Count > count) all.RemoveRange(count, all.Count - count);
-                    return all;
-                }
-            }
-            catch (Exception e) { PcServices.Log("Could not list apps: " + e.Message); return new List<AppUse>(); }
+            var all = apps.Get();
+            if (all == null) return new List<AppUse>();
+            return all.GetRange(0, Math.Max(0, Math.Min(count, all.Count)));
         }
 
         static bool CloseAppImpl(string name)
@@ -443,7 +488,10 @@ namespace BridgeNight
             return asked;
         }
 
-        static List<StartupApp> StartupAppsImpl()
+        static List<StartupApp> StartupAppsImpl() { var l = startup.Get(); return l == null ? new List<StartupApp>() : new List<StartupApp>(l); }
+        static List<DriveUse> DrivesImpl() { var l = drives.Get(); return l == null ? new List<DriveUse>() : new List<DriveUse>(l); }
+
+        static List<StartupApp> StartupAppsRead()
         {
             var list = new List<StartupApp>();
             const string run = @"Software\Microsoft\Windows\CurrentVersion\Run";
@@ -501,7 +549,7 @@ namespace BridgeNight
             catch (Exception e) { PcServices.Log("Could not read the startup folder: " + e.Message); }
         }
 
-        static List<DriveUse> DrivesImpl()
+        static List<DriveUse> DrivesRead()
         {
             var list = new List<DriveUse>();
             try
@@ -761,6 +809,44 @@ namespace BridgeNight
             foreach (var c in vram.Values) c.Dispose();
             vram.Clear();
             if (disk != null) disk.Dispose();
+        }
+    }
+
+    /// For getters the window calls on its UI thread: Get returns the last value at once (default until the first
+    /// load is done) and, when that value is older than `seconds`, starts one background load. Nobody asking = no work.
+    sealed class Cached<T>
+    {
+        readonly object gate = new object();
+        readonly string name;
+        readonly TimeSpan every;
+        readonly Func<T> load;
+        T value;
+        DateTime at = DateTime.MinValue;
+        bool busy;
+
+        public Cached(string name, int seconds, Func<T> load) { this.name = name; every = TimeSpan.FromSeconds(seconds); this.load = load; }
+
+        public T Get()
+        {
+            lock (gate)
+            {
+                if (!busy && DateTime.UtcNow - at >= every)
+                {
+                    busy = true;
+                    PcServices.Background(name, Load);
+                }
+                return value;
+            }
+        }
+
+        void Load()
+        {
+            try
+            {
+                var v = load();
+                lock (gate) value = v;
+            }
+            finally { lock (gate) { at = DateTime.UtcNow; busy = false; } }
         }
     }
 }

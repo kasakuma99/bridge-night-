@@ -80,7 +80,7 @@ namespace BridgeNight
                 }
                 catch (Exception e)
                 {
-                    lock (gate) failure = "Could not check for updates: " + e.Message;
+                    lock (gate) failure = PcServices.Scrub("Could not check for updates: " + e.Message);
                     PcServices.Log("Update check failed: " + e.Message);
                 }
                 finally
@@ -160,7 +160,7 @@ namespace BridgeNight
                 try { Install(); }
                 catch (Exception e)
                 {
-                    lock (gate) failure = "Update failed: " + e.Message + ". The current version keeps running.";
+                    lock (gate) failure = PcServices.Scrub("Update failed: " + e.Message + ". The current version keeps running.");
                     PcServices.Log("Update failed, keeping " + Program.Version + ": " + e.Message);
                 }
                 finally
