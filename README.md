@@ -88,6 +88,7 @@ built to stay light: nothing runs in the background that you didn't switch on.</
 <table>
   <tr><th>Feature</th><th>What it does</th></tr>
   <tr><td><b>Home</b></td><td>One clear status line (League, helper, site), quick tiles for mic, audio, game mode and updates, and how your PC handled the last game.</td></tr>
+  <tr><td><b>Live</b></td><td>The running custom game right in the helper: score, game clock, both teams with level, K/D/A, CS and items, and a timeline where the newest event slides in on top.</td></tr>
   <tr><td><b>Performance</b></td><td>Live charts for CPU, GPU, memory and video memory, a report of how your PC handled the last game, and which apps use the most. Measures every 1, 2 or 5 seconds, or not at all.</td></tr>
   <tr><td><b>Network</b></td><td>Ping, jitter and packet loss towards EUW (Riot does not answer pings, so it measures to a server right next to it), and whether lag comes from your Wi-Fi, your provider or Riot. Only while the window is open.</td></tr>
   <tr><td><b>Game mode</b></td><td>A check before game night (pending Windows restart, League patch), a reminder to take a break after long sessions, optional quieter music while you play, and one-click fixes for a monitor below its best refresh rate, mouse acceleration and the Sticky Keys pop-up.</td></tr>
