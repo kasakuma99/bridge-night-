@@ -15,7 +15,7 @@ namespace BridgeNight
     class LivePage : Page
     {
         public static readonly Color Blue = Color.FromArgb(0x5a, 0xa9, 0xff), Red = Color.FromArgb(0xff, 0x5d, 0x6c);
-        const int Rows = 5, RowH = 54, TeamW = 382, ScoreH = 104, Bottom = 524;
+        const int Rows = 5, RowH = 54, TeamW = 382, ScoreH = 104, PageBottom = 524;
 
         Card empty, blueCard, redCard;
         Label timelineTitle;
@@ -93,7 +93,7 @@ namespace BridgeNight
             // The timeline takes the rest of the page, so small games show more of it.
             timelineTitle.Top = Math.Max(blueCard.Bottom, redCard.Bottom) + Theme.Px(16);
             timeline.Top = timelineTitle.Bottom + Theme.Px(6);
-            timeline.Height = Math.Max(Theme.Px(80), Theme.Px(Y0 + Bottom + 24) - timeline.Top);
+            timeline.Height = Math.Max(Theme.Px(80), Theme.Px(Y0 + PageBottom + 24) - timeline.Top);
 
             var teams = new Dictionary<string, Color>(StringComparer.OrdinalIgnoreCase);
             foreach (var p in order) foreach (var n in Names(p)) teams[n] = Blue;
