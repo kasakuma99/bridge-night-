@@ -65,8 +65,32 @@ function Page($w, $field, $name) {
     Call $w "ShowPage" @($p)
     Call $p "Shown" $null
     Call $p "Tick" $null
+    # Background results (nav badge, app lists) arrive a moment later: let them in, then draw.
+    Start-Sleep -Milliseconds 300; [Windows.Forms.Application]::DoEvents()
+    Call $p "Tick" $null
     Snap $w $name
     Call $p "Hidden" $null
+}
+# DrawToBitmap paints child windows in reverse order, so an overlay (tour, Settings) is painted on top by hand.
+function SnapOverlay($w, $overlay, $name) {
+    $createAll.Invoke($w, @($true)) | Out-Null
+    $bmp = New-Object Drawing.Bitmap $w.Width, $w.Height
+    $w.DrawToBitmap($bmp, (New-Object Drawing.Rectangle 0, 0, $w.Width, $w.Height))
+    $overlay.DrawToBitmap($bmp, (New-Object Drawing.Rectangle $overlay.Left, $overlay.Top, $overlay.Width, $overlay.Height))
+    $file = Join-Path $Out "$name.png"
+    $bmp.Save($file, [Drawing.Imaging.ImageFormat]::Png); $bmp.Dispose()
+    Write-Host "Wrote $file"
+}
+function SettingsShots($w, $sections, $prefix) {
+    Call $w "ShowPage" @($w.GetType().GetField("Home").GetValue($w))
+    Call $w "OpenSettings" @($sections[0][0])
+    $pop = $w.GetType().GetField("settingsPopup", [Reflection.BindingFlags]"NonPublic,Instance").GetValue($w)
+    foreach ($s in $sections) {
+        Call $pop "ShowSection" @([string]$s[0])
+        Call $pop "Tick" $null
+        SnapOverlay $w $pop ($prefix + $s[1])
+    }
+    Call $w "CloseSettings" $null
 }
 
 $w = NewWindow
@@ -79,25 +103,22 @@ foreach ($tab in 0, 1, 2) {
 Page $w "Network" "03-network"
 Page $w "GameModeP" "04-game-mode"
 Page $w "Audio" "05-audio"
-Page $w "SettingsP" "06-settings"
-Call $w "OpenHelp" @("Audio")
+SettingsShots $w @(@("Connection", "1-connection"), @("Startup & alerts", "2-startup"), @("Performance", "3-performance"),
+    @("Game mode", "4-game-mode"), @("Audio", "5-audio"), @("Updates", "6-updates")) "06-settings-"
+Call $w "OpenHelp" @("What it may change on your PC")
 Page $w "Help" "07-help"
 Call $w "ShowPage" @($w.GetType().GetField("Home").GetValue($w))
 Call $w "ShowTour" $null
-# DrawToBitmap paints child windows in reverse order, so the tour overlay is painted on top by hand.
 $tour = $w.GetType().GetField("tour", [Reflection.BindingFlags]"NonPublic,Instance").GetValue($w)
-$createAll.Invoke($w, @($true)) | Out-Null
-$bmp = New-Object Drawing.Bitmap $w.Width, $w.Height
-$w.DrawToBitmap($bmp, (New-Object Drawing.Rectangle 0, 0, $w.Width, $w.Height))
-$tour.DrawToBitmap($bmp, (New-Object Drawing.Rectangle $tour.Left, $tour.Top, $tour.Width, $tour.Height))
-$bmp.Save((Join-Path $Out "08-tour.png"), [Drawing.Imaging.ImageFormat]::Png); $bmp.Dispose()
+SnapOverlay $w $tour "08-tour"
 $w.Dispose()
 
 $env:BN_FAKE_GAME = "1"; $env:BN_FAKE_MUTED = "1"; $env:BN_FAKE_UPDATE = "0.7.1"
 Static "HelperStatus" "SetLeague" @($true, "InProgress", $true)
 $w = NewWindow
 Page $w "Home" "09-home-in-game"
-Page $w "SettingsP" "10-settings-update"
+Page $w "GameModeP" "09b-game-mode-in-game"
+SettingsShots $w @(, @("Updates", "update")) "10-settings-"
 $w.Dispose()
 
 $mini = (T "MiniWindow").GetConstructors()[0].Invoke(@($settings, [Action] { }))
