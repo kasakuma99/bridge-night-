@@ -183,22 +183,16 @@ namespace BridgeNight
     class GameModePage : Page
     {
         const int Slots = 4;
-        ToggleSwitch auto, music, breaks;
-        Card before, fixes, now;
+        Card before, fixes;
         readonly Label[][] beforeRows = new Label[Slots][], fixRows = new Label[Slots][];
         readonly FlatButton[] beforeFix = new FlatButton[Slots], fixFix = new FlatButton[Slots];
         List<PcCheck> beforeList = new List<PcCheck>(), fixList = new List<PcCheck>();
-        Label note, nowTitle, nowText;
-        bool syncing;
+        Label note, nowIcon, nowTitle, nowText;
+        Pill autoPill, musicPill, breakPill;
 
         public GameModePage(MainWindow w) : base(w, "Game mode")
         {
             Heading("Game mode", "Game mode");
-            auto = Ui.Toggle(this, "Automatic game mode", X0 + W0, 26);
-            var al = L(this, "Automatic", Theme.Body, Theme.Ink2, X0 + W0 - 160, 26, 100, 28);
-            al.TextAlign = ContentAlignment.MiddleRight;
-            al.Left = auto.Left - al.Width - Theme.Px(4);
-            auto.CheckedChanged += delegate { if (!syncing) { S.GameModeAuto = auto.Checked; Save(); Tick(); } };
 
             before = Ui.Card(this, "Before game night", X0, Y0, 382, 200);
             fixes = Ui.Card(this, "Gamer fixes", X0, Y0 + 214, 382, 260);
@@ -212,16 +206,38 @@ namespace BridgeNight
             }
             note = L(this, "", Theme.Small, Theme.Ink2, X0, Y0 + 480, 382, 40);
 
-            var when = Ui.Card(this, "When a game starts", X0 + 394, Y0, 382, 168);
-            music = Ui.SwitchRow(when, "\uEC4F", "Music quieter in game", "Turns music apps down while you play", 46, 382);
-            Ui.Divider(when, 16, 104, 350);
-            breaks = Ui.SwitchRow(when, "", "Break reminder", "A short nudge after a long session", 114, 382);
-            music.CheckedChanged += delegate { if (!syncing) { S.MusicQuieter = music.Checked; Save(); } };
-            breaks.CheckedChanged += delegate { if (!syncing) { S.BreakReminder = breaks.Checked; Save(); } };
+            // Right column: what game mode does, read-only. The switches are in Settings.
+            const int rx = X0 + 394, rw = 382;
+            var when = Ui.Card(this, "When a game starts", rx, Y0, rw, 230);
+            Ui.Link(when, "Change in Settings", rw - 12, 12).Click += delegate { Win.OpenSettings("Game mode"); };
+            autoPill = StateRow(when, "", "Automatic game mode", "On while a League game runs", 46, true);
+            musicPill = StateRow(when, "", "Music quieter in game", "Music apps at 30 % while you play", 106, true);
+            breakPill = StateRow(when, "", "Break reminder", "A short nudge after 2 hours of play", 166, false);
 
-            now = Ui.Card(this, "Right now", X0 + 394, Y0 + 182, 382, 120);
-            nowTitle = L(now, "", Theme.Strong, Theme.Ink, 16, 46, 350, 24);
-            nowText = L(now, "", Theme.Small, Theme.Mute, 16, 72, 350, 40);
+            var now = Ui.Card(this, "Right now", rx, Y0 + 244, rw, 120);
+            nowIcon = L(now, "", Theme.GlyphBig, Theme.Ink2, 16, 50, 40, 40);
+            nowIcon.TextAlign = ContentAlignment.MiddleCenter;
+            nowIcon.BackColor = Theme.NavActive;
+            nowIcon.AccessibleRole = AccessibleRole.Graphic;
+            nowTitle = L(now, "", Theme.Strong, Theme.Ink, 70, 48, 296, 22);
+            nowText = L(now, "", Theme.Small, Theme.Mute, 70, 70, 296, 40);
+
+            var safe = Ui.Card(this, null, rx, Y0 + 378, rw, 96);
+            Ui.Icon(safe, "", Theme.Good, 16, 18);
+            L(safe, "Safe to leave on", Theme.Strong, Theme.Ink, 50, 16, 316, 22);
+            L(safe, "No admin rights, League itself is never touched, and the music volume goes back when the game ends.", Theme.Small, Theme.Ink2, 50, 40, 316, 44);
+        }
+
+        Pill StateRow(Card card, string glyph, string title, string sub, int y, bool divider)
+        {
+            Ui.Icon(card, glyph, Theme.Ink2, 14, y + 10);
+            L(card, title, Theme.Body, Theme.Ink, 48, y, 250, 22);
+            L(card, sub, Theme.Small, Theme.Mute, 48, y + 22, 250, 20);
+            var p = new Pill { AnchorRight = card.Width - Theme.Px(16), Top = Theme.Px(y + 9) };
+            card.Controls.Add(p);
+            p.Set("Off", false);
+            if (divider) Ui.Divider(card, 16, y + 52, 350);
+            return p;
         }
 
         Label[] Row(Card card, int i, out FlatButton fix)
@@ -233,8 +249,6 @@ namespace BridgeNight
             fix = Ui.ButtonRight(card, "Fix", false, 366, y + 4);
             return new[] { icon, title, detail };
         }
-
-        void Save() { try { S.Save(); } catch (Exception e) { Win.Log("Could not save settings: " + e.Message); } }
 
         void Fix(List<PcCheck> list, int i)
         {
@@ -259,6 +273,10 @@ namespace BridgeNight
             var h2 = Show(fixes, fixRows, fixFix, fixList, "Nothing to fix: your settings look right.");
             fixes.Height = Theme.Px(h2);
             note.Top = fixes.Bottom + Theme.Px(10);
+            var problems = 0;
+            foreach (var c in beforeList) if (c.Problem) problems++;
+            foreach (var c in fixList) if (c.Problem) problems++;
+            Win.SetBadge(problems);
         }
 
         static int Show(Card card, Label[][] rows, FlatButton[] buttons, List<PcCheck> list, string empty)
@@ -295,23 +313,22 @@ namespace BridgeNight
             return 46 + Math.Max(1, Math.Min(Slots, list.Count)) * 56 + 6;
         }
 
-        public override void Shown()
-        {
-            syncing = true;
-            auto.Checked = S.GameModeAuto;
-            music.Checked = S.MusicQuieter;
-            breaks.Checked = S.BreakReminder;
-            syncing = false;
-            Fill();
-        }
+        public override void Shown() { Fill(); }
 
         public override void Tick()
         {
+            var auto = S.GameModeAuto;
+            autoPill.Set(auto ? "On" : "Off", auto);
+            musicPill.Set(S.MusicQuieter ? "On" : "Off", auto && S.MusicQuieter);
+            breakPill.Set(S.BreakReminder ? "On" : "Off", auto && S.BreakReminder);
             var active = GameMode.Active;
-            Ui.Set(nowTitle, active ? "Game mode is on" : "Game mode is off", active ? Theme.Ink : Theme.Ink2);
-            Ui.Set(nowText, active ? (GameMode.ActiveText == "" ? "Everything goes back to normal when the game ends." : GameMode.ActiveText)
-                : S.GameModeAuto ? "It switches on when a game starts and back off when it ends." : "Automatic is off: nothing changes when a game starts.");
-            foreach (Control c in new Control[] { music, breaks }) c.Enabled = S.GameModeAuto;
+            var start = PcServices.GameStartedAt;
+            Ui.Set(nowIcon, active ? "" : start.HasValue ? "" : "", active ? Theme.Good : Theme.Ink2);
+            Ui.Set(nowTitle, active ? "Game mode is on" : start.HasValue ? "In game · " + Ui.Clock(DateTime.Now - start.Value) : "No game right now");
+            Ui.Set(nowText, active ? (GameMode.ActiveText == "" ? "Everything goes back to normal when the game ends." : GameMode.ActiveText + ". Back to normal when the game ends.")
+                : !auto ? "Automatic is off: nothing changes when a game starts."
+                : S.MusicQuieter ? "When a game starts, music gets quieter. It goes back when the game ends."
+                : "Nothing to change when a game starts: music quieter is off.");
         }
     }
 
@@ -368,7 +385,9 @@ namespace BridgeNight
 
         public void Set(AudioDevice d)
         {
+            if (Device != null && d.Id == Device.Id && d.Name == Device.Name && d.IsDefault == Device.IsDefault) return; // nothing new: no repaint
             Device = d;
+            Ui.TipIfCut(this, d.Name, Theme.Small, Width - Theme.Px(32), d.Name);
             AccessibleName = Kind(d.Name) + ", " + d.Name;
             AccessibleDescription = d.IsDefault ? "In use" : "Click to use";
             Invalidate();
@@ -418,10 +437,9 @@ namespace BridgeNight
         KeysView micKeys, outKeys;
         FlatButton mute;
         readonly OutputTile[] outputs = new OutputTile[Slots];
-        Card switches;
-        ToggleSwitch sound, badge, hotkeys;
+        Card hotCard, alertCard;
+        Pill hotPill, soundPill, badgePill;
         readonly System.Windows.Forms.Timer meterTimer = new System.Windows.Forms.Timer { Interval = 120 };
-        bool syncing;
 
         public AudioPage(MainWindow w) : base(w, "Audio")
         {
@@ -450,34 +468,41 @@ namespace BridgeNight
             {
                 outputs[i] = new OutputTile { Location = new Point(Theme.Px(X0 + i % 3 * 263), Theme.Px(Y0 + 120 + i / 3 * 116)), Visible = false };
                 var tile = outputs[i];
-                tile.Click += delegate { if (tile.Device != null && AudioCtl.SetOutput(tile.Device.Id)) Tick(); };
+                tile.Click += delegate { if (tile.Device != null && AudioCtl.SetOutput(tile.Device.Id)) RefreshAll(); };
                 Controls.Add(tile);
             }
 
-            switches = Ui.Card(this, null, X0, Y0 + 240, W0, 190);
-            sound = Ui.SwitchRow(switches, "\uE767", "Sound when muting and unmuting", null, 14, W0);
-            Ui.Divider(switches, 16, 66, W0 - 32);
-            badge = Ui.SwitchRow(switches, "\uE7F4", "Small \"Muted\" badge on screen", null, 74, W0);
-            Ui.Divider(switches, 16, 126, W0 - 32);
-            hotkeys = Ui.SwitchRow(switches, "\uE765", "Hotkeys Ctrl+Alt+M and Ctrl+Alt+H", null, 134, W0);
-            sound.CheckedChanged += delegate { if (!syncing) { S.MuteSound = sound.Checked; Save(); } };
-            badge.CheckedChanged += delegate { if (!syncing) { S.MutedBadge = badge.Checked; Save(); } };
-            hotkeys.CheckedChanged += delegate { if (!syncing) { S.Hotkeys = hotkeys.Checked; Save(); Tick(); } };
+            // Hotkeys and mute alerts: what is set, read-only. The switches are in Settings.
+            hotCard = Ui.Card(this, "Hotkeys", X0, Y0 + 246, 513, 156);
+            hotPill = new Pill { AnchorRight = hotCard.Width - Theme.Px(16), Top = Theme.Px(14) };
+            hotCard.Controls.Add(hotPill);
+            HelpPage.KeyRow(hotCard, "Mute or unmute mic", new[] { "Ctrl", "Alt", "M" }, 46, 513);
+            HelpPage.KeyRow(hotCard, "Next sound output", new[] { "Ctrl", "Alt", "H" }, 80, 513);
+            L(hotCard, "They work everywhere, also in game. Muting is done in Windows, so Discord and League go quiet too.", Theme.Small, Theme.Mute, 16, 110, 481, 38);
+
+            alertCard = Ui.Card(this, "When you mute", X0 + 526, Y0 + 246, 250, 156);
+            soundPill = AlertRow(alertCard, "\uE767", "Short sound", 46);
+            badgePill = AlertRow(alertCard, "\uE7F4", "\"Muted\" badge", 80);
+            Ui.Link(alertCard, "Change in Settings", 238, 118).Click += delegate { Win.OpenSettings("Audio"); };
 
             meterTimer.Tick += delegate { meter.Muted = AudioCtl.MicMuted; meter.Level = AudioCtl.MicLevel; };
         }
 
-        void Save() { try { S.Save(); } catch (Exception e) { Win.Log("Could not save settings: " + e.Message); } }
-
-        public override void Shown()
+        static Pill AlertRow(Card card, string glyph, string text, int y)
         {
-            syncing = true;
-            sound.Checked = S.MuteSound;
-            badge.Checked = S.MutedBadge;
-            hotkeys.Checked = S.Hotkeys;
-            syncing = false;
-            meterTimer.Start();
+            Ui.Icon(card, glyph, Theme.Ink2, 14, y + 1);
+            L(card, text, Theme.Body, Theme.Ink, 46, y, 130, 26).TextAlign = ContentAlignment.MiddleLeft;
+            var p = new Pill { AnchorRight = card.Width - Theme.Px(16), Top = Theme.Px(y + 2) };
+            card.Controls.Add(p);
+            return p;
         }
+
+        int outTicks;
+
+        public override void Shown() { outTicks = 0; meterTimer.Start(); }
+
+        /// Everything now, the output list included (after a switch).
+        public void RefreshAll() { outTicks = 0; Tick(); }
 
         public override void Hidden() { meterTimer.Stop(); }
 
@@ -501,6 +526,8 @@ namespace BridgeNight
             micName.Left = meter.Right + Theme.Px(16);
             micKeys.Left = mute.Left - Theme.Px(14) - micKeys.Width;
 
+            // The device list (~4 ms) is read every 3 s; a switch made here or by hotkey refreshes it at once (RefreshAll).
+            if (outTicks++ % 3 != 0) return;
             var outs = AudioCtl.Outputs() ?? new List<AudioDevice>();
             for (var i = 0; i < Slots; i++)
             {
@@ -509,7 +536,10 @@ namespace BridgeNight
             }
             Ui.Show(outEmpty, outs.Count == 0);
             var rows = Math.Max(1, (Math.Min(outs.Count, Slots) + 2) / 3);
-            switches.Top = Theme.Px(Y0 + 120 + rows * 116 + (outs.Count == 0 ? -40 : 0)) + Theme.Px(6);
+            hotCard.Top = alertCard.Top = Theme.Px(Y0 + 120 + rows * 116 + (outs.Count == 0 ? -40 : 0)) + Theme.Px(10);
+            hotPill.Set(S.Hotkeys ? "On" : "Off", S.Hotkeys);
+            soundPill.Set(S.MuteSound ? "On" : "Off", S.MuteSound);
+            badgePill.Set(S.MutedBadge ? "On" : "Off", S.MutedBadge);
         }
 
         protected override void Dispose(bool disposing) { if (disposing) meterTimer.Dispose(); base.Dispose(disposing); }

@@ -73,9 +73,8 @@ namespace BridgeNight
     class PerformancePage : Page
     {
         readonly Backdrop[] tabs = new Backdrop[3];
-        Segmented tabPicker, every;
-        ToggleSwitch measure;
-        bool syncing;
+        Segmented tabPicker;
+        SummaryChip chip;
         int slow;
 
         // Live
@@ -104,30 +103,12 @@ namespace BridgeNight
             tabPicker.Location = new Point(Theme.Px(X0 + W0) - tabPicker.Width, Theme.Px(22));
             tabPicker.Changed += delegate { ShowTab(); };
             Controls.Add(tabPicker);
-            every = new Segmented("Measure every", new[] { "1s", "2s", "5s" }, 9);
-            every.Location = new Point(tabPicker.Left - Theme.Px(16) - every.Width, Theme.Px(22));
-            every.Changed += delegate
-            {
-                if (syncing) return;
-                S.MeasureEvery = every.Selected == 0 ? 1 : every.Selected == 1 ? 2 : 5;
-                PerfMon.IntervalSeconds = S.MeasureEvery;
-                Save();
-            };
-            Controls.Add(every);
-            measure = new ToggleSwitch("Measure");
-            measure.Location = new Point(every.Left - Theme.Px(6) - measure.Width, Theme.Px(25));
-            measure.CheckedChanged += delegate
-            {
-                if (syncing) return;
-                S.LiveMeasure = measure.Checked;
-                Save();
-                if (measure.Checked) PerfMon.Start("perf"); else PerfMon.Stop("perf");
-                Tick();
-            };
-            Controls.Add(measure);
-            var ml = Ui.Label(this, "Measure", Theme.Body, Theme.Ink2, 0, 26, 70, 26);
-            ml.TextAlign = ContentAlignment.MiddleRight;
-            ml.Left = measure.Left - ml.Width;
+            // Measuring on/off and how often live in Settings; the chip says what is set and opens it.
+            chip = new SummaryChip("Change") { AnchorRight = tabPicker.Left - Theme.Px(12) };
+            chip.Top = tabPicker.Top + (tabPicker.Height - chip.Height) / 2;
+            chip.Click += delegate { Win.OpenSettings("Performance"); };
+            Controls.Add(chip);
+            SyncChip();
 
             for (var i = 0; i < 3; i++)
             {
@@ -148,7 +129,11 @@ namespace BridgeNight
             if (Visible) Tick();
         }
 
-        void Save() { try { S.Save(); } catch (Exception e) { Win.Log("Could not save settings: " + e.Message); } }
+        void SyncChip()
+        {
+            if (S.LiveMeasure) chip.Set("Measuring every " + S.MeasureEvery + " s", Theme.Good);
+            else chip.Set("Live measuring is off", Theme.Mute);
+        }
 
         /* ---------------------------------------------------------------- Live */
 
@@ -218,7 +203,7 @@ namespace BridgeNight
             var labels = new[] { span + unit, span * 4 / 5 + "", span * 3 / 5 + "", span * 2 / 5 + "", span / 5 + "", "now" };
             var p = S.LiveMeasure ? PerfMon.Latest : null;
             var h = S.LiveMeasure ? PerfMon.History(secs) : new List<PerfSample>();
-            liveChart.Empty = S.LiveMeasure ? "Measuring…" : "Live measuring is off. Switch on \"Measure\" above.";
+            liveChart.Empty = S.LiveMeasure ? "Measuring…" : "Live measuring is off. Switch it on in Settings (Change, above).";
             liveChart.SetData(new List<Series>
             {
                 new Series(Theme.MemLine, h.Select(x => x.MemTotalGb > 0 ? (float?)(x.MemUsedGb / x.MemTotalGb * 100) : null).ToArray(), false),
@@ -265,7 +250,7 @@ namespace BridgeNight
                 Ui.Set(diskText, "Disk: " + p.DiskReadMBs.ToString("0.#", Ui.En) + " MB/s read · " + p.DiskWriteMBs.ToString("0.#", Ui.En) + " write");
                 Ui.Set(netText, "Network: " + (p.NetDownMBs * 8).ToString("0.#", Ui.En) + " Mbit/s down · " + (p.NetUpMBs * 8).ToString("0.#", Ui.En) + " up");
             }
-            Ui.Set(tipText, p == null ? (S.LiveMeasure ? "Measuring…" : "Switch on \"Measure\" to get tips.") : PerfMon.Tip() ?? "Nothing stands out: your PC has room to spare.");
+            Ui.Set(tipText, p == null ? (S.LiveMeasure ? "Measuring…" : "Switch on live measuring in Settings to get tips.") : PerfMon.Tip() ?? "Nothing stands out: your PC has room to spare.");
             var upt = PerfMon.Uptime;
             Ui.Set(uptimeTitle, upt > TimeSpan.Zero ? "On for " + Ui.Span(upt) : "PC uptime");
             Ui.Set(uptimeText, PerfMon.RestartPending ? "Windows wants to restart. Restarting before game night frees memory and finishes updates."
@@ -404,25 +389,6 @@ namespace BridgeNight
             restartValue = StatCard(p, "Windows restart", 2);
         }
 
-        DateTime appsCountedAt = DateTime.MinValue;
-        static readonly HashSet<string> WindowsParts = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
-            { "ApplicationFrameHost", "TextInputHost", "ShellExperienceHost", "StartMenuExperienceHost", "SearchHost", "explorer" };
-
-        /// Apps with a window, like the taskbar shows; not the 300+ background processes Windows always runs.
-        static string OpenApps()
-        {
-            try
-            {
-                var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-                foreach (var pr in Process.GetProcesses())
-                    using (pr)
-                        try { if (pr.MainWindowHandle != IntPtr.Zero && pr.MainWindowTitle != "" && !WindowsParts.Contains(pr.ProcessName)) names.Add(pr.ProcessName); }
-                        catch { } // the process just ended
-                return names.Count.ToString();
-            }
-            catch { return "–"; }
-        }
-
         Label StatCard(Control p, string caption, int i)
         {
             var c = Ui.Card(p, null, X0 + i * 263, 388, 250, 86);
@@ -469,7 +435,8 @@ namespace BridgeNight
             if (apps.Count == 0) Ui.Set(appsNote, "Measuring…", Theme.Mute);
             else if (appsNote.Text == "Measuring…") Ui.Set(appsNote, "Close asks the app politely. League and Windows are never closed.");
 
-            if (DateTime.UtcNow >= appsCountedAt) { appsCountedAt = DateTime.UtcNow.AddSeconds(5); Ui.Set(procValue, OpenApps()); }
+            var open = PerfMon.OpenApps; // counted in the background (apps with a window, like the taskbar)
+            Ui.Set(procValue, open.HasValue ? open.Value.ToString() : "–");
             var up = PerfMon.Uptime;
             Ui.Set(upValue, up > TimeSpan.Zero ? Ui.Span(up) : "–");
             Ui.Set(restartValue, PerfMon.RestartPending ? "Pending" : "Not needed", PerfMon.RestartPending ? Theme.Warn : Theme.Ink);
@@ -501,10 +468,7 @@ namespace BridgeNight
 
         public override void Shown()
         {
-            syncing = true;
-            measure.Checked = S.LiveMeasure;
-            every.Selected = S.MeasureEvery == 1 ? 0 : S.MeasureEvery == 5 ? 2 : 1;
-            syncing = false;
+            SyncChip();
             PerfMon.IntervalSeconds = S.MeasureEvery;
             if (S.LiveMeasure) PerfMon.Start("perf");
             slow = 0;
