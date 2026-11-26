@@ -24,6 +24,12 @@ Teams, live games, stats and rivalries for our League of Legends custom game nig
 
 <br/>
 
+<a href="https://github.com/kasakuma99/bridge-night-/releases"><img src="docs/images/release-0.6.0.png" alt="Helper 0.6.0: a brand-new window, sunset look and app icon, CPU and GPU gauges" width="100%" /></a>
+
+<p align="center"><a href="https://github.com/kasakuma99/bridge-night-/releases"><b>Download 0.6.0 →</b></a></p>
+
+<br/>
+
 ## How a night works
 
 <table>
@@ -74,7 +80,7 @@ A tiny Windows tray app. **One player per game** runs it, and nobody has to type
 
 | | |
 |---|---|
-| **New window** | Status, setup, settings and log, plus live CPU and GPU gauges |
+| **Custom games only** | Normal, ranked and other games are ignored |
 | **Safe** | No admin rights, no service, no ads, no tracking. Open source |
 | **Your token** | Talks only to our site, with a token you make on the Helper page |
 
@@ -96,26 +102,6 @@ The release notes and the Helper page show the file's SHA-256 fingerprint. In Po
 <b>Mini window</b> &nbsp;·&nbsp; <b>Performance charts</b> &nbsp;·&nbsp; <b>Instant replay</b> &nbsp;·&nbsp; <b>Mic mute everywhere</b> &nbsp;·&nbsp; <b>Ping check</b><br/>
 <sub>A design concept for the next helper. Not built yet, and it stays light: nothing runs in the background that you didn't switch on.</sub>
 </p>
-
-## What's new
-
-- **Helper 0.6.0:** new window with a sidebar and CPU/GPU gauges
-- **Helper 0.5.0:** live games go through our own live server
-- **Private site:** Discord login, admin approval, data closed to strangers
-- **Live page:** levels, K/D/A, items, spells and augments for everyone
-- **Elo ranking:** a rating per player, with placement games
-- **Teams page:** redesigned, with Shuffle, Choose or Fair sit-outs
-
-<details>
-<summary>More changes</summary>
-<br/>
-
-- Login popup, account menu, offline and new-version notices, a better 404 page
-- Stricter security: Content Security Policy, safer helper links, a security review
-- Fair play: no champions during champ select
-- Members make their own helper tokens; they stop working when a member is removed
-
-</details>
 
 <br/>
 
