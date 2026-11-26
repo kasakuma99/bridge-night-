@@ -31,9 +31,9 @@ that one player runs during the game, so nobody ever has to type in a result.</p
 
 <br/><br/>
 
-<img src="docs/images/release-0.7.0.png" alt="New version 0.7.0 of the helper, coming soon: a brand-new look, performance and network, instant replay and audio" width="100%" />
+<img src="docs/images/release-0.7.0.png" alt="New version 0.7.0 of the helper: a brand-new look, performance and network, audio and game mode" width="100%" />
 
-<p><b>Coming soon.</b> Until then, <a href="https://github.com/kasakuma99/bridge-night-/releases">helper 0.6.0</a> is the current download.</p>
+<p><b>Out now.</b> <a href="https://github.com/kasakuma99/bridge-night-/releases/latest">Download helper 0.7.0</a>: from now on it keeps itself up to date.</p>
 
 <br/>
 
@@ -71,30 +71,30 @@ that one player runs during the game, so nobody ever has to type in a result.</p
   <tr><td align="center"><b>Reads, never controls</b><br/><sub>It only reads the League client on your own PC.<br/>It never clicks, picks or changes anything.</sub></td>
       <td align="center"><b>Custom games only</b><br/><sub>Normal and ranked games are ignored.<br/>Champions appear from the loading screen on.</sub></td></tr>
   <tr><td align="center"><b>Safe by design</b><br/><sub>No admin rights, no background service,<br/>no ads, no tracking. All code is public.</sub></td>
-      <td align="center"><b>Your own token</b><br/><sub>It talks only to our site, with a personal<br/>token you can revoke at any time.</sub></td></tr>
+      <td align="center"><b>Your own token</b><br/><sub>Games go only to our site, with a personal<br/>token you can revoke at any time.</sub></td></tr>
 </table>
 
 <p><sub>Set up: log in with Discord → get approved → Helper tab → download → make a token → paste it into the helper.</sub></p>
 
 <br/>
 
-<img src="docs/images/helper-07.png" alt="Helper 0.7 concept" width="100%" />
+<img src="docs/images/helper-07.png" alt="Helper 0.7: Home, Performance, Game mode and the mini window" width="100%" />
 
-<h3>What's coming in 0.7.0</h3>
+<h3>What's new in 0.7.0</h3>
 
 <p>Version 0.7.0 turns the helper into a complete game-night toolbox,<br/>
 built to stay light: nothing runs in the background that you didn't switch on.</p>
 
 <table>
   <tr><th>Feature</th><th>What it does</th></tr>
-  <tr><td><b>Home</b></td><td>One clear status line (League, helper, site), check in for tonight's game night, and quick tiles for mic, audio, game mode and Discord status.</td></tr>
+  <tr><td><b>Home</b></td><td>One clear status line (League, helper, site), quick tiles for mic, audio, game mode and updates, and how your PC handled the last game.</td></tr>
   <tr><td><b>Performance</b></td><td>Live charts for CPU, GPU, memory and video memory, a report of how your PC handled the last game, and which apps use the most. Measures every 1, 5 or 10 seconds, or not at all.</td></tr>
-  <tr><td><b>Instant replay</b></td><td>Saves the last 15, 30 or 60 seconds with one hotkey, named after your champion and score, and small enough to share in Discord. Off by default.</td></tr>
-  <tr><td><b>Network</b></td><td>Ping, jitter and packet loss to the EUW server, and whether lag comes from your Wi-Fi, your provider or Riot.</td></tr>
+  <tr><td><b>Network</b></td><td>Ping, jitter and packet loss towards EUW (Riot does not answer pings, so it measures to a server right next to it), and whether lag comes from your Wi-Fi, your provider or Riot. Only while the window is open.</td></tr>
   <tr><td><b>Game mode</b></td><td>A check before game night (pending Windows restart, League patch), a high-performance power plan during games, and one-click fixes for common settings like a monitor stuck at 60 Hz.</td></tr>
   <tr><td><b>Audio</b></td><td>Mute your microphone everywhere at once, in Discord, League and the browser, and switch between headset, speakers and monitor with one key.</td></tr>
   <tr><td><b>Mini window</b></td><td>A slim strip that stays on top while you play: status, mic, ping, GPU load and the game timer.</td></tr>
-  <tr><td><b>Notifications</b></td><td>A short heads-up when teams are locked, when a result is saved with your rating change, and before game night, each with a button to the site.</td></tr>
+  <tr><td><b>Notifications</b></td><td>A short heads-up when a result is saved, when game mode switches on, and after an update, with a "Muted" badge while your mic is off.</td></tr>
+  <tr><td><b>Automatic updates</b></td><td>New versions come from this page's releases, are checked with their SHA-256 fingerprint and install by themselves, never during a game. Can be turned off.</td></tr>
   <tr><td><b>Help and tour</b></td><td>A short tour on first start that you can skip, and a Help page that explains every part.</td></tr>
 </table>
 

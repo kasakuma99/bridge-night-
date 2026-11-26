@@ -21,7 +21,10 @@ if ($Empty) {
     $refs = "System.dll", "System.Core.dll", "System.Drawing.dll", "System.Windows.Forms.dll", "System.Management.dll",
             "System.Security.dll", "System.Web.Extensions.dll" | ForEach-Object { "/reference:" + (Join-Path $fw $_) }
     [string[]]$res = @(Get-ChildItem (Join-Path $helper "res") -File | ForEach-Object { "/resource:$($_.FullName),$($_.Name)" }) + "/resource:$(Join-Path $helper 'app.ico'),app.ico"
-    $src = @(Get-ChildItem $helper -Filter *.cs | Where-Object { $_.Name -notlike "Pc*.cs" } | ForEach-Object { $_.FullName }) + (Join-Path $preview "FakePcServices.cs")
+    # Built as TEST (own settings folder), but the pictures show the normal title, as in the released app.
+    $logic = Join-Path $env:TEMP "bn-helper-preview-BridgeNightHelper.cs"
+    [IO.File]::WriteAllText($logic, ([IO.File]::ReadAllText((Join-Path $helper "BridgeNightHelper.cs")) -replace 'Title = "Bridge Night Helper TEST"', 'Title = "Bridge Night Helper"'))
+    $src = @(Get-ChildItem $helper -Filter *.cs | Where-Object { $_.Name -notlike "Pc*.cs" -and $_.Name -ne "BridgeNightHelper.cs" } | ForEach-Object { $_.FullName }) + $logic + (Join-Path $preview "FakePcServices.cs")
     & (Join-Path $fw "csc.exe") /nologo /nowarn:649,169,67 /target:library /define:TEST "/out:$dll" @refs @res $src
     if ($LASTEXITCODE -ne 0) { throw "Preview build failed" }
 }
