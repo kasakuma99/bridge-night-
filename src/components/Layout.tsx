@@ -1,10 +1,8 @@
 import { Suspense, lazy, useEffect, useRef } from "react";
 import { Link, NavLink, Outlet, useLocation } from "react-router-dom";
-import { MessageCircle } from "lucide-react";
 import { SAMPLE_MODE, useAuth, useData, type Role } from "../data/context";
 import { FEATURES } from "../lib/features";
 import { showFeed } from "../lib/live";
-import { isDiscordInvite } from "../lib/util";
 import { Logo, Skeleton } from "./ui";
 import { PendingResults } from "./HelperAdmin";
 import { AccountMenu } from "./qol/AccountMenu";
@@ -42,17 +40,6 @@ const NAV: [to: string, label: string][] = [
   ...(FEATURES.builds ? [["/builds", "Builds"] as [string, string]] : []),
   ["/players", "Players"],
 ];
-
-function DiscordLink({ className, children, label }: { className?: string; children: React.ReactNode; label?: string }) {
-  const { data } = useData();
-  const url = data.settings.discordUrl;
-  if (!isDiscordInvite(url)) return null;
-  return (
-    <a className={className} href={url} target="_blank" rel="noopener noreferrer" aria-label={label}>
-      {children}
-    </a>
-  );
-}
 
 export function Layout() {
   const { data, status, error, now } = useData();
@@ -95,12 +82,6 @@ export function Layout() {
               </NavLink>
             ))}
           </nav>
-          {!closed && (
-            <DiscordLink className="btn sm dis" label="Join our Discord (opens in a new tab)">
-              <MessageCircle aria-hidden />
-              <span>Join our Discord</span>
-            </DiscordLink>
-          )}
           <AccountMenu />
         </div>
       </header>
@@ -153,7 +134,6 @@ export function Layout() {
             </span>
             {!closed && (
               <>
-                <DiscordLink>Join our Discord</DiscordLink>
                 <Link to="/stats">Stats</Link>
                 {FEATURES.rivals && <Link to="/rivals">Rivals</Link>}
                 {FEATURES.builds && <Link to="/builds">Builds</Link>}

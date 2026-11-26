@@ -9,8 +9,7 @@
 <br/>
 
 <a href="https://bridge-night.bridge-night.workers.dev"><img src="https://img.shields.io/badge/Open_the_site-ff4f8e?style=for-the-badge&logo=googlechrome&logoColor=white" alt="Open the site" height="36"/></a>&nbsp;
-<a href="https://github.com/kasakuma99/bridge-night-/releases"><img src="https://img.shields.io/badge/Get_the_helper-ff7466?style=for-the-badge&logo=windows&logoColor=white" alt="Get the helper" height="36"/></a>&nbsp;
-<a href="https://discord.gg/mEAF2C9Qq"><img src="https://img.shields.io/badge/Join_our_Discord-ff9c4a?style=for-the-badge&logo=discord&logoColor=white" alt="Join our Discord" height="36"/></a>
+<a href="https://github.com/kasakuma99/bridge-night-/releases"><img src="https://img.shields.io/badge/Get_the_helper-ff7466?style=for-the-badge&logo=windows&logoColor=white" alt="Get the helper" height="36"/></a>
 
 <p><a href="https://bridge-night.bridge-night.workers.dev"><b>bridge-night.bridge-night.workers.dev</b></a></p>
 
@@ -104,15 +103,11 @@ built to stay light: nothing runs in the background that you didn't switch on.</
 
 <br/>
 
-<a href="https://discord.gg/mEAF2C9Qq"><img src="docs/images/discord.png" alt="Join us on Discord" width="100%" /></a>
-
-<br/><br/>
-
 <img src="docs/images/logo.png" alt="Bridge Night logo" width="88" />
 
 <p><b>Bridge Night</b><br/><sub>Made by friends for friends. Thanks to <b>Lenny</b> and <b>Tosh</b>, and to everyone who shows up on game night.</sub></p>
 
-<p><sub><a href="docs/DEVELOPMENT.md">How it's built and how to run it</a> &nbsp;·&nbsp; <a href="https://github.com/kasakuma99/bridge-night-/releases">Releases</a> &nbsp;·&nbsp; <a href="https://discord.gg/mEAF2C9Qq">Discord</a></sub></p>
+<p><sub><a href="docs/DEVELOPMENT.md">How it's built and how to run it</a> &nbsp;·&nbsp; <a href="https://github.com/kasakuma99/bridge-night-/releases">Releases</a></sub></p>
 
 <sub>Bridge Night was created under Riot Games' "Legal Jibber Jabber" policy using assets owned by Riot Games.<br/>Riot Games does not endorse or sponsor this project.</sub>
 

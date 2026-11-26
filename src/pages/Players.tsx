@@ -7,7 +7,7 @@ import { HelperTokensPanel } from "../components/HelperAdmin";
 import { StoreError } from "../data/store";
 import { FEATURES } from "../lib/features";
 import type { Player, Settings } from "../lib/types";
-import { RIOT_ID_RE, clampInt, isDiscordInvite, plural } from "../lib/util";
+import { RIOT_ID_RE, clampInt, plural } from "../lib/util";
 
 /** House rules only show the settings of features that are on. */
 const HAS_RULES = FEATURES.dodges || FEATURES.rerollLimit || FEATURES.challenges;
@@ -123,7 +123,6 @@ export default function Players() {
         </section>
         <div className="stack2">
           {HAS_RULES && <HouseRules settings={data.settings} disabled={!isMember} />}
-          <DiscordBox settings={data.settings} disabled={!isAdmin} />
           {isAdmin && !SAMPLE_MODE && <MembersPanel />}
           {isAdmin && !SAMPLE_MODE && <HelperTokensPanel />}
           {isAdmin && (
@@ -322,34 +321,3 @@ function HouseRules({ settings, disabled }: { settings: Settings; disabled: bool
   );
 }
 
-function DiscordBox({ settings, disabled }: { settings: Settings; disabled: boolean }) {
-  const { store } = useData();
-  const toast = useToast();
-  const [url, setUrl] = useState(settings.discordUrl);
-  if (disabled) return null;
-  return (
-    <section className="panel">
-      <h3>Discord</h3>
-      <p className="sub">Your server invite. The "Join our Discord" buttons use it.</p>
-      <form
-        className="addf"
-        onSubmit={async (e) => {
-          e.preventDefault();
-          const v = url.trim();
-          if (v && !isDiscordInvite(v)) return toast("That doesn't look like a Discord invite link", { err: true });
-          try {
-            await store.saveSettings({ ...settings, discordUrl: v });
-            toast(v ? "Discord link saved" : "Discord link removed");
-          } catch (e2) {
-            toast(e2 instanceof StoreError ? e2.message : "Could not save the link", { err: true });
-          }
-        }}
-      >
-        <input className="f" type="url" value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://discord.gg/..." aria-label="Discord invite link" />
-        <button className="btn" type="submit">
-          Save link
-        </button>
-      </form>
-    </section>
-  );
-}
