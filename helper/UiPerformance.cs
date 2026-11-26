@@ -103,10 +103,9 @@ namespace BridgeNight
             tabPicker.Location = new Point(Theme.Px(X0 + W0) - tabPicker.Width, Theme.Px(22));
             tabPicker.Changed += delegate { ShowTab(); };
             Controls.Add(tabPicker);
-            // Measuring on/off and how often live in Settings; the chip says what is set and opens it.
-            chip = new SummaryChip("Change") { AnchorRight = tabPicker.Left - Theme.Px(12) };
+            // Measuring on/off and how often live in Settings; the chip only says what is set.
+            chip = new SummaryChip("") { AnchorRight = tabPicker.Left - Theme.Px(12) };
             chip.Top = tabPicker.Top + (tabPicker.Height - chip.Height) / 2;
-            chip.Click += delegate { Win.OpenSettings("Performance"); };
             Controls.Add(chip);
             SyncChip();
 

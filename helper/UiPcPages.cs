@@ -180,91 +180,95 @@ namespace BridgeNight
         }
     }
 
-    /// Game mode: one glance (ready ring + state), the checks as tiles with their fix button, and how long you played.
+    /// Game mode: a slim status bar, then a grid (live game, live readings, the checks), then your last games.
     class GameModePage : Page
     {
-        const int Slots = 6, TileW = 250, TileH = 104, Gap = 13;
+        // Grid of 6: live game, live readings, then up to 4 checks (the last one sums up the rest if there are more).
+        const int Slots = 4, TileW = 250, TileH = 112, Gap = 13, StripH = 64, GridTop = StripH + 14;
         ReadyRing ring;
-        Label heroTitle, heroSub, stateBig, stateCaption, todayText, lengthsNote;
-        Pill autoPill, musicPill, breakPill;
-        FlatButton change;
+        Label checksTitle, checksSub, modeValue, todayValue, liveBig, liveText, gpuValue, pingValue, againTitle, againWhen, avgValue, longValue;
         readonly Card[] tiles = new Card[Slots];
         readonly Label[] tileIcon = new Label[Slots], tileTitle = new Label[Slots], tileDetail = new Label[Slots], tileOk = new Label[Slots];
         readonly FlatButton[] tileFix = new FlatButton[Slots];
         List<PcCheck> checks = new List<PcCheck>();
-        Bars lengths;
-        BarRow today;
-        DateTime noteUntil = DateTime.MinValue, checkedAt;
-        int slow;
+        Chart gpuChart, pingChart;
         Card again;
-        Label againWhen;
+        Bars lengths;
+        DateTime noteUntil = DateTime.MinValue;
+        int slow;
 
         public GameModePage(MainWindow w) : base(w, "Game mode")
         {
             Heading("Game mode", "Game mode");
 
-            // 1. One glance: how ready the PC is, and what happens when a game starts.
-            var hero = Ui.Card(this, null, X0, Y0, W0, 140);
-            ring = new ReadyRing { Bounds = Theme.R(18, 16, 108, 108) };
-            hero.Controls.Add(ring);
-            heroTitle = L(hero, "", Theme.Big, Theme.Ink, 146, 18, 420, 32);
-            heroSub = L(hero, "", Theme.Small, Theme.Ink2, 146, 52, 440, 22);
-            autoPill = HeroPill(hero, 146);
-            musicPill = HeroPill(hero, 146);
-            breakPill = HeroPill(hero, 146);
-            change = Ui.Link(hero, "Change in Settings", 600, 92);
-            change.Click += delegate { Win.OpenSettings("Game mode"); };
-            stateBig = L(hero, "", Theme.Huge, Theme.Ink, W0 - 200, 26, 182, 50);
-            stateBig.TextAlign = ContentAlignment.MiddleRight;
-            stateCaption = L(hero, "", Theme.Small, Theme.Mute, W0 - 230, 78, 212, 20);
-            stateCaption.TextAlign = ContentAlignment.TopRight;
+            // 1. Slim status bar: checks, game mode, play time today. Read-only; the switches live in Settings.
+            var strip = Ui.Card(this, null, X0, Y0, W0, StripH);
+            ring = new ReadyRing { Bounds = Theme.R(14, 8, 48, 48), Compact = true };
+            strip.Controls.Add(ring);
+            checksTitle = L(strip, "", Theme.Strong, Theme.Ink, 72, 12, 200, 22);
+            checksSub = L(strip, "", Theme.Small, Theme.Mute, 72, 33, 200, 20);
+            StripBlock(strip, 286, "", "Game mode", out modeValue);
+            StripBlock(strip, 536, "", "Played today", out todayValue);
 
-            // 2. Every check is a tile: green when fine, amber with its fix button when not.
+            // 2a. Live game.
+            var live = Ui.Card(this, null, GridX(0), GridY(0), TileW, TileH);
+            Ui.Icon(live, "", Theme.Ink2, 14, 14);
+            L(live, "Live game", Theme.Strong, Theme.Ink, 44, 12, 100, 22);
+            Ui.Link(live, "Open the site  ↗", TileW - 14, 10).Click += delegate { Ui.Open(MainWindow.SiteUrl); };
+            liveBig = L(live, "", Theme.Big, Theme.Ink, 44, 42, TileW - 56, 32);
+            liveText = L(live, "", Theme.Small, Theme.Mute, 44, 78, TileW - 56, 22);
+
+            // 2b. Two live readings with a tiny line each.
+            var reads = Ui.Card(this, null, GridX(1), GridY(0), TileW, TileH);
+            L(reads, "GPU", Theme.Small, Theme.Ink2, 14, 10, 100, 20);
+            gpuValue = L(reads, "–", Theme.Big, Theme.Ink, 14, 30, 110, 30);
+            gpuChart = new Chart { Bounds = Theme.R(14, 68, 104, 32), Max = 100, Empty = "" };
+            reads.Controls.Add(gpuChart);
+            L(reads, "Ping to " + NetCheck.ServerName, Theme.Small, Theme.Ink2, 132, 10, 110, 20);
+            pingValue = L(reads, "–", Theme.Big, Theme.Ink, 132, 30, 110, 30);
+            pingChart = new Chart { Bounds = Theme.R(132, 68, 104, 32), Max = 60, AutoMax = true, Empty = "" };
+            reads.Controls.Add(pingChart);
+
+            // 2c. The checks: green when fine, amber with their fix button when not.
             for (var i = 0; i < Slots; i++)
             {
-                var t = tiles[i] = Ui.Card(this, null, X0 + (i % 3) * (TileW + Gap), Y0 + 152 + (i / 3) * (TileH + Gap), TileW, TileH);
+                var t = tiles[i] = Ui.Card(this, null, GridX(i + 2), GridY(i + 2), TileW, TileH);
                 tileIcon[i] = Ui.Icon(t, "", Theme.Good, 14, 14);
                 tileTitle[i] = L(t, "", Theme.Strong, Theme.Ink, 44, 12, TileW - 56, 22);
-                tileDetail[i] = L(t, "", Theme.Small, Theme.Mute, 44, 34, TileW - 56, 34);
-                tileOk[i] = L(t, "All good", Theme.Small, Theme.Good, 44, 74, 140, 20);
-                tileFix[i] = Ui.ButtonRight(t, "Fix", false, TileW - 14, 66);
+                tileDetail[i] = L(t, "", Theme.Small, Theme.Mute, 44, 34, TileW - 56, 38);
+                tileOk[i] = L(t, "All good", Theme.Small, Theme.Good, 44, 82, 140, 20);
+                tileFix[i] = Ui.ButtonRight(t, "Fix", false, TileW - 14, 74);
                 var k = i;
                 tileFix[i].Click += delegate { Fix(k); };
             }
-
-            // A free tile slot becomes "Check again", so the grid never has a hole.
             again = Ui.Card(this, null, 0, 0, TileW, TileH);
             Ui.Icon(again, "", Theme.Ink2, 14, 14);
-            L(again, "Check again", Theme.Strong, Theme.Ink, 44, 12, TileW - 56, 22);
-            againWhen = L(again, "", Theme.Small, Theme.Mute, 44, 34, TileW - 56, 34);
-            Ui.ButtonRight(again, "Check now", false, TileW - 14, 66).Click += delegate { Fill(); };
+            againTitle = L(again, "", Theme.Strong, Theme.Ink, 44, 12, TileW - 56, 22);
+            againWhen = L(again, "", Theme.Small, Theme.Mute, 44, 34, TileW - 56, 38);
+            Ui.ButtonRight(again, "Check again", false, TileW - 14, 74).Click += delegate { Fill(); };
 
-            // 3. A small picture of your play: length of the last games, and today's total against the break reminder.
-            var play = Ui.Card(this, "Your last games", X0, Y0 + 152 + 2 * (TileH + Gap), W0, 150);
-            lengths = new Bars { Bounds = Theme.R(16, 40, 390, 100), Color = Theme.Orange, HighlightLast = true, Empty = "Play a custom game and its length shows up here." };
+            // 3. Your last games: length of each, average and longest.
+            var playTop = GridY(3) + TileH + Gap;
+            var play = Ui.Card(this, "Your last games", X0, playTop, W0, 160);
+            lengths = new Bars { Bounds = Theme.R(16, 40, 500, 110), Color = Theme.Orange, HighlightLast = true, Empty = "Play a custom game and its length shows up here." };
             play.Controls.Add(lengths);
-            L(play, "Played today", Theme.Small, Theme.Ink2, 440, 46, 200, 20);
-            todayText = L(play, "", Theme.Big, Theme.Ink, 440, 68, 130, 32);
-            today = new BarRow { Bounds = Theme.R(574, 74, 186, 24), LabelWidth = 0, ValueWidth = 0, Gradient = true };
-            play.Controls.Add(today);
-            lengthsNote = L(play, "", Theme.Small, Theme.Mute, 440, 108, 320, 20);
+            L(play, "Average game", Theme.Small, Theme.Ink2, 560, 48, 200, 20);
+            avgValue = L(play, "–", Theme.Big, Theme.Ink, 560, 68, 200, 30);
+            L(play, "Longest", Theme.Small, Theme.Ink2, 560, 104, 200, 20);
+            longValue = L(play, "–", Theme.Strong, Theme.Ink, 560, 124, 200, 22);
         }
 
-        Pill HeroPill(Card hero, int x)
+        void StripBlock(Card strip, int x, string glyph, string caption, out Label value)
         {
-            var p = new Pill { Left = Theme.Px(x), Top = Theme.Px(94) };
-            hero.Controls.Add(p);
-            p.Set("Off", false);
-            return p;
+            var line = new Panel { Bounds = Theme.R(x - 14, 14, 1, StripH - 28), BackColor = Theme.Border };
+            strip.Controls.Add(line);
+            Ui.Icon(strip, glyph, Theme.Ink2, x, 22);
+            L(strip, caption, Theme.Small, Theme.Mute, x + 32, 12, 200, 20);
+            value = L(strip, "", Theme.Strong, Theme.Ink, x + 32, 32, 200, 22);
         }
 
-        /// Pills sit in one row after each other, the Settings link right after them.
-        void LayoutPills()
-        {
-            var x = autoPill.Left;
-            foreach (var p in new[] { autoPill, musicPill, breakPill }) { p.Left = x; x = p.Right + Theme.Px(8); }
-            change.Left = x + Theme.Px(4);
-        }
+        static int GridX(int slot) { return X0 + (slot % 3) * (TileW + Gap); }
+        static int GridY(int slot) { return Y0 + GridTop + (slot / 3) * (TileH + Gap); }
 
         void Fix(int i)
         {
@@ -274,10 +278,10 @@ namespace BridgeNight
                 MessageBox.Show(this, "Restart Windows now? Save your work first.", Program.Title, MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes) return;
             string text;
             var ok = GameMode.Fix(c.Id, out text);
-            Ui.Set(heroSub, string.IsNullOrEmpty(text) ? (ok ? "Done." : "That did not work.") : text, ok ? Theme.Good : Theme.Warn);
-            noteUntil = DateTime.UtcNow.AddSeconds(8);
             Win.Log("Game mode fix " + c.Id + ": " + (ok ? "done" : "failed") + (string.IsNullOrEmpty(text) ? "" : " (" + text + ")"));
             Fill();
+            Ui.Set(checksSub, string.IsNullOrEmpty(text) ? (ok ? "Done." : "That did not work.") : text, ok ? Theme.Good : Theme.Warn);
+            noteUntil = DateTime.UtcNow.AddSeconds(8);
         }
 
         void Fill()
@@ -285,8 +289,10 @@ namespace BridgeNight
             var all = new List<PcCheck>();
             all.AddRange(GameMode.BeforeNight() ?? new List<PcCheck>());
             all.AddRange(GameMode.Fixes() ?? new List<PcCheck>());
-            // Things to fix first, then the ones that are fine.
-            checks = all.Where(c => c.Problem).Concat(all.Where(c => !c.Problem)).Take(Slots).ToList();
+            var ordered = all.Where(c => c.Problem).Concat(all.Where(c => !c.Problem)).ToList(); // things to fix first
+            var room = ordered.Count > Slots ? Slots - 1 : Slots;
+            checks = ordered.Take(room).ToList();
+            var rest = ordered.Skip(room).ToList();
             var problems = all.Count(c => c.Problem);
             for (var i = 0; i < Slots; i++)
             {
@@ -309,14 +315,17 @@ namespace BridgeNight
                     tileFix[i].AccessibleDescription = c.Title;
                 }
             }
-            checkedAt = DateTime.Now;
-            Ui.Set(againWhen, "Last checked at " + checkedAt.ToString("HH:mm", Ui.En));
+            // The free slot: either the rest of the checks, or simply "check again".
+            var restProblems = rest.Count(c => c.Problem);
+            Ui.Set(againTitle, rest.Count == 0 ? "Check again" : "+" + rest.Count + " more " + (rest.Count == 1 ? "check" : "checks"));
+            Ui.Set(againWhen, rest.Count == 0 ? "Last checked at " + DateTime.Now.ToString("HH:mm", Ui.En)
+                : (restProblems == 0 ? "All fine: " : restProblems + " to look at: ") + string.Join(", ", rest.Select(c => c.Title).ToArray()));
             Ui.Show(again, checks.Count < Slots);
             if (checks.Count < Slots) again.Location = tiles[checks.Count].Location;
+
             ring.Set(all.Count - problems, all.Count);
-            Ui.Set(heroTitle, all.Count == 0 ? "Checking your PC…" : problems == 0 ? "Ready for game night" : problems == 1 ? "1 quick fix before game night" : problems + " quick fixes before game night");
-            if (DateTime.UtcNow >= noteUntil)
-                Ui.Set(heroSub, problems == 0 ? "Everything below looks right on this PC." : "Fixes only happen when you click them. Nothing changes by itself.", Theme.Ink2);
+            Ui.Set(checksTitle, all.Count == 0 ? "Checking…" : problems == 0 ? "All checks fine" : problems == 1 ? "1 thing to fix" : problems + " things to fix");
+            if (DateTime.UtcNow >= noteUntil) Ui.Set(checksSub, "Fixes only happen on click", Theme.Mute);
             Win.SetBadge(problems);
             FillPlay();
         }
@@ -331,29 +340,48 @@ namespace BridgeNight
             lengths.TopLabels = mins.Select(m => Math.Round(m) + " min").ToArray();
             lengths.BottomLabels = shown.Select(g => g.Start.ToString("ddd", Ui.En)).ToArray();
             lengths.Invalidate();
+            Ui.Set(avgValue, mins.Count == 0 ? "–" : Math.Round(mins.Average()) + " min");
+            Ui.Set(longValue, mins.Count == 0 ? "–" : Math.Round(mins.Max()) + " min");
+
             var played = TimeSpan.Zero;
             foreach (var g in games) if (g.Start.Date == DateTime.Today) played += g.End - g.Start;
             var start = PcServices.GameStartedAt;
             if (start.HasValue) played += DateTime.Now - start.Value;
-            Ui.Set(todayText, played.TotalMinutes < 1 ? "–" : played.TotalHours >= 1 ? (int)played.TotalHours + " h " + played.Minutes + " min" : played.Minutes + " min");
-            today.Set("", (float)(played.TotalMinutes / 120.0), "");
-            Ui.Set(lengthsNote, S.BreakReminder ? "Full bar = 2 hours, then the break reminder." : "Full bar = 2 hours of play.");
+            Ui.Set(todayValue, played.TotalMinutes < 1 ? "Nothing yet" : played.TotalHours >= 1 ? (int)played.TotalHours + " h " + played.Minutes + " min" : played.Minutes + " min");
         }
 
-        public override void Shown() { slow = 0; Fill(); }
+        public override void Shown()
+        {
+            slow = 0;
+            if (S.LiveMeasure) PerfMon.Start("gamemode");
+            NetCheck.Start("gamemode");
+            Fill();
+        }
+
+        public override void Hidden() { PerfMon.Stop("gamemode"); NetCheck.Stop("gamemode"); }
 
         public override void Tick()
         {
             var auto = S.GameModeAuto;
-            autoPill.Set(auto ? "Automatic: on" : "Automatic: off", auto);
-            musicPill.Set(S.MusicQuieter ? "Music quieter: on" : "Music quieter: off", auto && S.MusicQuieter);
-            breakPill.Set(S.BreakReminder ? "Break reminder: on" : "Break reminder: off", auto && S.BreakReminder);
-            LayoutPills();
             var start = PcServices.GameStartedAt;
-            var active = GameMode.Active;
-            Ui.Set(stateBig, start.HasValue ? Ui.Clock(DateTime.Now - start.Value) : "No game", start.HasValue ? Theme.Ink : Theme.Mute);
-            Ui.Set(stateCaption, start.HasValue ? (active ? "in game · game mode on" : "in game") : auto ? "game mode starts with the game" : "automatic game mode is off");
-            if (noteUntil != DateTime.MinValue && DateTime.UtcNow >= noteUntil) { noteUntil = DateTime.MinValue; Fill(); }
+            Ui.Set(modeValue, !auto ? "Off" : GameMode.Active ? "On now" : S.MusicQuieter ? "Automatic · music quieter" : "Automatic", auto ? Theme.Ink : Theme.Mute);
+
+            var st = HelperStatus.Read();
+            if (start.HasValue) { liveBig.Font = Theme.Big; Ui.Set(liveBig, Ui.Clock(DateTime.Now - start.Value), Theme.Ink); }
+            else { liveBig.Font = Theme.Strong; Ui.Set(liveBig, "No game right now", Theme.Ink2); }
+            Ui.Set(liveText, start.HasValue ? (st.CustomGame ? (S.Paused ? "Custom game · sending paused" : "Custom game · live on the site") : "Not a custom game · not sent")
+                : !st.LeagueConnected ? "League is closed"
+                : st.CustomGame ? "Custom lobby · " + (string.IsNullOrEmpty(st.Phase) ? "waiting" : st.Phase)
+                : "League is open");
+
+            var p = PerfMon.Latest;
+            Ui.Set(gpuValue, p != null && p.Gpu.HasValue ? Math.Round(p.Gpu.Value) + " %" : S.LiveMeasure ? "–" : "Off");
+            gpuChart.SetData(new List<Series> { new Series(Theme.Pink, PerfMon.History(60).Select(x => x.Gpu).ToArray(), true) }, new string[0]);
+            var n = NetCheck.Current;
+            Ui.Set(pingValue, n != null && n.PingMs.HasValue ? n.PingMs.Value + " ms" : "–");
+            pingChart.SetData(new List<Series> { new Series(Theme.Good, NetCheck.History(300).Select(x => x.Value.HasValue ? (float?)x.Value.Value : null).ToArray(), true) }, new string[0]);
+
+            if (noteUntil != DateTime.MinValue && DateTime.UtcNow >= noteUntil) { noteUntil = DateTime.MinValue; Ui.Set(checksSub, "Fixes only happen on click", Theme.Mute); }
             if (++slow % 30 == 0) FillPlay();
         }
     }
@@ -362,6 +390,7 @@ namespace BridgeNight
     class ReadyRing : Control
     {
         int ok, total = -1;
+        public bool Compact;
 
         public ReadyRing()
         {
@@ -385,7 +414,7 @@ namespace BridgeNight
             var g = e.Graphics;
             g.Clear(BackColor);
             g.SmoothingMode = SmoothingMode.AntiAlias;
-            float w = Theme.Px(10);
+            float w = Theme.Px(Compact ? 5 : 10);
             var r = new RectangleF(w / 2f + 1, w / 2f + 1, Width - w - 2, Height - w - 2);
             using (var track = new Pen(Color.FromArgb(28, 255, 255, 255), w)) g.DrawEllipse(track, r);
             if (total > 0 && ok > 0)
@@ -396,6 +425,11 @@ namespace BridgeNight
                     g.DrawArc(p, r, -90, sweep);
             }
             var big = total <= 0 ? "…" : ok + "/" + total;
+            if (Compact)
+            {
+                TextRenderer.DrawText(g, big, Theme.SmallStrong, ClientRectangle, Theme.Ink, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding);
+                return;
+            }
             TextRenderer.DrawText(g, big, Theme.Big, new Rectangle(0, 0, Width, Height - Theme.Px(12)), Theme.Ink,
                 TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding);
             TextRenderer.DrawText(g, "checks fine", Theme.Tiny, new Rectangle(0, Height / 2 + Theme.Px(10), Width, Theme.Px(18)), Theme.Mute,
@@ -554,7 +588,6 @@ namespace BridgeNight
             alertCard = Ui.Card(this, "When you mute", X0 + 526, Y0 + 246, 250, 156);
             soundPill = AlertRow(alertCard, "\uE767", "Short sound", 46);
             badgePill = AlertRow(alertCard, "\uE7F4", "\"Muted\" badge", 80);
-            Ui.Link(alertCard, "Change in Settings", 238, 118).Click += delegate { Win.OpenSettings("Audio"); };
 
             meterTimer.Tick += delegate { meter.Muted = AudioCtl.MicMuted; meter.Level = AudioCtl.MicLevel; };
         }

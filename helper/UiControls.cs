@@ -819,7 +819,8 @@ namespace BridgeNight
             this.link = link;
             Font = Theme.Small;
             Height = Theme.Px(32);
-            Ui.Tips.SetToolTip(this, "Change in Settings");
+            if (link == "") { TabStop = false; Cursor = Cursors.Default; } // status only, not a button
+            else Ui.Tips.SetToolTip(this, "Change in Settings");
         }
 
         public void Set(string text, Color dotColor)
@@ -827,8 +828,8 @@ namespace BridgeNight
             if (text == Text && dotColor == dot && Width > Theme.Px(40)) return;
             Text = text;
             dot = dotColor;
-            AccessibleName = text + ". Change in Settings";
-            Width = Theme.Px(30) + TextRenderer.MeasureText(text, Font).Width + Theme.Px(25) + Theme.Px(20) + TextRenderer.MeasureText(link, Theme.SmallStrong).Width + Theme.Px(10);
+            AccessibleName = link == "" ? text : text + ". Change in Settings";
+            Width = Theme.Px(30) + TextRenderer.MeasureText(text, Font).Width + (link == "" ? Theme.Px(14) : Theme.Px(25) + Theme.Px(20) + TextRenderer.MeasureText(link, Theme.SmallStrong).Width + Theme.Px(10));
             if (AnchorRight >= 0) Left = AnchorRight - Width;
             Invalidate();
         }
@@ -840,8 +841,9 @@ namespace BridgeNight
             var r = new RectangleF(Theme.Px(1), Theme.Px(1), Width - Theme.Px(2) - 1, Height - Theme.Px(2) - 1);
             using (var path = Theme.Round(r, r.Height / 2))
             {
-                using (var b = new SolidBrush(Pressed ? Theme.Card : Hover ? Theme.Raised : Theme.Card)) g.FillPath(b, path);
-                using (var p = new Pen(Hover ? Theme.BorderHi : Theme.Border)) g.DrawPath(p, path);
+                var lit = link != "" && Hover;
+                using (var b = new SolidBrush(lit && !Pressed ? Theme.Raised : Theme.Card)) g.FillPath(b, path);
+                using (var p = new Pen(lit ? Theme.BorderHi : Theme.Border)) g.DrawPath(p, path);
             }
             var d = Theme.Px(7);
             using (var b = new SolidBrush(dot)) g.FillEllipse(b, Theme.Px(14), (Height - d) / 2f, d, d);
@@ -849,6 +851,7 @@ namespace BridgeNight
             var tw = TextRenderer.MeasureText(Text, Font).Width;
             var x = Theme.Px(30);
             TextRenderer.DrawText(g, Text, Font, new Rectangle(x, 0, tw + 2, Height), Theme.Ink2, f);
+            if (link == "") return;
             x += tw + Theme.Px(12);
             using (var p = new Pen(Theme.Border)) g.DrawLine(p, x, Theme.Px(8), x, Height - Theme.Px(8));
             x += Theme.Px(12);
