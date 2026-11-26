@@ -12,6 +12,8 @@ Teams, live games, stats and rivalries for our League of Legends custom game nig
 <a href="https://github.com/kasakuma99/bridge-night-/releases"><img src="https://img.shields.io/badge/Get_the_helper-ff7466?style=for-the-badge&logo=windows&logoColor=white" alt="Get the helper" height="36"/></a>&nbsp;
 <a href="https://discord.gg/mEAF2C9Qq"><img src="https://img.shields.io/badge/Join_our_Discord-ff9c4a?style=for-the-badge&logo=discord&logoColor=white" alt="Join our Discord" height="36"/></a>
 
+**→ [bridge-night.bridge-night.workers.dev](https://bridge-night.bridge-night.workers.dev)**
+
 <sub>Private for our group · free to run · fan project</sub>
 
 </div>
