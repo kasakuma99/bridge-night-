@@ -22,6 +22,12 @@ for (const t of TABLES) {
   const r = await fetch(`${url}/rest/v1/${t}?select=*&limit=1`, { headers });
   line(t, r.status === 401 || r.status === 403, `HTTP ${r.status}`);
 }
+// Arcade (20261126120000_minigame_scores.sql, 20261127100000_arcade_rooms_trivia.sql).
+// 404 = that migration is not applied yet, so there is nothing to see.
+for (const t of ["minigame_games", "minigame_scores", "minigame_best", "trivia_questions", "trivia_settings"]) {
+  const r = await fetch(`${url}/rest/v1/${t}?select=*&limit=1`, { headers });
+  line(t, r.status === 401 || r.status === 403 || r.status === 404, `HTTP ${r.status}${r.status === 404 ? " (not created yet)" : ""}`);
+}
 const CALLS = {
   ensure_member: {},
   set_live: { p_data: {} },

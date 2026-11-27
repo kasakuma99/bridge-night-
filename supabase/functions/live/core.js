@@ -12,7 +12,8 @@ var FEATURES = {
 	privateSite: true,
 	playerPages: false,
 	soloGames: true,
-	ratings: false
+	ratings: false,
+	arcade: true
 };
 FEATURES.ratings;
 // src/lib/champions.ts

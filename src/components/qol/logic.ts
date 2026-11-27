@@ -11,6 +11,7 @@ const TITLES: Record<string, string> = {
   "/builds": "Builds",
   "/players": "Players",
   "/helper": "Helper app",
+  "/arcade": "Arcade",
 };
 
 /** "Stats · Bridge Night"; the home page keeps the title from index.html. */
@@ -18,6 +19,7 @@ export function pageTitle(pathname: string) {
   const p = pathname.toLowerCase().replace(/\/+$/, "") || "/";
   if (p === "/") return `${SITE} · Custom games hub`;
   if (p.startsWith("/stats/")) return `Player stats · ${SITE}`;
+  if (p.startsWith("/arcade/")) return `Arcade · ${SITE}`;
   return `${TITLES[p] ?? "Page not found"} · ${SITE}`;
 }
 

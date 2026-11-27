@@ -33,6 +33,8 @@ export interface Features {
   soloGames: boolean;
   /** Calculated Elo ratings. Off: everyone has a fixed number of Papi Points. */
   ratings: boolean;
+  /** Arcade page (/arcade): waiting room and minigames (solo with leaderboards, or Versus in live rooms). */
+  arcade: boolean;
 }
 
 export const FEATURES: Features = {
@@ -48,6 +50,7 @@ export const FEATURES: Features = {
   playerPages: false,
   soloGames: true,
   ratings: false,
+  arcade: true,
 };
 
 /* ---------- Papi Points ---------- */

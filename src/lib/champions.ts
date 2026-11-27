@@ -69,6 +69,10 @@ export const fallbackDDragon = (): DDragon => ({
 export const champIcon = (v: string | null, id: string) => (v ? `${DD}/cdn/${v}/img/champion/${id}.png` : null);
 export const spellIcon = (v: string | null, id: string) => (v ? `${DD}/cdn/${v}/img/spell/${id}.png` : null);
 export const itemIcon = (v: string | null, id: number) => (v ? `${DD}/cdn/${v}/img/item/${id}.png` : null);
+/** Full splash art (no version in the path). Data Dragon sends CORS headers, so canvas effects can read it. */
+export const champSplash = (id: string, skin = 0) => `${DD}/cdn/img/champion/splash/${id}_${skin}.jpg`;
+/** Tall loading-screen art. */
+export const champLoading = (id: string, skin = 0) => `${DD}/cdn/img/champion/loading/${id}_${skin}.jpg`;
 
 export async function loadDDragon(signal?: AbortSignal): Promise<DDragon> {
   try {

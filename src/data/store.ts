@@ -1,5 +1,6 @@
 import { FEATURES } from "../lib/features";
 import { applyFeed, decideFeed } from "../lib/live";
+import type { RawScore } from "../lib/arcade";
 import type { AppData, LiveFeed, LiveGame, Match, Player, Settings, Side } from "../lib/types";
 import { DEFAULT_SETTINGS } from "../lib/types";
 import { uid } from "../lib/util";
@@ -208,3 +209,36 @@ export class LocalStore implements DataStore {
     this.update(() => emptyData());
   }
 }
+
+/* ---------- Arcade scores without Supabase (local dev and `npm run dev:sample`) ---------- */
+
+const SCORES_KEY = "bn-arcade-scores-v1";
+/** Old rounds fall off, so localStorage doesn't grow forever. */
+const SCORES_PER_GAME = 200;
+
+function readScores(): Record<string, RawScore[]> {
+  try {
+    const d = JSON.parse(localStorage.getItem(SCORES_KEY) || "{}");
+    return d && typeof d === "object" && !Array.isArray(d) ? d : {};
+  } catch {
+    return {};
+  }
+}
+
+/** The minigame_scores table, kept in this browser. Same rules as the database: own rounds only, no edits. */
+export const localScores = {
+  key: SCORES_KEY,
+  list(gameId: string): RawScore[] {
+    const rows = readScores()[gameId];
+    return Array.isArray(rows) ? rows.filter((r) => r && typeof r.playerId === "string" && Number.isFinite(r.score)) : [];
+  },
+  add(gameId: string, row: RawScore) {
+    const all = readScores();
+    all[gameId] = [...(Array.isArray(all[gameId]) ? all[gameId] : []), row].slice(-SCORES_PER_GAME);
+    try {
+      localStorage.setItem(SCORES_KEY, JSON.stringify(all));
+    } catch {
+      throw new StoreError("Could not save the score in this browser");
+    }
+  },
+};

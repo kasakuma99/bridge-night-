@@ -39,6 +39,7 @@ const NAV: [to: string, label: string][] = [
   ...(FEATURES.rivals ? [["/rivals", "Rivals"] as [string, string]] : []),
   ...(FEATURES.builds ? [["/builds", "Builds"] as [string, string]] : []),
   ["/players", "Players"],
+  ...(FEATURES.arcade ? [["/arcade", "Arcade"] as [string, string]] : []),
 ];
 
 export function Layout() {

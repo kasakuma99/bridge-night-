@@ -1,4 +1,4 @@
-import { StrictMode } from "react";
+import { StrictMode, Suspense, lazy } from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter, Route, Routes } from "react-router-dom";
 import "@fontsource/outfit/500.css";
@@ -26,6 +26,9 @@ import Players from "./pages/Players";
 import Helper from "./pages/Helper";
 import NotFound from "./pages/NotFound";
 
+// The Arcade loads only when someone opens it, so the rest of the site stays small.
+const Arcade = lazy(() => import("./pages/Arcade"));
+
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <BrowserRouter>
@@ -46,6 +49,16 @@ createRoot(document.getElementById("root")!).render(
                       {FEATURES.builds && <Route path="builds" element={<Builds />} />}
                       <Route path="players" element={<Players />} />
                       <Route path="helper" element={<Helper />} />
+                      {FEATURES.arcade && (
+                        <Route
+                          path="arcade/:game?"
+                          element={
+                            <Suspense fallback={null}>
+                              <Arcade />
+                            </Suspense>
+                          }
+                        />
+                      )}
                       <Route path="*" element={<NotFound />} />
                     </Route>
                   </Routes>

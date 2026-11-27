@@ -173,3 +173,4 @@ helper/dist/
 # Claude Code: personal settings and session handover notes stay local
 .claude/settings.local.json
 .claude/handover.md
+.claude/agents/
