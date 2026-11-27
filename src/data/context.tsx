@@ -8,7 +8,7 @@ import type { AppData, Player, TeamSize, TeamStyle } from "../lib/types";
 import { fallbackDDragon, loadDDragon, type DDragon } from "../lib/champions";
 import { FEATURES } from "../lib/features";
 import type { SitMode } from "../lib/teams";
-import type { ModeFilter, PeriodFilter } from "../lib/statsPage";
+import type { PeriodFilter } from "../lib/statsPage";
 
 /** Sample data: forced with VITE_SAMPLE_DATA=true, or automatic in local dev when Supabase isn't configured. */
 export const SAMPLE_MODE = import.meta.env.VITE_SAMPLE_DATA === "true" || (!supabase && import.meta.env.DEV);
@@ -105,9 +105,8 @@ export interface Prefs {
   apart: [string, string];
   /** reroll key -> number of drafts made */
   rerolls: Record<string, number>;
-  /** Stats page: days back (1 = today, 0 = all time) and team size (0 = every size). */
+  /** Stats page: days back (1 = today, 0 = all time). */
   period: PeriodFilter;
-  mode: ModeFilter;
   /** Who sits out when too many players are in. */
   sitMode: SitMode;
   /** Players tapped to sit out in "pick" mode. */
@@ -123,7 +122,6 @@ const defaultPrefs: Prefs = {
   apart: ["", ""],
   rerolls: {},
   period: 30,
-  mode: 0,
   sitMode: "fair",
   sitPick: [],
 };

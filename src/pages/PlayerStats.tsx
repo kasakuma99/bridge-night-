@@ -3,7 +3,7 @@ import { Link, useParams } from "react-router-dom";
 import { ArrowLeft, HeartCrack, Skull, Swords, Users } from "lucide-react";
 import { useData } from "../data/context";
 import { AugmentLabel, Avatar, ChampAvatar, Empty, Form } from "../components/ui";
-import { StatsFilter, useStatsFilter } from "../components/stats/StatsFilter";
+import { StatsFilter, TimeFilter, useStatsFilter } from "../components/stats/StatsFilter";
 import { POINTS_NAME, fmtPoints } from "../lib/features";
 import { kdaRatio, MIN_TOGETHER, type Versus } from "../lib/stats";
 import { groupName, MIN_SYNERGY_GAMES, modeLabel, pct, periodLabel, playerView, signed, statsFor, type Synergy } from "../lib/statsPage";
@@ -17,7 +17,7 @@ const cap = (s: string) => s[0].toUpperCase() + s.slice(1);
 export default function PlayerStats() {
   const { id = "" } = useParams();
   const { data, c: full, now, player, pname, isActive } = useData();
-  const { f, set, query } = useStatsFilter();
+  const { f, chosen, set, query } = useStatsFilter(true);
   const p = player(id);
   const v = useMemo(() => {
     const { ms, c } = statsFor(data.matches, data.players, f, now);
@@ -118,7 +118,8 @@ export default function PlayerStats() {
           </div>
         </div>
       </div>
-      <StatsFilter f={f} set={set} query={query} current={id} />
+      <StatsFilter f={f} chosen={chosen} set={set} query={query} />
+      <TimeFilter f={f} set={set} />
 
       {!v.g ? (
         <Empty title={`No games for ${p.name}`} text={`Nothing in ${scope}. Try another mode or a longer time.`} />

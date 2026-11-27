@@ -105,20 +105,14 @@
   .rk-row .elo { font-size: 18px; }
 }
 
-/* ---------- Stats: the filter box ---------- */
-.sf { padding: 0; margin-bottom: 18px; overflow: hidden; }
-.sf-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; min-height: 64px; padding: 12px 18px; border: 0; background: transparent; color: var(--color-ink); text-align: left; cursor: pointer; }
-.sf-top:hover { background: var(--color-s2); }
-.sf-sum { display: flex; align-items: center; gap: 14px; min-width: 0; }
-.sf-sum > svg { width: 20px; height: 20px; flex: none; color: var(--color-ice); }
-.sf-sum b { display: block; font: 600 17px var(--font-disp); }
-.sf-sum small { display: block; color: var(--color-mute); font-size: 13px; }
-.sf-chev { width: 22px; height: 22px; flex: none; color: var(--color-mute); transition: transform .15s var(--ease-out); }
-.sf.open .sf-chev { transform: rotate(180deg); }
-.sf-body { display: grid; gap: 16px; padding: 16px 18px 18px; border-top: 1px solid var(--color-line); }
-.sf-search { display: grid; gap: 6px; position: relative; }
+/* ---------- Stats: search and mode, then the time ---------- */
+.sf { display: grid; gap: 16px; margin-bottom: 14px; }
+.sf-time { padding-top: 16px; padding-bottom: 16px; }
+.sf-search { display: grid; gap: 6px; }
 .sf-search label, .sf-l { color: var(--color-mute); font-size: 13px; font-weight: 600; }
-.sf-search .f { width: 100%; }
+.sf-q { position: relative; display: block; }
+.sf-q svg { position: absolute; left: 14px; top: 50%; width: 18px; height: 18px; transform: translateY(-50%); color: var(--color-mute); pointer-events: none; }
+.sf-q .f { width: 100%; padding-left: 42px; }
 .sf-hits { list-style: none; margin: 0; padding: 4px; display: grid; gap: 2px; border: 1px solid var(--color-line2); border-radius: var(--radius-md); background: var(--color-s2); }
 .sf-hits li.sub { padding: 8px 10px; margin: 0; }
 .sf-hits button { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 44px; padding: 6px 10px; border: 0; border-radius: 9px; background: transparent; color: var(--color-ink); text-align: left; cursor: pointer; }
@@ -193,6 +187,4 @@
   .lb-head .md { display: block; }
   .lb-head button { min-height: 36px; padding: 0 10px; border: 1px solid var(--color-line2); border-radius: 999px; }
   .lb-head .on button { border-color: var(--color-ice); }
-  .sf-top { padding: 12px 14px; }
-  .sf-body { padding: 14px; }
 }

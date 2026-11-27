@@ -207,10 +207,19 @@ const step = (s) => console.log(`\n${s}`);
   await role("admin");
 
   step("Stats");
-  await p.goto(BASE + "/stats?mode=0&period=0");
-  ok((await h1()) === "Stats" && (await main().locator(".lb-head").innerText()).includes("Papi Points"), "leaderboard");
+  await p.goto(BASE + "/stats");
+  ok(
+    (await h1()) === "Stats" && (await main().getByLabel("Player").count()) === 1 && (await btn("Overall").count()) === 1 &&
+      (await main().locator(".sf-time, .lb").count()) === 0,
+    "first only the search and the modes",
+  );
+  await btn("Overall").click();
+  await main().locator(".lb-head").waitFor();
+  ok((await main().locator(".sf-time").count()) === 1 && p.url().includes("mode=0"), "a mode opens the time card and the leaderboard");
+  await main().locator(".sf-time").getByRole("button", { name: "All time", exact: true }).click();
+  await p.waitForURL(/period=0/);
+  ok((await main().locator(".lb-head").innerText()).includes("Papi Points"), "leaderboard");
   ok(!/\b(Elo|rating|dodge|bounty|challenge)/i.test(await main().innerText()), "hidden features stay hidden");
-  ok((await main().locator(".sf-body").count()) === 0, "the filter box starts closed");
   const sorted = async () => (await main().locator(".lb-row:not(.lb-head) [role=cell].on").allInnerTexts()).map((t) => parseInt(t));
   const rowCount = await main().locator(".lb-row:not(.lb-head)").count();
   await main().getByRole("button", { name: "Sort by Win %" }).click();
@@ -225,7 +234,6 @@ const step = (s) => console.log(`\n${s}`);
   // Someone who has played: the first on the leaderboard.
   const leader = (await main().locator(".lb-row:not(.lb-head) .lb-pl b").first().innerText()).trim();
   const me = (await data()).players.find((x) => x.name === leader);
-  await main().locator(".sf-top").click();
   await main().getByLabel("Player").fill(leader.slice(0, 3).toLowerCase());
   await main().locator(".sf-hits button", { hasText: leader }).click();
   await p.waitForURL(new RegExp(`/stats/${me.id}\\?mode=0&period=0`));
@@ -234,14 +242,15 @@ const step = (s) => console.log(`\n${s}`);
   for (const l of ["Games played", "Win rate", "Papi Points", "Average K / D / A", "FF %", "Highest win streak"])
     ok((await main().locator(".kpi .l", { hasText: l }).count()) === 1, `player: ${l}`);
   ok((await main().getByRole("heading", { name: "Teammates" }).count()) === 1 && (await main().getByText("Victim", { exact: true }).count()) === 1, "player: teammates and opponents");
+  ok((await main().locator(".sf-time").count()) === 1, "player: the time card");
   await shot("06b-player");
-  await main().locator(".sf-top").click();
   await btn("2v2").click();
-  await main().locator(".sf-top b", { hasText: "2v2" }).waitFor();
-  ok(p.url().includes("mode=2"), "mode filter, kept in the link");
+  await p.waitForURL(/mode=2/);
+  ok((await btn("2v2").getAttribute("aria-pressed")) === "true", "mode filter, kept in the link");
   await main().getByRole("link", { name: "Leaderboard" }).click();
-  await main().locator(".sf-top b", { hasText: "2v2" }).waitFor();
-  ok(p.url().includes("mode=2"), "the filter stays when going back");
+  await p.waitForURL(/\/stats\?mode=2/);
+  await main().locator(".sf-time").waitFor();
+  ok((await btn("2v2").getAttribute("aria-pressed")) === "true" && (await main().locator(".lb, .empty").count()) > 0, "the filter stays when going back");
   await p.goto(BASE + `/stats?player=${me.id}`);
   await p.waitForURL(new RegExp(`/stats/${me.id}`));
   ok((await h1()) === leader, "old link to a profile");

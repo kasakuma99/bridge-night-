@@ -3,7 +3,7 @@ import { Link, Navigate, useSearchParams } from "react-router-dom";
 import { ArrowDown, ArrowUp } from "lucide-react";
 import { useData } from "../data/context";
 import { AugmentLabel, Avatar, ChampAvatar, Empty } from "../components/ui";
-import { StatsFilter, useStatsFilter } from "../components/stats/StatsFilter";
+import { StatsFilter, TimeFilter, useStatsFilter } from "../components/stats/StatsFilter";
 import { POINTS_NAME, fmtPoints } from "../lib/features";
 import {
   board,
@@ -45,7 +45,7 @@ const cell = (r: BoardRow, k: SortKey) => (k === "points" ? fmtPoints(r.points) 
 
 export default function Stats() {
   const { data, c: full, now, pname, isActive } = useData();
-  const { f, set, query } = useStatsFilter();
+  const { f, chosen, set, query } = useStatsFilter();
   const [sort, setSort] = useState<{ key: SortKey; desc: boolean }>({ key: "points", desc: true });
   const [params] = useSearchParams();
 
@@ -124,12 +124,18 @@ export default function Stats() {
       <div className="head">
         <div>
           <h1>Stats</h1>
-          <p className="sub">
-            {plural(o.games, "game")} · {scope}
-          </p>
+          <p className="sub">{chosen ? `${plural(o.games, "game")} · ${scope}` : "Find a player, or pick a mode to see the leaderboard."}</p>
         </div>
       </div>
-      <StatsFilter f={f} set={set} query={query} />
+      <StatsFilter f={f} chosen={chosen} set={set} query={query} />
+      {chosen && renderBoard()}
+    </section>
+  );
+
+  function renderBoard() {
+    return (
+      <>
+      <TimeFilter f={f} set={set} />
 
       <section className="panel" aria-labelledby="lb-h">
         <div className="ph">
@@ -264,6 +270,7 @@ export default function Stats() {
         Synergy: how much more a group wins together than its players win on their own, in points of win rate. Groups need {MIN_SYNERGY_GAMES} games
         together.
       </p>
-    </section>
-  );
+      </>
+    );
+  }
 }
