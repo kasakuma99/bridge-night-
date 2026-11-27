@@ -434,3 +434,13 @@
 .arc-frame { scroll-margin-top: 76px; }
 /* On phones the site header wraps onto two rows (about 102px). */
 @media (max-width: 860px) { .arc-frame { scroll-margin-top: 112px; } }
+
+/* card art: Chum's Revenge (three low-poly shapes) */
+.arc-art-chums-revenge { background: radial-gradient(ellipse at 80% 10%, color-mix(in srgb, #ff7a2f 40%, transparent), transparent 60%), radial-gradient(ellipse at 10% 100%, color-mix(in srgb, var(--ps-teal) 40%, transparent), transparent 60%), url("./arcade-poly.svg") center / cover, #0a0d22; }
+.arc-art-poly { position: relative; width: 200px; height: 130px; }
+.arc-art-poly i { position: absolute; display: block; transition: transform .35s var(--ease-out); }
+.arc-art-poly i:nth-child(1) { left: 20px; bottom: 6px; width: 56px; height: 80px; background: linear-gradient(110deg, #b9fff3 0 50%, var(--ps-teal) 50%); clip-path: polygon(50% 0, 100% 30%, 100% 100%, 0 100%, 0 30%); }
+.arc-art-poly i:nth-child(2) { left: 92px; bottom: 0; width: 100px; height: 110px; background: linear-gradient(120deg, #ffb27a 0 45%, #ff7a2f 45% 75%, #b3471a 75%); clip-path: polygon(50% 0, 100% 35%, 85% 100%, 15% 100%, 0 35%); }
+.arc-art-poly i:nth-child(3) { left: 70px; top: 0; width: 34px; height: 40px; background: linear-gradient(90deg, #ffc4e4 0 50%, var(--ps-pink) 50%); clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%); }
+.arc-card:hover .arc-art-poly i:nth-child(2) { transform: translateY(-6px) rotate(-4deg); }
+.arc-card:hover .arc-art-poly i:nth-child(3) { transform: translateY(-10px) rotate(45deg); }

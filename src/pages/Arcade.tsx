@@ -202,7 +202,7 @@ function GameCard({ def, n }: { def: MinigameDef; n: number }) {
       <div className="arc-card-body">
         <div className="arc-card-tags">
           {def.boards.length > 0 && <span className="arc-tag solo">Solo</span>}
-          <span className="arc-tag versus">Versus</span>
+          {def.versus !== false && <span className="arc-tag versus">Versus</span>}
         </div>
         <h3>{def.name}</h3>
         <p>{def.blurb}</p>
@@ -234,6 +234,14 @@ function rand(seed: string) {
 const PIXEL_COLS = ["#16f4d0", "#7b5cff", "#c6ff3d", "#ff4fa3", "#1b2a6b", "#0b1240", "#3d7bff", "#e9eeff"];
 
 function CardArt({ id }: { id: string }) {
+  if (id === "chums-revenge")
+    return (
+      <div className="arc-art-poly">
+        <i />
+        <i />
+        <i />
+      </div>
+    );
   if (id === "champ-guesser") {
     const r = rand(id);
     return (

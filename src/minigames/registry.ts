@@ -1,12 +1,13 @@
 import type { Board, MinigameDef } from "./types";
 import { CHAMP_GUESSER } from "./champ-guesser";
 import { triviaDefs } from "./trivia";
+import { CHUMS } from "./chums";
 
 /**
  * Every Arcade game. Add a game by importing its defs here; the order is the order on the page.
  * Every board id here must also be in public.minigame_games (supabase/migrations).
  */
-export const MINIGAMES: MinigameDef[] = [...CHAMP_GUESSER, ...triviaDefs];
+export const MINIGAMES: MinigameDef[] = [...CHAMP_GUESSER, ...triviaDefs, ...CHUMS];
 
 export const findGame = (id: string | undefined) => MINIGAMES.find((g) => g.id === id);
 

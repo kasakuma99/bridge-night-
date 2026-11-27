@@ -1,0 +1,45 @@
+/* Chum's Revenge. Plain for now: a 16:9 screen with a small HUD; the surroundings get styled once the game plays well. */
+.arc-chums { justify-content: flex-start; gap: 10px; }
+.arc-chums-screen { position: relative; width: min(100%, calc((100cqh - 20px) * 16 / 9)); max-width: 1280px; aspect-ratio: 16 / 9; margin: 0 auto; background: #07081a; border: 1px solid var(--color-line2); overflow: hidden; user-select: none; }
+.arc-chums-canvas { display: block; width: 100%; height: 100%; image-rendering: pixelated; cursor: crosshair; outline: none; touch-action: none; }
+
+.arc-chums-hud { position: absolute; inset: 0; pointer-events: none; font: 700 clamp(12px, 1.6cqi, 18px) var(--font-disp); color: #fff; text-shadow: 0 1px 0 #000, 0 0 6px rgba(0, 0, 0, .8); }
+.arc-chums-hearts { position: absolute; left: 12px; top: 10px; display: flex; gap: 4px; }
+.arc-chums-hearts i { width: 1.1em; height: 1em; background: #3a2030; clip-path: polygon(50% 100%, 0 40%, 15% 5%, 50% 25%, 85% 5%, 100% 40%); }
+.arc-chums-hearts i.on { background: #ff4f6a; }
+.arc-chums-ammo { position: absolute; left: 12px; bottom: 10px; }
+.arc-chums-ammo b { font-size: 1.4em; }
+.arc-chums-ammo small { font-size: .65em; opacity: .7; }
+.arc-chums-reload { display: block; width: 90px; height: 8px; background: rgba(255, 255, 255, .2); }
+.arc-chums-reload i { display: block; height: 100%; background: #7ff0ff; }
+.arc-chums-coins { position: absolute; right: 12px; top: 10px; color: #ffd23f; }
+.arc-chums-room { position: absolute; right: 12px; bottom: 10px; text-transform: uppercase; letter-spacing: .1em; font-size: .85em; }
+.arc-chums-boss { position: absolute; left: 50%; top: 10px; width: 40%; transform: translateX(-50%); display: grid; gap: 3px; text-align: center; text-transform: uppercase; letter-spacing: .2em; font-size: .75em; }
+.arc-chums-boss i { display: block; height: 8px; background: #ff7a2f; box-shadow: 0 0 0 1px rgba(0, 0, 0, .6); }
+.arc-chums-hint { position: absolute; left: 50%; bottom: 12%; transform: translateX(-50%); margin: 0; padding: 4px 12px; background: rgba(0, 0, 0, .6); color: #fff; font: 700 clamp(12px, 1.4cqi, 16px) var(--font-disp); letter-spacing: .08em; text-transform: uppercase; white-space: nowrap; pointer-events: none; }
+
+.arc-chums-overlay { position: absolute; inset: 0; display: grid; place-content: center; justify-items: center; gap: 14px; background: rgba(5, 6, 15, .78); color: var(--color-ink); text-align: center; }
+.arc-chums-overlay h3 { font-size: clamp(20px, 3cqi, 32px); text-transform: uppercase; letter-spacing: .12em; }
+.arc-chums-shop { place-content: stretch; justify-items: stretch; align-content: center; padding: 3% 8%; gap: 10px; text-align: left; overflow: auto; }
+.arc-chums-shophead { display: flex; align-items: baseline; justify-content: space-between; }
+.arc-chums-shophead span { color: #ffd23f; font: 700 18px var(--font-disp); }
+.arc-chums-items { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 240px), 1fr)); gap: 6px; }
+.arc-chums-items button { width: 100%; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 10px; padding: 6px 10px; border: 1px solid var(--color-line2); background: var(--color-s2); color: var(--color-ink); text-align: left; cursor: pointer; }
+.arc-chums-items button:hover:not([disabled]) { border-color: var(--color-ice); }
+.arc-chums-items button[disabled] { opacity: .45; cursor: not-allowed; }
+.arc-chums-items b { color: #ffd23f; font: 700 14px var(--font-disp); }
+.arc-chums-items span { display: grid; font-weight: 600; font-size: 13px; }
+.arc-chums-items small { color: var(--color-mute); font-weight: 500; font-size: 12px; }
+.arc-chums-items em { font-style: normal; color: #ffd23f; font-size: 13px; }
+.arc-chums-pad { display: flex; gap: 8px; }
+.arc-chums-pad input { width: 110px; min-height: 44px; padding: 0 12px; border: 1px solid var(--color-line2); background: var(--color-bg); color: var(--color-ink); font: 700 18px var(--font-disp); letter-spacing: .2em; }
+.arc-chums-msg { margin: 0; min-height: 1.4em; color: var(--color-mute); font-size: 14px; }
+.arc-chums-msg.ok { color: var(--arc-right, #4ade80); }
+.arc-chums-msg.bad { color: var(--color-red); }
+
+.arc-chums-card { gap: 14px; }
+.arc-chums-title { font-size: clamp(24px, 4cqi, 44px); }
+.arc-chums-row { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; }
+.arc-chums-keys { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; justify-content: center; gap: 8px 20px; color: var(--color-mute); font-size: 14px; }
+.arc-chums-keys kbd { display: inline-block; min-width: 1.8em; margin-right: 3px; padding: 1px 6px; border: 1px solid var(--color-line2); background: var(--color-s2); color: var(--color-ink); font: 700 12px var(--font-disp); text-align: center; }
+.arc-chums-note { color: var(--color-dim); font-size: 13px; }

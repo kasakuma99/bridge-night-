@@ -43,6 +43,8 @@ export interface MinigameDef {
   blurb: string;
   /** Solo leaderboards, in tab order. */
   boards: Board[];
+  /** false: solo only (no Versus room). Default true. */
+  versus?: boolean;
   /** The game screen, loaded only when opened. */
   load: () => Promise<{ default: ComponentType<MinigameProps> }>;
 }
