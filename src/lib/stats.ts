@@ -228,7 +228,7 @@ export function compute(matches: Match[], players: Player[], now = Date.now()): 
         for (const it of s?.items ?? []) x.items[it] = (x.items[it] || 0) + 1;
       }
       const team = sides[side].slice().sort();
-      for (const k of [2, 3])
+      for (const k of [2, 3, 4, 5])
         for (const c of combos(team, k)) {
           const key = c.join(",");
           const g = (groups[key] ??= { ids: c, g: 0, w: 0 });

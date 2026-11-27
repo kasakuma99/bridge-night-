@@ -45,7 +45,7 @@ export const FEATURES: Features = {
   dodges: false,
   challenges: false,
   privateSite: true,
-  playerPages: false,
+  playerPages: true,
   soloGames: true,
   ratings: false,
 };

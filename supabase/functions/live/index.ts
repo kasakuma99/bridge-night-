@@ -157,6 +157,11 @@ async function reading(body: Record<string, unknown>, tok: { id: string }) {
     // Nothing going on before or after: no need to write.
     if (!s.state.raw && !state.raw && s.feed === undefined) return { ok: true, note: s.note };
     let feed: Any = s.feed;
+    if (s.reroll) {
+      const { liveId, size, players } = s.reroll;
+      const { error } = await db.rpc("_log_reroll", { p_live_id: liveId, p_size: size ?? null, p_players: players });
+      if (error) console.error("could not count the reroll", error); // counted once: the same live id is ignored
+    }
     if (s.save) {
       try {
         feed = await save(s.save, feed);

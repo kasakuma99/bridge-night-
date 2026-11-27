@@ -153,12 +153,15 @@ export function usePlayerColor() {
   };
 }
 
+/** The Discord picture of the linked member, or initials. */
 export function Avatar({ id, lg }: { id: string; lg?: boolean }) {
-  const { pname } = useData();
+  const { pname, player } = useData();
   const color = usePlayerColor();
+  const src = player(id)?.avatarUrl;
+  const [broken, setBroken] = useState<string | null>(null);
   return (
     <span className={`ava${lg ? " lg" : ""}`} style={{ background: color(id) }} aria-hidden>
-      {initials(pname(id))}
+      {src && broken !== src ? <img src={src} alt="" loading="lazy" referrerPolicy="no-referrer" onError={() => setBroken(src)} /> : initials(pname(id))}
     </span>
   );
 }
@@ -227,9 +230,21 @@ export function AugmentIcon({ id }: { id: number }) {
   );
 }
 
-export function Form({ id, n }: { id: string; n: number }) {
+/** The name of an augment, with its icon. */
+export function AugmentLabel({ id }: { id: number }) {
+  const a = useAugments()[id];
+  return (
+    <span className="who">
+      <AugmentIcon id={id} />
+      <span>{a?.name ?? `Augment ${id}`}</span>
+    </span>
+  );
+}
+
+/** Last games as pips: from all games, or the results given (oldest first). */
+export function Form({ id, n, results }: { id: string; n: number; results?: boolean[] }) {
   const { data } = useData();
-  const f = formOf(data.matches, id, n);
+  const f = results ? results.slice(-n) : formOf(data.matches, id, n);
   return (
     <span className="form" role="img" aria-label={`Last ${f.length} games: ${f.filter(Boolean).length} wins`}>
       {f.map((w, i) => (

@@ -155,13 +155,13 @@ export default function TeamsClassic() {
     setPrefs({ rerolls: {} });
     setSeed(freshSeed());
     nav("/live");
-    toast(dodges.off ? "Champ select started" : `Champ select: ${plural(dodges.perTeam, "dodge")} per team tonight`);
+    toast(dodges.off ? "Champ select started" : `Champ select: ${plural(dodges.perTeam, "reroll")} per team tonight`);
   };
 
   const cancel = async () => {
     const yes = await confirm({
       title: "Cancel this game?",
-      text: `${FEATURES.dodges ? "Teams, picks and dodges" : "Teams and picks"} are thrown away. Nothing is saved.`,
+      text: `${FEATURES.dodges ? "Teams, picks and rerolls" : "Teams and picks"} are thrown away. Nothing is saved.`,
       yes: "Cancel game",
     });
     if (!yes) return;
@@ -224,7 +224,7 @@ export default function TeamsClassic() {
               dodges.freshNight || dodges.left.blue || dodges.left.red ? (
                 <span className="hchip">
                   <i className="on" />
-                  Dodges on ·{" "}
+                  Rerolls on ·{" "}
                   <b>
                     {dodges.freshNight
                       ? `${dodges.perTeam} per team`
@@ -234,7 +234,7 @@ export default function TeamsClassic() {
               ) : (
                 <span className="hchip">
                   <i />
-                  Dodges back in <b>{fmtDuration(dodges.untilFresh)}</b>
+                  Rerolls back in <b>{fmtDuration(dodges.untilFresh)}</b>
                 </span>
               )
             ) : null}

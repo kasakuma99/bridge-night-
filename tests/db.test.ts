@@ -65,7 +65,7 @@ beforeAll(async () => {
   await db.query("insert into public.matches (id, mode, winner) values ($1, 1, 'blue')", [U(9)]);
   await db.query("insert into public.match_participants (match_id, player_id, team) values ($1, $2, 'blue'), ($1, $3, 'red')", [U(9), P(0), P(1)]);
   // The private part follows below.
-  for (const f of files.filter((x) => x >= "20261126" && x !== PRIVATE)) await db.exec(readFileSync(`supabase/migrations/${f}`, "utf8"));
+  for (const f of files.filter((x) => x >= "20261126" && x < PRIVATE)) await db.exec(readFileSync(`supabase/migrations/${f}`, "utf8"));
 }, 60_000);
 
 /* The database part of the live Edge Function. */
@@ -226,6 +226,8 @@ describe("after the release: private", () => {
     await db.query("insert into public.test_games (game_id, data) values ('1', '{}')");
     await db.query("insert into public.helper_tokens (name, token_hash, created_by) values ('old', 'x', null), ('mine', 'y', $1)", [MEMBER]);
     await db.exec(readFileSync(`supabase/migrations/${PRIVATE}`, "utf8"));
+    // What comes after the release.
+    for (const f of readdirSync("supabase/migrations").sort().filter((x) => x > PRIVATE)) await db.exec(readFileSync(`supabase/migrations/${f}`, "utf8"));
   }, 60_000);
 
   const TABLES = ["players", "player_riot_ids", "matches", "match_participants", "dodge_log", "live_game", "live_feed", "settings", "test_games", "pending_results", "members", "helper_tokens"];
@@ -249,6 +251,28 @@ describe("after the release: private", () => {
 
   it("members read everything they need", async () => {
     for (const t of ["players", "player_riot_ids", "matches", "match_participants", "settings"]) expect((await as(MEMBER, `select * from public.${t}`)).length).toBeGreaterThan(0);
+  });
+
+  it("members see the Discord picture and name of linked players, nobody else does", async () => {
+    await db.query("update public.members set player_id = $1 where user_id = $2", [P(3), ADMIN2]);
+    const pic = "https://cdn.discordapp.com/a.png";
+    expect(await as(MEMBER, "select * from public.player_profiles() order by player_id")).toEqual([
+      { player_id: P(0), avatar_url: pic, display_name: "Member" },
+      { player_id: P(3), avatar_url: pic, display_name: "Admin2" },
+    ]);
+    expect(await as(PENDING, "select * from public.player_profiles()")).toEqual([]);
+    await refused(as("anon", "select * from public.player_profiles()"));
+  });
+
+  it("a champ select that went back to the lobby is a reroll, counted once", async () => {
+    const log = "select public._log_reroll('t1', 3::smallint, array[$1, $2, gen_random_uuid()::text]::uuid[])";
+    await as("service", log, [P(0), P(1)]);
+    await as("service", log, [P(0), P(1)]);
+    expect(await as(MEMBER, "select live_id, size, players from public.rerolls")).toEqual([{ live_id: "t1", size: 3, players: [P(0), P(1)] }]);
+    expect(await as(PENDING, "select * from public.rerolls")).toEqual([]);
+    await refused(as("anon", "select * from public.rerolls"));
+    await refused(as(MEMBER, log, [P(0), P(1)]));
+    await refused(as(MEMBER, "insert into public.rerolls (live_id) values ('x')"));
   });
 
   it("only admins swap winners and delete games", async () => {

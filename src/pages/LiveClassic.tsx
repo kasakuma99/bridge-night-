@@ -100,7 +100,7 @@ export default function LiveClassic() {
       stats,
       dodgeLog: [...L.dodgeLog, { playerId: id, champion: champ, side: s, at: Date.now() }],
     });
-    toast(`${pname(id)} dodged${champ ? ` ${champ}` : ""}. New champions for everyone. ${s === "blue" ? "Blue" : "Red"} has ${dodges.left[s] - 1} left tonight`);
+    toast(`${pname(id)} rerolled${champ ? ` ${champ}` : ""}. New champions for everyone. ${s === "blue" ? "Blue" : "Red"} has ${dodges.left[s] - 1} left tonight`);
   };
 
   const spin = () => {
@@ -113,7 +113,7 @@ export default function LiveClassic() {
   const cancel = async () => {
     const yes = await confirm({
       title: "Cancel this game?",
-      text: `${FEATURES.dodges ? "Teams, picks and dodges" : "Teams and picks"} are thrown away. Nothing is saved.`,
+      text: `${FEATURES.dodges ? "Teams, picks and rerolls" : "Teams and picks"} are thrown away. Nothing is saved.`,
       yes: "Cancel game",
     });
     if (!yes) return;
@@ -163,9 +163,9 @@ export default function LiveClassic() {
 
   const pips = (s: Side) =>
     dodges.off ? (
-      <small>no dodges</small>
+      <small>no rerolls</small>
     ) : (
-      <span className="pips" aria-label={`${dodges.left[s]} dodges left tonight`}>
+      <span className="pips" aria-label={`${dodges.left[s]} rerolls left tonight`}>
         {Array.from({ length: dodges.perTeam }, (_, k) => (
           <i key={k} className={k < dodges.left[s] ? "full" : ""} />
         ))}{" "}
@@ -190,9 +190,9 @@ export default function LiveClassic() {
               type="button"
               disabled={dodges.left[sideOf(id)] <= 0}
               onClick={() => dodge(id)}
-              aria-label={`Dodge for ${pname(id)}`}
+              aria-label={`Reroll for ${pname(id)}`}
             >
-              Dodge
+              Reroll
             </button>
           ) : (
             <span />
@@ -319,7 +319,7 @@ export default function LiveClassic() {
       {L.sitOut.length > 0 && <p className="sit">Sitting out: {L.sitOut.map(pname).join(", ")}</p>}
       {FEATURES.dodges && L.dodgeLog.length > 0 && (
         <p className="sit" data-testid="dodgelog">
-          {L.dodgeLog.map((d) => `${pname(d.playerId)} dodged${d.champion ? ` ${d.champion}` : ""}`).join(" · ")}
+          {L.dodgeLog.map((d) => `${pname(d.playerId)} rerolled${d.champion ? ` ${d.champion}` : ""}`).join(" · ")}
         </p>
       )}
       {isMember ? (

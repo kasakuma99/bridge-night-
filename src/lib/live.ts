@@ -442,7 +442,7 @@ export function endReason(res: { winner?: Side; surrender?: "ff" | "early"; play
 /* ---------- the live game ---------- */
 
 const OVER = new Set(["WaitingForStats", "PreEndOfGame", "EndOfGame"]);
-const GONE = new Set(["None", "Lobby", "Matchmaking", "ReadyCheck", "ChampSelect", "TerminatedInError"]);
+export const GONE = new Set(["None", "Lobby", "Matchmaking", "ReadyCheck", "ChampSelect", "TerminatedInError"]);
 const RUNNING = new Set(["GameStart", "InProgress"]);
 
 const blank = (id: string, at: number): LiveFeed => ({ id, status: "select", players: [], events: [], startedAt: at, updatedAt: at });
