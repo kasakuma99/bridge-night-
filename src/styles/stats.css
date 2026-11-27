@@ -104,3 +104,95 @@
   .rk-row .who small.rk-meta { display: flex; }
   .rk-row .elo { font-size: 18px; }
 }
+
+/* ---------- Stats: the filter box ---------- */
+.sf { padding: 0; margin-bottom: 18px; overflow: hidden; }
+.sf-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; min-height: 64px; padding: 12px 18px; border: 0; background: transparent; color: var(--color-ink); text-align: left; cursor: pointer; }
+.sf-top:hover { background: var(--color-s2); }
+.sf-sum { display: flex; align-items: center; gap: 14px; min-width: 0; }
+.sf-sum > svg { width: 20px; height: 20px; flex: none; color: var(--color-ice); }
+.sf-sum b { display: block; font: 600 17px var(--font-disp); }
+.sf-sum small { display: block; color: var(--color-mute); font-size: 13px; }
+.sf-chev { width: 22px; height: 22px; flex: none; color: var(--color-mute); transition: transform .15s var(--ease-out); }
+.sf.open .sf-chev { transform: rotate(180deg); }
+.sf-body { display: grid; gap: 16px; padding: 16px 18px 18px; border-top: 1px solid var(--color-line); }
+.sf-search { display: grid; gap: 6px; position: relative; }
+.sf-search label, .sf-l { color: var(--color-mute); font-size: 13px; font-weight: 600; }
+.sf-search .f { width: 100%; }
+.sf-hits { list-style: none; margin: 0; padding: 4px; display: grid; gap: 2px; border: 1px solid var(--color-line2); border-radius: var(--radius-md); background: var(--color-s2); }
+.sf-hits li.sub { padding: 8px 10px; margin: 0; }
+.sf-hits button { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 44px; padding: 6px 10px; border: 0; border-radius: 9px; background: transparent; color: var(--color-ink); text-align: left; cursor: pointer; }
+.sf-hits button:hover, .sf-hits button:focus-visible { background: var(--color-s3); }
+.sf-hits b { display: block; font-weight: 600; }
+.sf-hits small { display: block; color: var(--color-mute); font-size: 12px; }
+.sf-row { display: grid; gap: 6px; }
+.sf-row .seg { flex-wrap: wrap; justify-self: start; max-width: 100%; }
+
+/* ---------- Stats: sortable leaderboard ---------- */
+.lb { display: grid; gap: 2px; }
+.lb-row { position: relative; display: grid; grid-template-columns: 28px minmax(0, 1fr) 96px 64px 52px 52px 68px; gap: 10px; align-items: center; padding: 8px 12px; border-radius: var(--radius-md); font: 600 15px var(--font-disp); font-variant-numeric: tabular-nums; }
+.lb-row > :nth-child(n+3) { text-align: right; }
+.lb-row:not(.lb-head):hover { background: var(--color-s2); }
+.lb-row .on { color: var(--color-ice); }
+.lb-row .pos { font: 700 16px var(--font-disp); color: var(--color-dim); text-align: center; }
+.lb-row:nth-child(2) .pos { color: var(--color-ice); }
+.lb-row .lb-pl { min-width: 0; }
+.lb-row .lb-pl a { color: inherit; text-decoration: none; min-width: 0; }
+.lb-row .lb-pl a::after { content: ""; position: absolute; inset: 0; border-radius: inherit; } /* the whole row opens the player */
+.lb-row .lb-pl a:focus-visible { outline: none; }
+.lb-row .lb-pl a:focus-visible::after { outline: 2px solid var(--color-ice); outline-offset: -2px; }
+.lb-row .lb-pl b { display: block; font: 600 15px var(--font-text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lb-row .lb-pl small { display: none; color: var(--color-mute); font: 500 12px var(--font-text); }
+.lb-head { padding-top: 0; padding-bottom: 6px; color: var(--color-dim); font: 600 12px var(--font-text); }
+.lb-head button { display: inline-flex; align-items: center; gap: 3px; min-height: 32px; padding: 0 4px; border: 0; border-radius: 6px; background: none; color: inherit; font: inherit; cursor: pointer; }
+.lb-head button:hover { color: var(--color-ink); }
+.lb-head .on button { color: var(--color-ice); }
+.lb-head button svg { width: 13px; height: 13px; }
+.lb-head .sm { display: none; }
+
+/* ---------- Stats: cards ---------- */
+.kpis5 { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+.kpis3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.stats .kpi .s .form { justify-content: flex-start; }
+.stats .row .who { min-width: 0; }
+.stats .row .who > span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pair { display: flex; align-items: center; gap: 8px; min-width: 0; flex-wrap: wrap; }
+.pair .rank { width: 18px; color: var(--color-dim); font: 700 14px var(--font-disp); }
+.pair > small { color: var(--color-dim); font-size: 12px; font-weight: 700; }
+.pair .who { gap: 6px; color: inherit; text-decoration: none; font-weight: 600; }
+.pair .who:hover span { text-decoration: underline; }
+.pair .who .ava { width: 26px; height: 26px; font-size: 11px; }
+.pair.grp { flex-wrap: nowrap; }
+.pair .avas { display: inline-flex; flex: none; }
+.pair .avas a + a { margin-left: -8px; }
+.pair .avas .ava { width: 26px; height: 26px; font-size: 11px; box-shadow: 0 0 0 2px var(--color-s1); }
+.pair .names { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+.stats .row .m b { display: block; text-align: right; font: 700 16px var(--font-disp); }
+.stats .row .m small { display: block; text-align: right; font-size: 12px; }
+.syn-up { color: var(--color-ice); }
+.syn-down { color: color-mix(in srgb, var(--color-red) 70%, var(--color-ink)); }
+.vsp .r b.syn-down { color: color-mix(in srgb, var(--color-red) 70%, var(--color-ink)); }
+.vsp .r b.syn-up { color: var(--color-ice); }
+.vsp .mates { flex-wrap: wrap; gap: 6px 14px; }
+.vsp .mates .who { gap: 8px; color: inherit; text-decoration: none; }
+.mates-size + .mates-size { margin-top: 14px; }
+
+@media (max-width: 1000px) {
+  .kpis5 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+@media (max-width: 640px) {
+  .kpis5, .kpis3 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .lb-row { grid-template-columns: 22px minmax(0, 1fr) auto auto; gap: 8px; padding: 8px 6px; }
+  .lb-row .md { display: none; }
+  .lb-row .lb-pl small { display: block; }
+  .lb-head .lg { display: none; }
+  .lb-head .sm { display: inline; }
+  /* On a phone the header is a row of sort buttons; each row shows the points and the sorted column. */
+  .lb-head { display: flex; flex-wrap: wrap; gap: 4px; padding: 0 0 8px; }
+  .lb-head > :nth-child(-n+2) { display: none; }
+  .lb-head .md { display: block; }
+  .lb-head button { min-height: 36px; padding: 0 10px; border: 1px solid var(--color-line2); border-radius: 999px; }
+  .lb-head .on button { border-color: var(--color-ice); }
+  .sf-top { padding: 12px 14px; }
+  .sf-body { padding: 14px; }
+}

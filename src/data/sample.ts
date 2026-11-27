@@ -89,5 +89,11 @@ export function sampleData(now = Date.now()): AppData {
       m.stats[p] = { ...m.stats[p], level: 14 + ((i + k) % 5), spells: [4, [32, 7, 21, 3][(i + k) % 4]], augments: [0, 1, 2, 3].map((x) => augs[(i + k * 3 + x) % augs.length]) };
     });
   });
-  return { players, matches, live: null, settings: { ...DEFAULT_SETTINGS } };
+  // Champ selects that went back to the lobby.
+  const rerolls = [
+    { at: evening(4, 0.05), size: 2, players: ["p0", "p1", "p2", "p4"] },
+    { at: evening(2, 0.1), size: 3, players: ids },
+    { at: evening(1, 0.2), size: 2, players: ["p0", "p1", "p3", "p5"] },
+  ];
+  return { players, matches, live: null, settings: { ...DEFAULT_SETTINGS }, rerolls };
 }

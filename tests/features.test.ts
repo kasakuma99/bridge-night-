@@ -19,8 +19,9 @@ const OFF = all(false);
 const ON = all(true);
 
 describe("feature flags", () => {
-  it("everything extra is off, except Rivals and the private site (and solo games while testing)", () => {
-    const { soloGames, rivals, privateSite, ...extras } = FEATURES;
+  it("everything extra is off, except Rivals, player pages and the private site (and solo games while testing)", () => {
+    const { soloGames, rivals, privateSite, playerPages, ...extras } = FEATURES;
+    expect(playerPages).toBe(true);
     expect(privateSite).toBe(true);
     expect(soloGames).toBe(true);
     expect(rivals).toBe(true);

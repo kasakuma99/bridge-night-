@@ -54,8 +54,8 @@ export function RuleInfo({ inGame }: { inGame?: boolean }) {
       <div className="info fresh" data-testid="rule">
         <Clock aria-hidden />
         <div>
-          <b>Dodges are on.</b> {ago ? `Last game was ${ago} ago, so` : "First game ever, so"} each team gets{" "}
-          {plural(d.perTeam, "dodge")} for tonight, whatever the team size.
+          <b>Rerolls are on.</b> {ago ? `Last game was ${ago} ago, so` : "First game ever, so"} each team gets{" "}
+          {plural(d.perTeam, "reroll")} for tonight, whatever the team size.
         </div>
       </div>
     );
@@ -64,7 +64,7 @@ export function RuleInfo({ inGame }: { inGame?: boolean }) {
       <div className="info fresh" data-testid="rule">
         <Clock aria-hidden />
         <div>
-          <b>Dodges tonight:</b> Blue side {d.left.blue} left, Red side {d.left.red} left. They reset after a {hours}h break.
+          <b>Rerolls tonight:</b> Blue side {d.left.blue} left, Red side {d.left.red} left. They reset after a {hours}h break.
         </div>
       </div>
     );
@@ -72,7 +72,7 @@ export function RuleInfo({ inGame }: { inGame?: boolean }) {
     <div className="info" data-testid="rule">
       <Clock aria-hidden />
       <div>
-        No dodges left tonight. They come back after a {hours}h break{ago ? ` (in ${fmtDuration(d.untilFresh)})` : ""}.
+        No rerolls left tonight. They come back after a {hours}h break{ago ? ` (in ${fmtDuration(d.untilFresh)})` : ""}.
       </div>
     </div>
   );

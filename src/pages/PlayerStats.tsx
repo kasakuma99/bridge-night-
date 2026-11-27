@@ -1,66 +1,31 @@
-import { useMemo } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, Award, Crown, Flame, HeartCrack, Shield, Skull, Sparkles, Swords, Target, Users } from "lucide-react";
+import { useMemo, type ReactNode } from "react";
+import { Link, useParams } from "react-router-dom";
+import { ArrowLeft, HeartCrack, Skull, Swords, Users } from "lucide-react";
 import { useData } from "../data/context";
-import { Avatar, ChampAvatar, Empty, Form } from "../components/ui";
-import { FEATURES, POINTS_NAME, shownPoints, visibleBadges } from "../lib/features";
-import { MIN_TOGETHER, badges, playerSummary, rating, type Badge, type Computed, type Versus } from "../lib/stats";
+import { AugmentLabel, Avatar, ChampAvatar, Empty, Form } from "../components/ui";
+import { StatsFilter, useStatsFilter } from "../components/stats/StatsFilter";
+import { POINTS_NAME, fmtPoints } from "../lib/features";
+import { kdaRatio, MIN_TOGETHER, type Versus } from "../lib/stats";
+import { groupName, MIN_SYNERGY_GAMES, modeLabel, pct, periodLabel, playerView, signed, statsFor, type Synergy } from "../lib/statsPage";
 import { plural } from "../lib/util";
+import "../styles/stats.css";
 
-const pct = (w: number, g: number) => (g ? `${Math.round((w / g) * 100)}%` : "–");
 const f1 = (v: number) => v.toFixed(1);
+const cap = (s: string) => s[0].toUpperCase() + s.slice(1);
 
-const BADGE_ICON: Record<string, typeof Award> = {
-  "Monthly champion": Crown,
-  "On fire": Flame,
-  "Bounty hunter": Target,
-  "Giant slayer": Swords,
-  "Champion pool": Sparkles,
-};
-
-function BadgeChip({ b }: { b: Badge }) {
-  const Icon = BADGE_ICON[b.title] ?? Shield;
-  return (
-    <span className={`bd${b.gold ? " gold" : ""}`} title={b.detail}>
-      <Icon aria-hidden />
-      {b.title}
-      <span className="sr-only">: {b.detail}</span>
-    </span>
-  );
-}
-
-function RatingChart({ c, id }: { c: Computed; id: string }) {
-  const h = c.st[id].hist.slice(-31);
-  const change = Math.round(h[h.length - 1] - h[Math.max(0, h.length - 6)]);
-  const mn = Math.min(...h) - 8;
-  const mx = Math.max(...h) + 8;
-  const line = h.map((v, i) => `${((i / Math.max(1, h.length - 1)) * 300).toFixed(1)},${(100 - ((v - mn) / (mx - mn)) * 66 - 8).toFixed(1)}`).join(" ");
-  const up = change >= 0;
-  return (
-    <div className="chart" style={{ marginBottom: 16 }}>
-      <span className="cl">Rating, last {h.length - 1} games</span>
-      <span className="cr" style={{ color: up ? "var(--color-ice)" : "var(--color-red)" }}>
-        {up ? "+" : ""}
-        {change} last 5
-      </span>
-      <svg viewBox="0 0 300 100" preserveAspectRatio="none" role="img" aria-label={`Rating chart, now ${rating(c, id)}`}>
-        <polygon points={`0,100 ${line} 300,100`} fill={up ? "rgba(191,230,255,.10)" : "rgba(255,90,110,.10)"} />
-        <polyline points={line} fill="none" stroke={up ? "var(--color-ice)" : "var(--color-red)"} strokeWidth="2.2" vectorEffect="non-scaling-stroke" strokeLinejoin="round" />
-      </svg>
-    </div>
-  );
-}
-
-/** Everything about one player, all time. */
+/** One player, for the chosen mode and time. */
 export default function PlayerStats() {
   const { id = "" } = useParams();
-  const { c, player, pname, active, isActive } = useData();
-  const nav = useNavigate();
+  const { data, c: full, now, player, pname, isActive } = useData();
+  const { f, set, query } = useStatsFilter();
   const p = player(id);
-  const s = useMemo(() => playerSummary(c, id, isActive, pname), [c, id, isActive, pname]);
+  const v = useMemo(() => {
+    const { ms, c } = statsFor(data.matches, data.players, f, now);
+    return playerView({ id, ms, c, full, f, isActive, name: pname });
+  }, [data.matches, data.players, f.mode, f.period, now, id, full, isActive, pname]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const back = (
-    <Link className="linkbtn" to="/stats" style={{ margin: 0 }}>
+    <Link className="linkbtn" to={`/stats${query}`} style={{ margin: 0 }}>
       <ArrowLeft aria-hidden />
       Leaderboard
     </Link>
@@ -74,153 +39,182 @@ export default function PlayerStats() {
       </section>
     );
 
-  const kpi = (l: string, v: React.ReactNode, sub?: string) => (
+  const scope = `${modeLabel(f.mode)} · ${periodLabel(f.period)}`;
+  const kpi = (l: string, val: ReactNode, sub?: ReactNode) => (
     <div className="kpi">
       <span className="l">{l}</span>
-      <span className="v">{v}</span>
-      {sub && <span className="s">{sub}</span>}
+      <span className="v">{val}</span>
+      {sub != null && <span className="s">{sub}</span>}
     </div>
   );
-
-  const person = (label: string, Icon: typeof Award, v: Versus | null, none: string, kind: "good" | "bad") => (
-    <div className={`vsp ${v ? kind : ""}`}>
+  const link = (pid: string) => (
+    <Link className="who" to={`/stats/${pid}${query}`}>
+      <Avatar id={pid} />
+      <b>{pname(pid)}</b>
+    </Link>
+  );
+  const person = (label: string, Icon: typeof Users, x: Versus | null, kind: "good" | "bad") => (
+    <div className={`vsp ${x ? kind : ""}`}>
       <span className="l">
         <Icon aria-hidden />
         {label}
       </span>
-      {v ? (
+      {x ? (
         <>
-          <Link className="who" to={`/stats/${v.id}`}>
-            <Avatar id={v.id} />
-            <b>{pname(v.id)}</b>
-          </Link>
+          {link(x.id)}
           <span className="r">
-            <b>{pct(v.w, v.g)}</b>
+            <b>{pct(x.w, x.g)}</b>
             <small>
-              {v.w}–{v.g - v.w} in {plural(v.g, "game")}
+              {x.w}–{x.g - x.w} in {plural(x.g, "game")}
             </small>
           </span>
         </>
       ) : (
-        <span className="sub">{none}</span>
+        <span className="sub">Not enough games yet</span>
       )}
     </div>
   );
-  const few = (v: Versus | null) => !!v && v.g < MIN_TOGETHER;
-
-  // Everyone you can pick, plus this player if they were removed.
-  const list = active.some((x) => x.id === id) ? active : [...active, p];
-  const bs = visibleBadges(badges(c.st[id]));
+  const partner = (label: string, Icon: typeof Users, s: Synergy | null, kind: "good" | "bad") => (
+    <div className={`vsp ${s ? kind : ""}`}>
+      <span className="l">
+        <Icon aria-hidden />
+        {label}
+      </span>
+      {s ? (
+        <>
+          <span className="who mates">
+            {s.ids
+              .filter((x) => x !== id)
+              .map((x) => (
+                <Link key={x} to={`/stats/${x}${query}`} className="who">
+                  <Avatar id={x} />
+                  <b>{pname(x)}</b>
+                </Link>
+              ))}
+          </span>
+          <span className="r">
+            <b className={s.score >= 0 ? "syn-up" : "syn-down"}>{signed(s.score)}</b>
+            <small>
+              {s.w}–{s.g - s.w} · {pct(s.w, s.g)}
+            </small>
+          </span>
+        </>
+      ) : (
+        <span className="sub">Not enough games together</span>
+      )}
+    </div>
+  );
+  const few = (x: Versus | null) => !!x && x.g < MIN_TOGETHER;
 
   return (
-    <section>
+    <section className="stats">
       {back}
       <div className="head">
         <div className="pc-top">
           <Avatar id={id} lg />
           <div>
             <h1>{p.name}</h1>
-            {s.g > 0 && (
-              <p className="sub">
-                Last games <Form id={id} n={10} />
-              </p>
+            <p className="sub">{p.riotId ?? "No Riot ID yet"}</p>
+          </div>
+        </div>
+      </div>
+      <StatsFilter f={f} set={set} query={query} current={id} />
+
+      {!v.g ? (
+        <Empty title={`No games for ${p.name}`} text={`Nothing in ${scope}. Try another mode or a longer time.`} />
+      ) : (
+        <>
+          <div className="kpis kpis3">
+            {kpi("Games played", v.g, `${plural(v.w, "win")} / ${plural(v.l, "loss", "losses")}`)}
+            {kpi("Win rate", pct(v.w, v.g), <Form id={id} n={10} results={v.form} />)}
+            {kpi(POINTS_NAME, fmtPoints(v.points), f.period ? `${v.change > 0 ? "+" : v.change < 0 ? "−" : "±"}${Math.abs(v.change)} in ${periodLabel(f.period).toLowerCase()}` : undefined)}
+            {kpi(
+              "Average K / D / A",
+              v.kdaGames ? `${f1(v.k / v.kdaGames)} / ${f1(v.d / v.kdaGames)} / ${f1(v.a / v.kdaGames)}` : "–",
+              v.kdaGames ? `KDA ${kdaRatio(v.k, v.d, v.a).toFixed(2)}${v.kdaGames < v.g ? ` · from ${plural(v.kdaGames, "game")}` : ""}` : "No K/D/A yet",
             )}
+            {kpi("FF %", pct(v.ff, v.g), `Their team surrendered ${plural(v.ff, "time")}`)}
+            {kpi("Highest win streak", v.bestStreak, v.worstRun ? `Longest losing run: ${v.worstRun}` : "Never lost twice in a row")}
           </div>
-        </div>
-        <select className="f" aria-label="Show another player" value={id} onChange={(e) => nav(`/stats/${e.target.value}`)}>
-          {list.map((x) => (
-            <option key={x.id} value={x.id}>
-              {x.name}
-            </option>
-          ))}
-        </select>
-      </div>
-      {bs.length > 0 && (
-        <div className="badges" aria-label="Badges" style={{ marginBottom: 16 }}>
-          {bs.map((b) => (
-            <BadgeChip key={b.title} b={b} />
-          ))}
-        </div>
-      )}
 
-      <div className="kpis">
-        {kpi("Games played", s.g)}
-        {kpi("Wins and losses", s.g ? `${s.w}–${s.l}` : "–", s.g ? `${plural(s.w, "win")}, ${plural(s.l, "loss", "losses")}` : undefined)}
-        {kpi("Win %", pct(s.w, s.g))}
-        {kpi(POINTS_NAME, shownPoints(rating(c, id)))}
-      </div>
-
-      {FEATURES.ratings && s.g > 0 && <RatingChart c={c} id={id} />}
-      <div className="pgrid">
-        <section className="panel" aria-labelledby="ps-kda">
-          <div className="ph">
-            <h2 id="ps-kda">K/D/A</h2>
-            {s.kdaGames > 0 && s.kdaGames < s.g && <p className="sub">From {plural(s.kdaGames, "game")}</p>}
-          </div>
-          <div className="bigkda">
-            <b>{s.kdaGames ? `${f1(s.k / s.kdaGames)} / ${f1(s.d / s.kdaGames)} / ${f1(s.a / s.kdaGames)}` : "–"}</b>
-            <small>Average kills, deaths and assists per game</small>
-          </div>
-          <div className="totals">
-            {(
-              [
-                ["Kills", s.k],
-                ["Deaths", s.d],
-                ["Assists", s.a],
-              ] as [string, number][]
-            ).map(([l, v]) => (
-              <div key={l}>
-                <b>{s.kdaGames ? v.toLocaleString("en-GB") : "–"}</b>
-                <small>{l}</small>
+          <div className="pgrid">
+            <section className="panel" aria-labelledby="ps-mates">
+              <div className="ph">
+                <h2 id="ps-mates">Teammates</h2>
+                <p className="sub">By synergy, {MIN_SYNERGY_GAMES}+ games together</p>
               </div>
-            ))}
-          </div>
-        </section>
+              {v.partners.length ? (
+                v.partners.map((x) => (
+                  <div key={x.size} className="mates-size">
+                    {!f.mode && <h3 className="pc-h">{cap(groupName(x.size))}</h3>}
+                    {partner(`Best ${groupName(x.size)}`, Users, x.best, "good")}
+                    {partner(`Worst ${groupName(x.size)}`, HeartCrack, x.worst, "bad")}
+                  </div>
+                ))
+              ) : (
+                <p className="sub">Not enough games together yet.</p>
+              )}
+            </section>
 
-        <section className="panel" aria-labelledby="ps-champs">
-          <div className="ph">
-            <h2 id="ps-champs">Most played champions</h2>
-          </div>
-          <div className="list">
-            {s.champs.length ? (
-              s.champs.slice(0, 5).map((x) => (
-                <div className="row" key={x.name}>
-                  <span className="who">
-                    <ChampAvatar name={x.name} sq />
-                    {x.name}
-                  </span>
-                  <span className="m">
-                    {plural(x.g, "game")} · {pct(x.w, x.g)}
-                  </span>
-                </div>
-              ))
-            ) : (
-              <p className="sub">No champions yet.</p>
-            )}
-          </div>
-        </section>
+            <section className="panel" aria-labelledby="ps-foe">
+              <div className="ph">
+                <h2 id="ps-foe">Against opponents</h2>
+                {(few(v.victim) || few(v.toughest)) && <p className="sub">Few games so far</p>}
+              </div>
+              {person("Victim", Skull, v.victim, "good")}
+              {person("Toughest opponent", Swords, v.toughest, "bad")}
+            </section>
 
-        <section className="panel" aria-labelledby="ps-duo">
-          <div className="ph">
-            <h2 id="ps-duo">With teammates</h2>
-            {(few(s.bestDuo) || few(s.worstDuo)) && <p className="sub">Few games so far</p>}
-          </div>
-          {person("Best duo", Users, s.bestDuo, "Not enough games yet", "good")}
-          {person("Worst duo", HeartCrack, s.worstDuo, "Not enough games yet", "bad")}
-        </section>
+            <section className="panel" aria-labelledby="ps-aug">
+              <div className="ph">
+                <h2 id="ps-aug">Most chosen augments</h2>
+              </div>
+              <div className="list">
+                {v.augments.length ? (
+                  v.augments.map((a) => (
+                    <div className="row" key={a.key}>
+                      <AugmentLabel id={+a.key} />
+                      <span className="m">
+                        {plural(a.picks, "pick")} · {pct(a.wins, a.picks)}
+                      </span>
+                    </div>
+                  ))
+                ) : (
+                  <p className="sub">No augments in these games.</p>
+                )}
+              </div>
+            </section>
 
-        <section className="panel" aria-labelledby="ps-foe">
-          <div className="ph">
-            <h2 id="ps-foe">Against opponents</h2>
-            {(few(s.victim) || few(s.toughest)) && <p className="sub">Few games so far</p>}
+            <section className="panel" aria-labelledby="ps-champs">
+              <div className="ph">
+                <h2 id="ps-champs">Most played champions</h2>
+                {v.avgDamage > 0 && <p className="sub">{Math.round(v.avgDamage).toLocaleString("en-GB")} damage per game</p>}
+              </div>
+              <div className="list">
+                {v.champs.length ? (
+                  v.champs.map((x) => (
+                    <div className="row" key={x.name}>
+                      <span className="who">
+                        <ChampAvatar name={x.name} sq />
+                        {x.name}
+                      </span>
+                      <span className="m">
+                        {plural(x.g, "game")} · {pct(x.w, x.g)}
+                      </span>
+                    </div>
+                  ))
+                ) : (
+                  <p className="sub">No champions yet.</p>
+                )}
+              </div>
+            </section>
           </div>
-          {person("Victim", Skull, s.victim, "Not enough games yet", "good")}
-          {person("Toughest opponent", Swords, s.toughest, "Not enough games yet", "bad")}
-        </section>
-      </div>
-      <p className="note">
-        Duos and opponents need {MIN_TOGETHER} games together. Until someone has that many, the few games played are used.
-      </p>
+          <p className="note">
+            Synergy: how much more {p.name} wins with these teammates than the players do on their own, in points of win rate. Opponents need{" "}
+            {MIN_TOGETHER} games; until then, the few games played are used.
+          </p>
+        </>
+      )}
     </section>
   );
 }

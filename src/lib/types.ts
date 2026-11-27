@@ -10,6 +10,19 @@ export interface Player {
   /** Removed players stay in old matches but are hidden everywhere else. */
   active: boolean;
   createdAt: number;
+  /** Discord picture of the member linked to this player (members only). */
+  avatarUrl?: string;
+  /** Discord name of that member. */
+  discordName?: string;
+}
+
+/** A champ select that went back to the lobby. League doesn't say who left. */
+export interface RerollEntry {
+  at: number;
+  /** Players per team. */
+  size?: number;
+  /** Players of the site who were in the lobby. */
+  players: string[];
 }
 
 export interface ParticipantStats {
@@ -180,6 +193,8 @@ export interface AppData {
   /** The game League is playing right now, or just finished. */
   feed?: LiveFeed | null;
   settings: Settings;
+  /** Champ selects that never became a game. */
+  rerolls?: RerollEntry[];
 }
 
 export const DEFAULT_SETTINGS: Settings = {

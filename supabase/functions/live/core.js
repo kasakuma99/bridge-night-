@@ -10,7 +10,7 @@ var FEATURES = {
 	dodges: false,
 	challenges: false,
 	privateSite: true,
-	playerPages: false,
+	playerPages: true,
 	soloGames: true,
 	ratings: false
 };
@@ -710,6 +710,19 @@ function statsOf({ champion, kills, deaths, assists, items, damage, level, spell
 	}).filter(([, v]) => v !== void 0));
 }
 var MAX_PLAYERS = 20;
+/** The champ select of `was` ended without a game. Only counted when players of the site were in it. */
+function rerollOf(was, players) {
+	const linked = linkFeed(was, players).players;
+	const ids = [...new Set(linked.flatMap((p) => p.playerId ? [p.playerId] : []))];
+	if (!ids.length) return void 0;
+	const per = (side) => linked.filter((p) => p.side === side).length;
+	const size = Math.min(5, Math.max(per("blue"), per("red")));
+	return {
+		liveId: was.id,
+		...size ? { size } : {},
+		players: ids
+	};
+}
 var text = (v, max) => typeof v === "string" ? v.slice(0, max) : void 0;
 var cap = (v, max) => v === void 0 ? void 0 : Math.max(0, Math.min(max, Math.round(v)));
 var few = (v, n) => v?.filter((x) => Number.isInteger(x) && x > 0 && x < 1e6).slice(0, n);
@@ -787,11 +800,16 @@ function step(o) {
 		at: now,
 		shownAt: state.shownAt
 	};
-	if (!raw) return {
-		state: base,
-		...shown && shown.status !== "ended" ? { feed: null } : {},
-		note: "no custom game"
-	};
+	if (!raw) {
+		const gone = shown && shown.status !== "ended";
+		const reroll = !other && state.raw?.status === "select" && GONE.has(reading.phase) && reading.phase !== "ChampSelect" ? rerollOf(state.raw, o.players) : void 0;
+		return {
+			state: base,
+			...gone ? { feed: null } : {},
+			...reroll ? { reroll } : {},
+			note: reroll ? "champ select cancelled" : "no custom game"
+		};
+	}
 	const linked = linkFeed(raw, o.players);
 	const prev = shown?.id === linked.id ? shown : null;
 	const feed = {

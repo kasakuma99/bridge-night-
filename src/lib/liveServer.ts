@@ -1,4 +1,4 @@
-import { feedMatch, linkFeed, nextFeed, type Reading } from "./live";
+import { GONE, feedMatch, linkFeed, nextFeed, type Reading } from "./live";
 import type { FeedEvent, FeedPlayer, LiveFeed, Match, Player, Side } from "./types";
 
 /*
@@ -30,7 +30,27 @@ export interface Step {
   feed?: LiveFeed | null;
   /** Save this game (or add details to it). `known`: it was saved before. */
   save?: { match: Match; known: boolean };
+  /** A champ select that went back to the lobby (a reroll). League doesn't say who left. */
+  reroll?: Reroll;
   note: string;
+}
+
+export interface Reroll {
+  liveId: string;
+  /** Players per team, when the lobby had any. */
+  size?: number;
+  /** Players of the site who were in it. */
+  players: string[];
+}
+
+/** The champ select of `was` ended without a game. Only counted when players of the site were in it. */
+function rerollOf(was: LiveFeed, players: Player[]): Reroll | undefined {
+  const linked = linkFeed(was, players).players;
+  const ids = [...new Set(linked.flatMap((p) => (p.playerId ? [p.playerId] : [])))];
+  if (!ids.length) return undefined;
+  const per = (side: string) => linked.filter((p) => p.side === side).length;
+  const size = Math.min(5, Math.max(per("blue"), per("red")));
+  return { liveId: was.id, ...(size ? { size } : {}), players: ids };
 }
 
 const text = (v: string | undefined, max: number) => (typeof v === "string" ? v.slice(0, max) : undefined);
@@ -109,7 +129,9 @@ export function step(o: {
   if (!raw) {
     // A finished game stays on the Live page for a while after League has moved on.
     const gone = shown && shown.status !== "ended";
-    return { state: base, ...(gone ? { feed: null } : {}), note: "no custom game" };
+    const cancelled = !other && state.raw?.status === "select" && GONE.has(reading.phase) && reading.phase !== "ChampSelect";
+    const reroll = cancelled ? rerollOf(state.raw!, o.players) : undefined;
+    return { state: base, ...(gone ? { feed: null } : {}), ...(reroll ? { reroll } : {}), note: reroll ? "champ select cancelled" : "no custom game" };
   }
 
   const linked = linkFeed(raw, o.players);

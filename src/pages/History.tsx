@@ -145,7 +145,7 @@ export default function History() {
               matchEnd(m),
               m.gameMode,
               FEATURES.challenges && m.challenge && `Challenge: ${m.challenge}`,
-              FEATURES.dodges && m.dodges.length > 0 && `Dodged: ${m.dodges.map((d) => `${pname(d.playerId)}${d.champion ? ` (${d.champion})` : ""}`).join(", ")}`,
+              FEATURES.dodges && m.dodges.length > 0 && `Rerolled: ${m.dodges.map((d) => `${pname(d.playerId)}${d.champion ? ` (${d.champion})` : ""}`).join(", ")}`,
             ].filter(Boolean);
             const isOpen = open === m.id;
             return (

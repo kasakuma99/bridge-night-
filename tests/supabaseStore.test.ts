@@ -19,6 +19,8 @@ function fake(over: Record<string, unknown[]> = {}) {
     settings: [{ dodge_hours: 12, dodges_per_team: 2, reroll_limit: 2, challenges_enabled: true, discord_url: "", save_live_games: true }],
     live_feed: [],
     test_games: [],
+    rerolls: [],
+    player_profiles: [],
     ...over,
   };
   const loads: string[] = [];
@@ -32,6 +34,7 @@ function fake(over: Record<string, unknown[]> = {}) {
     },
     removeChannel: vi.fn(async () => {}),
     functions: { invoke },
+    rpc: async (fn: string) => ({ data: tables[fn], error: null }),
     from: (t: string) => {
       loads.push(t);
       const rows = { data: tables[t], error: null };
@@ -44,6 +47,28 @@ function fake(over: Record<string, unknown[]> = {}) {
 const ready = (s: SupabaseStore) => vi.waitFor(() => expect(s.getState().status).toBe("ready"));
 
 describe("the Supabase store", () => {
+  it("adds Discord pictures (only from Discord) and rerolls", async () => {
+    const f = fake({
+      player_profiles: [{ player_id: "p0", avatar_url: "https://cdn.discordapp.com/a.png", display_name: "tosh" }, { player_id: "p9", avatar_url: "https://evil.example/a.png", display_name: "x" }],
+      rerolls: [{ at: "2026-01-01T00:00:00Z", size: 3, players: ["p0"] }],
+    });
+    const s = new SupabaseStore(f.sb);
+    s.setAccess(true);
+    await ready(s);
+    const d = s.getState().data;
+    expect(d.players[0]).toMatchObject({ avatarUrl: "https://cdn.discordapp.com/a.png", discordName: "tosh" });
+    expect(d.rerolls).toEqual([{ at: Date.parse("2026-01-01T00:00:00Z"), size: 3, players: ["p0"] }]);
+  });
+
+  it("still loads when the database has no pictures or rerolls yet", async () => {
+    const f = fake();
+    (f.sb as unknown as { rpc: unknown }).rpc = async () => ({ data: null, error: { message: "no such function" } });
+    const s = new SupabaseStore(f.sb);
+    s.setAccess(true);
+    await ready(s);
+    expect(s.getState().data.players[0].avatarUrl).toBeUndefined();
+  });
+
   it("loads nothing without access, and forgets everything when it is taken away", async () => {
     const f = fake();
     const s = new SupabaseStore(f.sb);

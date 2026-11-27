@@ -255,7 +255,7 @@ function HouseRules({ settings, disabled }: { settings: Settings; disabled: bool
       <h3>House rules</h3>
       <p className="sub">
         {FEATURES.dodges &&
-          "Dodges: after a long enough break a new night starts, and each side gets this many dodges in champ select for the whole night, from 1v1 to 4v4. "}
+          "Rerolls: after a long enough break a new night starts, and each side gets this many rerolls in champ select for the whole night, from 1v1 to 4v4. "}
         {FEATURES.rerollLimit && "Rerolls: how often you can reroll teams before a game."}
       </p>
       <form
@@ -287,7 +287,7 @@ function HouseRules({ settings, disabled }: { settings: Settings; disabled: bool
                 <input className="f" type="number" min={1} max={72} inputMode="numeric" value={h} onChange={(e) => setH(e.target.value)} />
               </label>
               <label>
-                Dodges per team
+                Rerolls per team (champ select)
                 <input className="f" type="number" min={0} max={5} inputMode="numeric" value={d} onChange={(e) => setD(e.target.value)} />
               </label>
             </>

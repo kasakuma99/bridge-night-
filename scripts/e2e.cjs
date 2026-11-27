@@ -207,20 +207,44 @@ const step = (s) => console.log(`\n${s}`);
   await role("admin");
 
   step("Stats");
-  await p.goto(BASE + "/stats");
-  await btn("All time").click();
-  ok((await h1()) === "Stats" && (await main().locator(".lbhead").innerText()).includes("Papi Points"), "leaderboard");
+  await p.goto(BASE + "/stats?mode=0&period=0");
+  ok((await h1()) === "Stats" && (await main().locator(".lb-head").innerText()).includes("Papi Points"), "leaderboard");
   ok(!/\b(Elo|rating|dodge|bounty|challenge)/i.test(await main().innerText()), "hidden features stay hidden");
-  const second = main().locator(".rk-row").nth(1);
-  const name = (await second.locator(".who b").innerText()).trim();
-  await second.click();
-  await p.locator(".pcard h2", { hasText: name }).waitFor();
-  ok(true, "a click opens that profile");
-  for (const h of ["Records", "Best duos", "Best trios", "Group favourites", "Awards this week", "Monthly champions"])
+  ok((await main().locator(".sf-body").count()) === 0, "the filter box starts closed");
+  const sorted = async () => (await main().locator(".lb-row:not(.lb-head) [role=cell].on").allInnerTexts()).map((t) => parseInt(t));
+  const rowCount = await main().locator(".lb-row:not(.lb-head)").count();
+  await main().getByRole("button", { name: "Sort by Win %" }).click();
+  const rates = await sorted();
+  ok(rates.length === rowCount && rates.every((r, i) => i === 0 || rates[i - 1] >= r), "sorted by win rate, highest first");
+  await main().getByRole("button", { name: "Sort by Win %" }).click();
+  const back = await sorted();
+  ok(back.every((r, i) => i === 0 || back[i - 1] <= r), "and lowest first");
+  for (const h of ["Most picked augments", "Highest win rate augments", "Most picked champions", "Biggest stomp", "Biggest rivalry", "Best synergy", "Worst synergy"])
     ok((await main().getByRole("heading", { name: h }).count()) === 1, `${h} panel`);
   await shot("06-stats");
-  await p.goto(BASE + "/stats?player=p1");
-  ok((await p.locator(".pcard h2").innerText()).length > 0, "link to a profile");
+  // Someone who has played: the first on the leaderboard.
+  const leader = (await main().locator(".lb-row:not(.lb-head) .lb-pl b").first().innerText()).trim();
+  const me = (await data()).players.find((x) => x.name === leader);
+  await main().locator(".sf-top").click();
+  await main().getByLabel("Player").fill(leader.slice(0, 3).toLowerCase());
+  await main().locator(".sf-hits button", { hasText: leader }).click();
+  await p.waitForURL(new RegExp(`/stats/${me.id}\\?mode=0&period=0`));
+  await main().locator("h1", { hasText: leader }).waitFor();
+  ok((await main().locator(".pc-top .sub").innerText()) === (me.riotId || "No Riot ID yet"), "search opens the player, with the Riot ID");
+  for (const l of ["Games played", "Win rate", "Papi Points", "Average K / D / A", "FF %", "Highest win streak"])
+    ok((await main().locator(".kpi .l", { hasText: l }).count()) === 1, `player: ${l}`);
+  ok((await main().getByRole("heading", { name: "Teammates" }).count()) === 1 && (await main().getByText("Victim", { exact: true }).count()) === 1, "player: teammates and opponents");
+  await shot("06b-player");
+  await main().locator(".sf-top").click();
+  await btn("2v2").click();
+  await main().locator(".sf-top b", { hasText: "2v2" }).waitFor();
+  ok(p.url().includes("mode=2"), "mode filter, kept in the link");
+  await main().getByRole("link", { name: "Leaderboard" }).click();
+  await main().locator(".sf-top b", { hasText: "2v2" }).waitFor();
+  ok(p.url().includes("mode=2"), "the filter stays when going back");
+  await p.goto(BASE + `/stats?player=${me.id}`);
+  await p.waitForURL(new RegExp(`/stats/${me.id}`));
+  ok((await h1()) === leader, "old link to a profile");
 
   step("Rivals");
   await p.goto(BASE + "/rivals");
@@ -254,7 +278,7 @@ const step = (s) => console.log(`\n${s}`);
   step("Helper, 404, hidden pages, keyboard, manifest");
   await p.goto(BASE + "/helper");
   ok((await h1()) === "Helper app" && !/Pending results/.test(await main().innerText()), "helper page");
-  for (const r of ["/does-not-exist", "/builds", "/stats/p0"]) {
+  for (const r of ["/does-not-exist", "/builds"]) {
     await p.goto(BASE + r);
     ok((await h1()) === "Lost on the bridge", `${r} doesn't exist`);
   }
@@ -266,7 +290,7 @@ const step = (s) => console.log(`\n${s}`);
 
   step("Phone layout");
   await p.setViewportSize({ width: 375, height: 780 });
-  for (const r of ["/", "/live", "/history", "/stats", "/rivals", "/players", "/helper"]) {
+  for (const r of ["/", "/live", "/history", "/stats", "/stats/p0", "/rivals", "/players", "/helper"]) {
     await p.goto(BASE + r);
     await p.waitForTimeout(250);
     ok((await overflow()) <= 0, `no sideways scrolling on ${r}`);

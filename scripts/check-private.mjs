@@ -17,7 +17,7 @@ const line = (name, closed, detail) => {
   console.log(`${closed ? "closed" : "OPEN  "}  ${name}  ${detail}`);
 };
 
-const TABLES = ["players", "matches", "match_participants", "dodge_log", "live_game", "live_feed", "live_state", "test_games", "settings", "members", "helper_tokens", "player_riot_ids", "pending_results"];
+const TABLES = ["players", "matches", "match_participants", "dodge_log", "live_game", "live_feed", "live_state", "test_games", "settings", "members", "helper_tokens", "player_riot_ids", "pending_results", "rerolls"];
 for (const t of TABLES) {
   const r = await fetch(`${url}/rest/v1/${t}?select=*&limit=1`, { headers });
   line(t, r.status === 401 || r.status === 403, `HTTP ${r.status}`);
@@ -31,6 +31,8 @@ const CALLS = {
   save_live_result: { p_live_id: "00000000-0000-0000-0000-000000000000", p_winner: "blue" },
   _save_live_game: { m: {}, p_known: false },
   _put_live: { p_version: -1, p_state: null, p_feed: null, p_clear: false, p_token: null },
+  player_profiles: {},
+  _log_reroll: { p_live_id: "check", p_size: 1, p_players: [] },
 };
 for (const [f, body] of Object.entries(CALLS)) {
   const r = await fetch(`${url}/rest/v1/rpc/${f}`, { method: "POST", headers, body: JSON.stringify(body) });

@@ -16,6 +16,8 @@ interface PartRow {
   deaths: number | null; assists: number | null; items: number[] | null; damage: number | null;
   level: number | null; spells: number[] | null; augments: number[] | null;
 }
+interface ProfileRow { player_id: string; avatar_url: string | null; display_name: string | null }
+interface RerollRow { at: string; size: number | null; players: string[] }
 interface DodgeRow { match_id: string; player_id: string | null; side: Side; champion: string; at: string }
 interface SettingsRow {
   dodge_hours: number | string; dodges_per_team: number; reroll_limit: number; challenges_enabled: boolean; discord_url: string;
@@ -131,7 +133,7 @@ export class SupabaseStore implements DataStore {
     }
     this.loading = (async () => {
       try {
-        const [players, riot, matches, parts, dodges, live, settings, feed] = await Promise.all([
+        const [players, riot, matches, parts, dodges, live, settings, feed, profiles, rerolls] = await Promise.all([
           this.all<PlayerRow>("players", "id,name,active,created_at", "created_at"),
           // Riot IDs are members-only: visitors are refused (on purpose), so treat that as "no Riot IDs".
           this.all<RiotRow>("player_riot_ids", "player_id,riot_id", "player_id").catch(() => [] as RiotRow[]),
@@ -141,6 +143,9 @@ export class SupabaseStore implements DataStore {
           this.sb.from("live_game").select("data").maybeSingle(),
           this.sb.from("settings").select("*").eq("id", 1).maybeSingle(),
           this.sb.from("live_feed").select("data").maybeSingle(),
+          // Both are newer than the site: without them the Stats page shows initials and no rerolls.
+          this.profiles(),
+          this.all<RerollRow>("rerolls", "at,size,players", "at").catch(() => [] as RerollRow[]),
         ]);
         if (live.error) throw live.error;
         if (settings.error) throw settings.error;
@@ -150,6 +155,12 @@ export class SupabaseStore implements DataStore {
         const tests = conf?.save_live_games === false ? await this.all<{ data: Match }>("test_games", "data", "created_at") : [];
         if (!this.allowed) return;
         const data = this.build(players, riot, matches, parts, dodges, live.data?.data ?? null, conf);
+        const pics = new Map(profiles.map((p) => [p.player_id, p]));
+        data.players = data.players.map((p) => {
+          const x = pics.get(p.id);
+          return x ? { ...p, ...(x.avatar_url ? { avatarUrl: x.avatar_url } : {}), ...(x.display_name ? { discordName: x.display_name } : {}) } : p;
+        });
+        data.rerolls = rerolls.map((r) => ({ at: ms(r.at), ...(r.size ? { size: r.size } : {}), players: r.players ?? [] }));
         const known = new Set(data.matches.map((m) => m.gameId));
         for (const t of tests) if (!known.has(t.data.gameId)) data.matches.push(t.data);
         // A newer look at the live game may have arrived while this was loading.
@@ -172,6 +183,17 @@ export class SupabaseStore implements DataStore {
       }
     })();
     return this.loading;
+  }
+
+  /** Discord pictures and names of linked players. Nothing when the database doesn't have them yet. */
+  private async profiles(): Promise<ProfileRow[]> {
+    try {
+      const { data, error } = await this.sb.rpc("player_profiles");
+      if (error) return [];
+      return ((data ?? []) as ProfileRow[]).filter((p) => !p.avatar_url || p.avatar_url.startsWith("https://cdn.discordapp.com/"));
+    } catch {
+      return [];
+    }
   }
 
   private build(

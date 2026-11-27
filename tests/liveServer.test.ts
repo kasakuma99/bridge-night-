@@ -134,6 +134,31 @@ describe("the live server", () => {
     expect(s.shown).toMatchObject({ status: "ended" });
   });
 
+  it("a champ select that goes back to the lobby is a reroll, once, with the players who were in it", () => {
+    const s = server();
+    const sim = new Sim({ blue: rid("Tosh", "Samu"), red: rid("Nick", "Lenny") });
+    expect(s.send(sim.reading(T0), "a", T0).reroll).toBeUndefined();
+    const id = s.shown!.id;
+    const r = s.send(idle, "a", T0 + 2000).reroll;
+    expect(r).toEqual({ liveId: id, size: 2, players: expect.arrayContaining(["p0", "p1", "p2", "p3"]) });
+    expect(r!.players).toHaveLength(4);
+    expect(s.send(idle, "a", T0 + 4000).reroll).toBeUndefined();
+  });
+
+  it("a game that starts, or ends, is not a reroll", () => {
+    const s = server();
+    const sim = new Sim({ blue: rid("Tosh"), red: rid("Nick") });
+    s.send(sim.reading(T0), "a", T0);
+    sim.load();
+    expect(s.send(sim.reading(T0), "a", T0 + 2000).reroll).toBeUndefined();
+    sim.start();
+    sim.step(100);
+    s.send(sim.reading(T0), "a", T0 + 4000);
+    sim.finish("nexus");
+    s.send(sim.reading(T0), "a", T0 + 6000);
+    expect(s.send(idle, "a", T0 + 8000).reroll).toBeUndefined();
+  });
+
   it("nothing a helper sends can be too big or break the rules of the database", () => {
     const big: LiveFeed = {
       id: "x".repeat(500), gameId: "9".repeat(500), status: "playing", mode: "m".repeat(500), map: "m".repeat(500), startedAt: 0, updatedAt: 0,
