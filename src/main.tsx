@@ -1,13 +1,8 @@
 import { StrictMode, Suspense, lazy } from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter, Route, Routes } from "react-router-dom";
-import "@fontsource/outfit/500.css";
-import "@fontsource/outfit/600.css";
-import "@fontsource/outfit/700.css";
-import "@fontsource/plus-jakarta-sans/400.css";
-import "@fontsource/plus-jakarta-sans/500.css";
-import "@fontsource/plus-jakarta-sans/600.css";
-import "@fontsource/plus-jakarta-sans/700.css";
+// Headings: VT323 (the UI kit). Text is Tahoma / Verdana from the system.
+import "@fontsource/vt323/400.css";
 import "./index.css";
 import { AuthProvider, DataProvider, DDragonProvider, PrefsProvider } from "./data/context";
 import { ConfirmProvider, ToastProvider } from "./components/ui";

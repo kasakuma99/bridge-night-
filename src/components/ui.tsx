@@ -128,8 +128,8 @@ export function useConfirm() {
 
 /* ---------- avatars & icons ---------- */
 
-/** One colour per player, in roster order. */
-const PAL = ["#3b74d6", "#c8496a", "#2f9c86", "#8e63d2", "#c66a3a", "#4f9a3e", "#b8478f", "#3e8db8", "#a3633f", "#6d6fd8", "#5f8f2f", "#b5546a"];
+/** One colour per player, in roster order. Earthy tones that sit on the olive kit (no purple). */
+const PAL = ["#6b7d3a", "#9a5b34", "#3f7a6a", "#8a7a2a", "#5d6f86", "#7a4a3a", "#4f7f3f", "#8c6a3e", "#476a7a", "#7d5d2a", "#5a7a55", "#8a4f45"];
 const hue = (s: string) => {
   let h = 0;
   for (const c of s) h = (h * 31 + c.charCodeAt(0)) % 360;
@@ -149,7 +149,7 @@ export function usePlayerColor() {
   const { data } = useData();
   return (id: string) => {
     const i = data.players.findIndex((p) => p.id === id);
-    return i >= 0 ? PAL[i % PAL.length] : "#4a5563";
+    return i >= 0 ? PAL[i % PAL.length] : "#5a6a50";
   };
 }
 
@@ -168,7 +168,7 @@ export function ChampAvatar({ name, sq, size }: { name: string; sq?: boolean; si
   const [broken, setBroken] = useState(false);
   const champ = dd.champions.find((c) => c.name === name);
   const src = champ ? champIcon(dd.version, champ.id) : null;
-  const style = { background: `hsl(${hue(name)} 35% 30%)`, ...(size ? { width: size, height: size, fontSize: size * 0.36 } : {}) };
+  const style = { background: `hsl(${20 + (hue(name) % 130)} 30% 28%)`, ...(size ? { width: size, height: size, fontSize: size * 0.36 } : {}) };
   return (
     <span className={`ava${sq ? " sq" : ""}`} style={style} aria-hidden>
       {src && !broken ? <img src={src} alt="" loading="lazy" onError={() => setBroken(true)} /> : initials(name)}
@@ -242,9 +242,9 @@ export function Form({ id, n }: { id: string; n: number }) {
 export function Logo({ size = 30 }: { size?: number }) {
   return (
     <svg viewBox="0 0 32 32" aria-hidden style={{ width: size, height: size }}>
-      <rect x="1" y="1" width="30" height="30" rx="9" fill="#18202a" stroke="#313d4b" />
-      <path d="M6 22h20M9 22v-6l7-6 7 6v6" fill="none" stroke="#bfe6ff" strokeWidth="2.2" strokeLinejoin="round" />
-      <circle cx="16" cy="17" r="2.4" fill="#ff5a6e" />
+      <rect x="1" y="1" width="30" height="30" fill="#3e4637" stroke="#8c9880" />
+      <path d="M6 22h20M9 22v-6l7-6 7 6v6" fill="none" stroke="#c4b550" strokeWidth="2.2" strokeLinejoin="round" />
+      <rect x="14" y="15" width="4" height="4" fill="#e07a64" />
     </svg>
   );
 }

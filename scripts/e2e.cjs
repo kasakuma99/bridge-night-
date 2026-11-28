@@ -51,13 +51,13 @@ const step = (s) => console.log(`\n${s}`);
   for (const r of ["/", "/live", "/history", "/stats", "/rivals", "/players", "/helper", "/does-not-exist"]) {
     await p.goto(BASE + r);
     await p.getByText("This site is private").waitFor();
-    ok((await p.locator("nav.tabs a").count()) === 0 && !/Samu|Lenny|Artur/.test(await p.locator("#root").innerText()), `${r} shows only the login`);
+    ok((await p.locator("nav.k-tabs a").count()) === 0 && !/Samu|Lenny|Artur/.test(await p.locator("#root").innerText()), `${r} shows only the login`);
   }
   await shot("00-login");
   await p.goto(BASE + "/");
   await btn("Log in with Discord").click();
-  await p.locator("nav.tabs a").first().waitFor();
-  ok((await p.locator("nav.tabs a").allInnerTexts()).join() === "Teams,Live,Past games,Stats,Rivals,Players", "menu after logging in");
+  await p.locator("nav.k-tabs a").first().waitFor();
+  ok((await p.locator("nav.k-tabs a").allInnerTexts()).join() === "Teams,Live,Past games,Stats,Rivals,Players,Arcade", "menu after logging in");
   await p.locator(".qol-acct-btn").click();
   ok(await p.locator(".qol-acct-pop").getByText("Log out").isVisible(), "account menu");
   await p.keyboard.press("Escape");
@@ -129,7 +129,7 @@ const step = (s) => console.log(`\n${s}`);
   await main().locator("h1", { hasText: "Champ Select" }).waitFor();
   const champIcons = () => main().locator('.ava.sq:not(.unknown) img, img.ava.sq').count();
   ok((await main().innerText()).includes("Champions show up on the loading screen"), "no champions in champ select");
-  ok((await p.locator("nav.tabs .live-dot").count()) === 1, "red dot on the Live tab");
+  ok((await p.locator("nav.k-tabs .live-dot").count()) === 1, "red dot on the Live tab");
   await btn("2. Loading screen").click();
   await main().getByText("Loading screen", { exact: true }).first().waitFor();
   ok((await h1()) === "In Game", "loading screen");
@@ -147,8 +147,9 @@ const step = (s) => console.log(`\n${s}`);
   await btn("Augments arrive").click();
   await p.waitForTimeout(800);
   await shot("04-ended");
-  ok((await p.locator("nav.tabs .live-dot").count()) === 0, "the dot is gone");
+  ok((await p.locator("nav.k-tabs .live-dot").count()) === 0, "the dot is gone");
   await main().getByRole("link", { name: "Past games" }).first().click();
+  await main().locator("h1", { hasText: "Past games" }).waitFor();
   ok((await h1()) === "Past games" && (await main().locator(".match").count()) === 1, "saved in Past games");
 
   step("Live: no winner, a member decides");

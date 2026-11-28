@@ -1,0 +1,108 @@
+/* Old Steam UI kit (lenny-ui-kit): the window, tabs, sidebar, lists and XP taskbar that frame every page.
+   Rules (UI-KIT.md): only the kit tokens (in index.css), square corners (only the taskbar is rounded), no gradients
+   except the taskbar, no glows, blur or hover motion, VT323 for headings, 11px Tahoma for text, etched lines between
+   sections, at most one .k-box ("window") per page for the special thing.
+   Layout.tsx draws the chrome; pages use the k- primitives below or the restyled shared classes in index.css.
+   Unlayered on purpose, like stats.css. */
+
+/* ---------- window ---------- */
+.k-win { max-width: 1180px; margin: 24px auto 0; background: var(--k-olive); border: 1px solid; border-color: var(--k-raised); box-shadow: 0 0 0 1px #000; }
+.k-title { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 4px 8px; font: bold 11px var(--k-body); color: var(--k-dim); text-transform: uppercase; letter-spacing: .08em; }
+.k-ctrls { display: flex; align-items: center; gap: 6px; color: var(--k-text); }
+.k-ctrl { display: inline-grid; place-items: center; min-width: 16px; height: 16px; padding: 0 4px; border: 1px solid; border-color: var(--k-raised); background: var(--k-olive); color: var(--k-text); font: bold 10px/1 var(--k-body); text-transform: none; letter-spacing: 0; text-decoration: none; cursor: pointer; }
+.k-ctrl:hover { background: var(--k-olive-light); color: #fff; }
+.k-ctrl:active, .k-ctrl[aria-pressed="true"] { border-color: var(--k-sunken); }
+.k-inner { padding: 8px 32px 32px; }
+.k-inner > main { outline: 0; }
+
+/* text links: white and underlined, visited goes grey-beige */
+.k-link, .k-inner p a:not(.btn), .k-inner li a:not(.btn):not(.lbrow), .k-inner td a:not(.btn), .k-inner .sub a, .k-inner .note a { color: var(--k-link); text-decoration: underline; }
+.k-link:visited, .k-inner p a:not(.btn):visited, .k-inner td a:not(.btn):visited { color: var(--k-visited); }
+.k-link:hover, .k-inner p a:not(.btn):hover, .k-inner td a:not(.btn):hover { color: var(--k-accent); }
+
+.k-h1, .k-h2 { margin: 0; font-family: var(--k-head); font-weight: normal; line-height: 1; letter-spacing: 0; }
+.k-h1 { font-size: 44px; color: #fff; }
+.k-h2 { font-size: var(--k-big); color: var(--k-accent); margin-bottom: 12px; }
+.k-h3 { margin: 0 0 8px; font: bold var(--k-small) var(--k-body); text-transform: uppercase; letter-spacing: .1em; color: var(--k-accent); }
+.k-h3 .k-dim { font-weight: normal; }
+.k-dim { margin: 0; color: var(--k-dim); }
+
+/* etched line: a dark line with a light line under it */
+.k-sep { height: 0; margin: 28px 0; border: 0; border-top: 1px solid var(--k-lo); border-bottom: 1px solid var(--k-olive-light); }
+
+/* ---------- header: globe, site name, one line, account ---------- */
+.k-head { display: flex; align-items: center; gap: 18px; padding: 8px 0 20px; }
+.k-globe { flex: none; }
+.k-headtext { min-width: 0; }
+.k-headtext p { margin: 6px 0 0; max-width: 60ch; color: var(--k-dim); }
+.k-headtext a { text-decoration: none; color: inherit; }
+.k-acct { margin-left: auto; align-self: flex-start; }
+.k-acct .btn { min-height: 0; padding: 2px 10px; gap: 6px; }
+.k-acct .btn svg { width: 12px; height: 12px; }
+.k-acct .qol-face { width: 16px !important; height: 16px !important; }
+
+/* ---------- tabs, like Store | Library | Community ---------- */
+.k-tabs { display: flex; gap: 3px; overflow-x: auto; scrollbar-width: none; border-bottom: 1px solid var(--k-lo); }
+.k-tabs::-webkit-scrollbar { display: none; }
+.k-tabs a { flex: none; display: inline-flex; align-items: center; gap: 6px; padding: 3px 14px; background: var(--k-olive-dark); border: 1px solid; border-color: var(--k-hi) var(--k-lo) transparent var(--k-hi); border-bottom: 0; color: var(--k-text); text-decoration: none; }
+.k-tabs a:hover { background: var(--k-olive-light); color: #fff; }
+.k-tabs a.active { background: var(--k-olive); color: var(--k-accent); margin-bottom: -1px; padding-bottom: 4px; }
+.k-page { padding-top: 24px; }
+
+/* ---------- two columns: 180px sidebar + content ---------- */
+.k-layout { display: grid; grid-template-columns: 180px minmax(0, 1fr); gap: 32px; }
+.k-main { min-width: 0; }
+.k-side { align-self: start; min-width: 0; padding: 14px 14px 10px; background: var(--k-olive-dark); border: 1px solid; border-color: var(--k-sunken); }
+.k-side .k-sep { margin: 14px -14px; }
+.k-group { margin-bottom: 4px; }
+.k-stats { width: 100%; border-collapse: collapse; }
+.k-stats td { padding: 3px 0; }
+.k-stats td:last-child { text-align: right; }
+.k-counter { padding: 0 4px; background: #000; color: var(--k-accent); font: bold 12px "Courier New", monospace; letter-spacing: 2px; }
+
+/* ---------- steam game list ---------- */
+.k-list { width: 100%; border-collapse: collapse; background: var(--k-olive-dark); border: 1px solid; border-color: var(--k-sunken); }
+.k-list th { padding: 4px 8px; text-align: left; font-weight: normal; color: var(--k-dim); background: var(--k-olive); border-bottom: 1px solid var(--k-lo); }
+.k-list td { padding: 5px 8px; vertical-align: top; }
+.k-list tbody tr:hover td { background: var(--k-olive-light); }
+.k-list .date { color: var(--k-dim); white-space: nowrap; width: 1%; }
+.k-blurb { display: block; color: var(--k-dim); }
+
+/* ---------- the one special window per page ---------- */
+.k-box { background: var(--k-olive); border: 1px solid; border-color: var(--k-raised); box-shadow: 0 0 0 1px #000, 4px 4px 0 rgba(0, 0, 0, .35); }
+.k-box .k-title { color: var(--k-text); text-transform: none; letter-spacing: 0; }
+.k-boxbody { padding: 6px 10px 10px; }
+.k-screen { display: grid; place-items: center; min-height: 140px; background: #000; color: var(--k-dim); border: 1px solid; border-color: var(--k-sunken); image-rendering: pixelated; }
+.k-note { margin: 8px 0 0; }
+
+/* ---------- footer ---------- */
+.k-foot { padding: 0; border: 0; font-size: var(--k-small); color: var(--k-dim); }
+.k-foot p { margin: 0 0 6px; max-width: 80ch; }
+.k-foot nav { display: flex; flex-wrap: wrap; gap: 4px 14px; margin-bottom: 8px; }
+.k-badges { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.k-badge { display: grid; place-items: center; width: 88px; height: 31px; background: #000; border: 1px solid var(--k-olive-light); color: var(--k-accent); font: bold 9px/1.1 var(--k-body); text-align: center; }
+
+/* ---------- XP taskbar (the only rounded, gradient thing) ---------- */
+body { padding-bottom: 30px; }
+.k-taskbar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 30; display: flex; height: 30px; font: 11px Tahoma, sans-serif; background: linear-gradient(180deg, #1f2f86 0, #3165c4 3%, #3682e5 6%, #4490e6 10%, #3883e5 12%, #2b71e0 15%, #2663da 18%, #235bd6 20%, #2157d6 38%, #245ddb 54%, #2562df 86%, #2158d4 92%, #1941a5 98%); }
+.k-start { display: flex; align-items: center; gap: 6px; padding: 0 20px 0 10px; border-radius: 0 10px 10px 0; background: linear-gradient(180deg, #3c9a3c, #56c156 8%, #3fa83f 40%, #2f8f2f 85%, #276f27); color: #fff; font: italic bold 16px "Trebuchet MS", sans-serif; text-shadow: 1px 1px 2px rgba(0, 0, 0, .6); text-decoration: none; }
+.k-start::before { content: ""; width: 14px; height: 14px; background: linear-gradient(#ff9a3c, #ff9a3c) 0 0 / 6px 6px no-repeat, linear-gradient(#7a95ff, #7a95ff) 8px 0 / 6px 6px no-repeat, linear-gradient(#3fd1a1, #3fd1a1) 0 8px / 6px 6px no-repeat, linear-gradient(#ffd86b, #ffd86b) 8px 8px / 6px 6px no-repeat; }
+.k-start:focus-visible, .k-task:focus-visible { outline: 1px dotted #fff; outline-offset: -3px; }
+.k-tasks { flex: 1; display: flex; gap: 3px; min-width: 0; padding: 3px 6px; }
+.k-task { display: flex; align-items: center; width: 150px; min-width: 0; padding: 0 8px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; border-radius: 2px; background: #3c81f3; color: #fff; text-decoration: none; }
+.k-task:hover { background: #53a3ff; }
+.k-task.active { background: #1e52b7; box-shadow: inset 1px 1px 2px rgba(0, 0, 0, .5); }
+.k-tray { display: flex; align-items: center; padding: 0 12px; border-left: 1px solid #092e8a; background: linear-gradient(180deg, #0c59b9, #18b5f2 10%, #1290e8 19%, #0d8dea 63%, #0f9eed 88%, #095bc9); color: #fff; white-space: nowrap; }
+
+@media (max-width: 700px) {
+  .k-win { margin: 0; border-left: 0; border-right: 0; }
+  .k-inner { padding: 8px 16px 24px; }
+  .k-head { gap: 10px; padding-bottom: 14px; }
+  .k-globe { width: 48px !important; height: 48px !important; }
+  .k-h1 { font-size: 34px; }
+  .k-headtext p { display: none; }
+  .k-acct { align-self: center; }
+  .k-layout { grid-template-columns: minmax(0, 1fr); gap: 24px; }
+  .k-layout > .k-side { order: 2; }
+  .k-task { width: auto; }
+}

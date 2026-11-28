@@ -1,5 +1,5 @@
 /* Quality-of-life bits: login popup, account menu, offline + update notices, 404 page.
-   Uses the design tokens from index.css. */
+   Old Steam UI kit look (tokens in index.css). */
 
 /* ---------- dialogs ---------- */
 /* Tailwind's reset sets margin: 0 on everything, which pins modal dialogs to the top-left corner. Centre them again
@@ -8,17 +8,15 @@ dialog.modal:modal { margin: auto; }
 
 /* ---------- login popup ---------- */
 dialog.qol-login { max-width: 440px; }
-.qol-login .panel { padding: 28px 24px 22px; text-align: center; display: grid; gap: 10px; box-shadow: 0 24px 60px rgba(0, 0, 0, .5); }
-.qol-login-logo { display: grid; place-items: center; width: 72px; height: 72px; margin: 0 auto 6px; border-radius: var(--radius-xl); background: var(--color-s2); border: 1px solid var(--color-line2); }
-.qol-login h2 { font-size: var(--text-xl); }
+.qol-login .panel { padding: 20px 20px 16px; text-align: center; display: grid; gap: 8px; }
+.qol-login-logo { display: grid; place-items: center; width: 64px; height: 64px; margin: 0 auto 6px; background: #000; border: 1px solid; border-color: var(--k-sunken); }
 .qol-login .sub { margin: 0 auto; max-width: 34ch; }
 .qol-login-acts { display: grid; gap: 10px; margin-top: 12px; }
 .qol-login .note { margin: 4px 0 0; }
 
 /* ---------- private site: log in, wait, no access ---------- */
-.qol-gate { display: grid; place-items: center; min-height: 60vh; }
-.qol-gate .panel { width: min(100%, 440px); padding: 28px 24px 22px; text-align: center; display: grid; gap: 10px; }
-.qol-gate h1 { font-size: var(--text-xl); }
+.qol-gate { display: grid; place-items: center; min-height: 40vh; }
+.qol-gate .panel { width: min(100%, 440px); padding: 20px 20px 16px; text-align: center; display: grid; gap: 8px; background: var(--k-olive); border-color: var(--k-raised); box-shadow: 0 0 0 1px #000, 4px 4px 0 rgba(0, 0, 0, .35); }
 .qol-gate .sub { margin: 0 auto; max-width: 36ch; }
 .qol-gate .note { margin: 4px 0 0; }
 .qol-gate .qol-login-logo > svg { width: 32px; height: 32px; }
@@ -27,7 +25,7 @@ dialog.qol-login { max-width: 440px; }
 .prow.mem { grid-template-columns: auto minmax(0, 1fr) minmax(110px, 150px) auto auto; }
 .prow.mem select.f { min-width: 0; width: 100%; }
 .blocked { margin-top: 12px; }
-.blocked summary { cursor: pointer; color: var(--color-mute); font-size: 14px; font-weight: 600; }
+.blocked summary { cursor: pointer; color: var(--k-dim); }
 @media (max-width: 640px) {
   .prow.mem { grid-template-columns: auto minmax(0, 1fr) auto auto; }
   .prow.mem select.f { grid-column: 2 / -1; grid-row: 2; }
@@ -35,37 +33,38 @@ dialog.qol-login { max-width: 440px; }
 
 /* ---------- account menu ---------- */
 .qol-acct { position: relative; flex: none; }
-.qol-acct-btn { padding-left: 6px; gap: 8px; }
-.qol-acct-btn[aria-expanded="true"] { background: var(--color-s2); }
-.qol-face { display: inline-grid; place-items: center; flex: none; border-radius: 999px; object-fit: cover; background: var(--color-s3); color: var(--color-ink); font: 700 12px var(--font-disp); }
+.qol-acct-btn { padding-left: 3px; gap: 6px; }
+.qol-acct-btn[aria-expanded="true"] { border-color: var(--k-sunken); background: var(--k-olive-dark); }
+.qol-face { display: inline-grid; place-items: center; flex: none; object-fit: cover; background: var(--k-olive-light); color: var(--k-text); border: 1px solid #000; font: bold 9px var(--k-body); }
 .qol-acct-name { max-width: 14ch; overflow: hidden; text-overflow: ellipsis; }
-.btn svg.qol-chev { width: 16px; height: 16px; color: var(--color-mute); transition: transform .15s; }
+.btn svg.qol-chev { width: 11px; height: 11px; color: var(--k-dim); }
 .qol-acct-btn[aria-expanded="true"] .qol-chev { transform: rotate(180deg); }
-.qol-acct-pop { position: absolute; right: 0; top: calc(100% + 8px); z-index: 10; width: max-content; min-width: 240px; max-width: min(320px, calc(100vw - 32px)); padding: 10px; display: grid; gap: 4px; box-shadow: 0 16px 40px rgba(0, 0, 0, .45); animation: pop .18s var(--ease-out) both; }
-.qol-acct-who { display: flex; gap: 12px; align-items: center; padding: 6px 6px 12px; margin-bottom: 4px; border-bottom: 1px solid var(--color-line); }
+.qol-acct-pop { position: absolute; right: 0; top: calc(100% + 4px); z-index: 10; width: max-content; min-width: 220px; max-width: min(320px, calc(100vw - 32px)); padding: 6px; display: grid; gap: 2px; background: var(--k-olive); border-color: var(--k-raised); box-shadow: 0 0 0 1px #000, 4px 4px 0 rgba(0, 0, 0, .35); }
+.qol-acct-who { display: flex; gap: 10px; align-items: center; padding: 4px 4px 8px; margin-bottom: 4px; border-bottom: 1px solid var(--k-lo); }
 .qol-acct-who b { display: block; overflow-wrap: anywhere; }
-.qol-acct-who .sub { display: block; margin: 0; font-size: var(--text-sm); }
+.qol-acct-who .sub { display: block; margin: 0; }
 .qol-acct-pop .btn { justify-content: flex-start; width: 100%; border-color: transparent; }
+.qol-acct-pop .btn:hover:not([disabled]) { background: var(--k-select); }
 
 /* ---------- offline + new version ---------- */
-.qol-offline { margin: 14px 0 0; display: flex; gap: 10px; align-items: center; padding: 10px 14px; font-size: 14px; border-radius: var(--radius-md); background: color-mix(in srgb, var(--color-gold) 10%, var(--color-s1)); border: 1px solid color-mix(in srgb, var(--color-gold) 40%, transparent); }
-.qol-offline svg { width: 18px; height: 18px; flex: none; color: var(--color-gold); }
-.qol-update { position: fixed; right: 24px; bottom: 24px; z-index: 30; display: flex; gap: 12px; align-items: center; padding: 10px 10px 10px 16px; font-weight: 600; background: var(--color-s2); border: 1px solid var(--color-line2); border-radius: var(--radius-lg); box-shadow: 0 16px 40px rgba(0, 0, 0, .45); animation: pop .25s var(--ease-out) both; }
-.qol-update > svg { width: 18px; height: 18px; flex: none; color: var(--color-ice); }
+.qol-offline { margin: 0 0 14px; display: flex; gap: 8px; align-items: center; padding: 6px 12px; background: var(--k-olive-dark); border: 1px solid; border-color: var(--k-sunken); border-left: 3px solid var(--k-accent); }
+.qol-offline svg { width: 14px; height: 14px; flex: none; color: var(--k-accent); }
+.qol-update { position: fixed; right: 16px; bottom: 42px; z-index: 40; display: flex; gap: 10px; align-items: center; padding: 6px 6px 6px 12px; font-weight: bold; background: var(--k-olive); border: 1px solid; border-color: var(--k-raised); box-shadow: 0 0 0 1px #000, 4px 4px 0 rgba(0, 0, 0, .35); }
+.qol-update > svg { width: 14px; height: 14px; flex: none; color: var(--k-accent); }
 
 /* ---------- 404 ---------- */
 .qol-nf { display: grid; justify-items: center; gap: 12px; text-align: center; padding: 40px 0 16px; }
-.qol-nf-code { margin: 0 0 4px; font-size: clamp(96px, 20vw, 168px); font-weight: 700; line-height: .9; letter-spacing: -.05em; color: var(--color-ice); }
+.qol-nf-code { margin: 0 0 4px; font: clamp(96px, 20vw, 160px)/.9 var(--k-head); color: var(--k-accent); }
 .qol-nf .sub { max-width: 46ch; }
-.qol-nf-path { color: var(--color-ink); overflow-wrap: anywhere; }
+.qol-nf-path { color: var(--k-text); overflow-wrap: anywhere; }
 .qol-nf-acts { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; margin-top: 10px; }
-.qol-nf-links { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px 22px; margin-top: 18px; font-size: 14px; color: var(--color-mute); }
-.qol-nf-links a { text-decoration: none; padding: 6px 2px; }
-.qol-nf-links a:hover { color: var(--color-ink); text-decoration: underline; text-underline-offset: 4px; }
+.qol-nf-links { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px 18px; margin-top: 14px; color: var(--k-dim); }
+.qol-nf-links a { color: var(--k-link); text-decoration: underline; padding: 2px; }
+.qol-nf-links a:hover { color: var(--k-accent); }
 
 @media (max-width: 640px) {
   .qol-acct-name, .btn svg.qol-chev { display: none; }
-  .qol-acct-btn { padding: 0 6px; }
-  .qol-update { left: 16px; right: 16px; bottom: auto; top: 12px; }
+  .qol-acct-btn { padding: 0 4px; }
+  .qol-update { left: 16px; right: 16px; }
   .qol-update span { flex: 1; }
 }

@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import type { MinigameProps } from "../types";
 import { ITEMS, ROOMS, boss, buy, nearShop, newRun, roomClear, score, step, type Input, type State } from "./logic";
+import { Chiptune, loadAudioPref, type Sfx } from "./music";
 import type { ChumsView } from "./scene";
 import "./chums.css";
 
@@ -38,6 +39,8 @@ const hudOf = (s: State): Hud => {
     score: score(s),
   };
 };
+
+const SFX = new Set<string>(["shoot", "hit", "kill", "hurt", "coin", "door", "reload", "buy", "blast"]);
 
 const KEYS: Record<string, [number, number]> = { w: [0, -1], a: [-1, 0], s: [0, 1], d: [1, 0], arrowup: [0, -1], arrowleft: [-1, 0], arrowdown: [0, 1], arrowright: [1, 0] };
 
@@ -113,6 +116,9 @@ export default function ChumsRevenge({ onScore, onExit, onPlay }: MinigameProps)
         <li>
           <kbd>Esc</kbd> pause
         </li>
+        <li>
+          <kbd>M</kbd> music on / off
+        </li>
       </ul>
       <p className="arc-chums-note">Needs a keyboard and mouse.</p>
       <div className="arc-chums-row">
@@ -139,12 +145,35 @@ function Play({ onOver, onQuit }: { onOver: (s: State) => void; onQuit: () => vo
   const [shop, setShop] = useState(false);
   const [paused, setPaused] = useState(false);
   const [failed, setFailed] = useState<string | null>(null);
+  const audio = useRef<Chiptune | null>(null);
+  const [sound, setSound] = useState(loadAudioPref);
   const shopRef = useRef(shop);
   shopRef.current = shop;
   const halt = useRef(false);
   halt.current = shop || paused;
   const over = useRef(onOver);
   over.current = onOver;
+
+  // Music and sound effects (Web Audio). The Start click already counts as the click browsers want before sound.
+  useEffect(() => {
+    let a: Chiptune | null = null;
+    try {
+      a = new Chiptune();
+      a.resume();
+      a.play("main");
+    } catch {
+      a = null; // no Web Audio: play without sound
+    }
+    audio.current = a;
+    return () => {
+      a?.dispose();
+      audio.current = null;
+    };
+  }, []);
+  useEffect(() => {
+    if (paused) audio.current?.pause();
+    else audio.current?.resume();
+  }, [paused]);
 
   // three.js is big: load it only when a run starts.
   useEffect(() => {
@@ -191,11 +220,24 @@ function Play({ onOver, onQuit }: { onOver: (s: State) => void; onQuit: () => vo
             const input: Input = { mx: Math.sign(mx), my: Math.sign(my), ax: aim.x, ay: aim.y, fire: mouse.current.down, reload: reloadPress.current };
             reloadPress.current = false;
             step(s, input, dt);
+            const a = audio.current;
+            if (a) {
+              for (const ev of new Set(s.events)) if (SFX.has(ev)) a.sfx(ev as Sfx);
+              if (s.events.includes("boss")) a.play("boss");
+              if (s.phase !== "play") {
+                a.stopMusic(s.phase === "won" ? 0.4 : 0.8);
+                a.sfx(s.phase === "won" ? "win" : "lose");
+              }
+            }
             if (s.phase !== "play") {
               ended = true;
               setTimeout(() => live && over.current(s), 1200);
             }
-          } else s.events = [];
+          } else {
+            // Buying happens while the loop is halted: play its sounds here.
+            if (audio.current) for (const ev of new Set(s.events)) if (SFX.has(ev)) audio.current.sfx(ev as Sfx);
+            s.events = [];
+          }
           v.render(s, halt.current ? 0 : Math.min(dt, 0.05));
           if (now - hudAt > 80) {
             hudAt = now;
@@ -234,6 +276,14 @@ function Play({ onOver, onQuit }: { onOver: (s: State) => void; onQuit: () => vo
           mouse.current.down = false;
         }
         e.preventDefault();
+        return;
+      }
+      if (k === "m") {
+        const a = audio.current;
+        if (a) {
+          a.toggleMute();
+          setSound({ volume: a.volume, muted: a.muted });
+        }
         return;
       }
       if (k === "r") reloadPress.current = true;
@@ -288,6 +338,7 @@ function Play({ onOver, onQuit }: { onOver: (s: State) => void; onQuit: () => vo
           onPointerDown={(e) => {
             pointer(e);
             if (e.button === 0) mouse.current.down = true;
+            audio.current?.resume();
             canvas.current?.focus({ preventScroll: true });
           }}
           onPointerUp={() => (mouse.current.down = false)}
@@ -297,12 +348,44 @@ function Play({ onOver, onQuit }: { onOver: (s: State) => void; onQuit: () => vo
           aria-label="Chum's Revenge game screen"
         />
         <HudView hud={hud} />
+        <button
+          type="button"
+          className="arc-chums-mute"
+          onClick={(e) => {
+            e.currentTarget.blur();
+            const a = audio.current;
+            if (!a) return;
+            a.resume();
+            a.toggleMute();
+            setSound({ volume: a.volume, muted: a.muted });
+          }}
+          aria-pressed={sound.muted}
+          title="Music on / off (M)"
+        >
+          {sound.muted ? "♪ off" : "♪ on"}
+        </button>
         {hud.shop && !shop && <p className="arc-chums-hint">Press E for the vending machine</p>}
         {hud.clear && hud.room < ROOMS.length - 1 && !hud.shop && <p className="arc-chums-hint">Room clear · door is open ▸</p>}
         {shop && <Shop state={game.current} onClose={() => setShop(false)} onChange={() => setHud(hudOf(game.current))} />}
         {paused && !shop && (
           <div className="arc-chums-overlay">
             <h3>Paused</h3>
+            <label className="arc-chums-vol">
+              Volume
+              <input
+                type="range"
+                min={0}
+                max={100}
+                value={Math.round(sound.volume * 100)}
+                onChange={(e) => {
+                  const a = audio.current;
+                  if (!a) return;
+                  a.setVolume(Number(e.target.value) / 100);
+                  if (a.muted) a.toggleMute();
+                  setSound({ volume: a.volume, muted: a.muted });
+                }}
+              />
+            </label>
             <div className="arc-chums-row">
               <button className="btn pri" onClick={() => setPaused(false)} autoFocus>
                 Resume
